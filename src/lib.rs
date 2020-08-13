@@ -14,7 +14,7 @@ use gfa::parser::parse_gfa;
 
 /// Convert a GFA to a biedged graph if file exists
 /// otherwise return None
-fn gfa_to_biedged_graph(path : &PathBuf) -> Option<UnGraphMap::<u64, String>> {
+fn gfa_to_biedged_graph(path : &PathBuf) -> Option<(UnGraphMap::<u64, String>,Vec<String>,Vec<String>)> {
     if let Some(gfa) = parse_gfa(path) {
         let graph = HashGraph::from_gfa(&gfa);
         Some(handlegraph_to_biedged_graph(&graph))
@@ -24,7 +24,7 @@ fn gfa_to_biedged_graph(path : &PathBuf) -> Option<UnGraphMap::<u64, String>> {
 }
 
 /// Convert a handlegraph to a biedged graph
-fn handlegraph_to_biedged_graph(graph: &HashGraph) -> UnGraphMap::<u64, String> {
+fn handlegraph_to_biedged_graph(graph: &HashGraph) -> (UnGraphMap::<u64, String>, Vec<String>, Vec<String>) {
     let mut biedged : UnGraphMap::<u64, String> = UnGraphMap::new();
 
     // Create queue
@@ -41,6 +41,10 @@ fn handlegraph_to_biedged_graph(graph: &HashGraph) -> UnGraphMap::<u64, String> 
 
     // Insert first value
     q.push_back(node_id);
+
+    //Store black and grey edges
+    let mut black_edges : Vec<String> = Vec::new();
+    let mut gray_edges : Vec<String> = Vec::new();
 
     while let Some(curr_node) = q.pop_front() {
 
@@ -59,7 +63,11 @@ fn handlegraph_to_biedged_graph(graph: &HashGraph) -> UnGraphMap::<u64, String> 
         
         // The two nodes are connected
         let id_edge = format!("B: {}",current_handle.unpack_number());
+        let edge = id_edge.clone();
         biedged.add_edge(node_1, node_2, id_edge);
+
+        // Add edge to black edges
+        black_edges.push(edge);
 
         // Look for neighbors in the Handlegraph, add edges in the biedged graph
         for neighbor in handle_edges_iter(graph, current_handle, Direction::Right) {
@@ -68,8 +76,12 @@ fn handlegraph_to_biedged_graph(graph: &HashGraph) -> UnGraphMap::<u64, String> 
             let neighbor_node_biedged = biedged.add_node(neighbor.as_integer());
 
             // Add edge from neighbor to 
-            let id_edge = format!("G:{}->{}",curr_node, neighbor.id());
+            let id_edge = format!("G: {}->{}",curr_node, neighbor.id());
+            let edge = id_edge.clone();
             biedged.add_edge(node_2, neighbor_node_biedged, id_edge);
+
+            // Add edge to gray edges
+            gray_edges.push(edge.clone());
 
             // Add to queue
             q.push_back(neighbor.id());
@@ -78,7 +90,7 @@ fn handlegraph_to_biedged_graph(graph: &HashGraph) -> UnGraphMap::<u64, String> 
         visited_nodes.insert(curr_node);
     }
 
-    biedged
+    (biedged,black_edges,gray_edges)
 }
 
 #[cfg(test)]
@@ -91,7 +103,7 @@ mod tests {
         let path = PathBuf::from("./input/samplePath3.gfa");
         let graph = HashGraph::from_gfa(&parse_gfa(&path).unwrap());
         let biedged = gfa_to_biedged_graph(&path).unwrap();
-        println!("{:?}", Dot::with_config(&biedged, &[Config::EdgeNoLabel]));
+        println!("{:?}", Dot::with_config(&biedged.0, &[Config::EdgeNoLabel]));
         println!("{:?}", graph);
     }
 
@@ -102,7 +114,9 @@ mod tests {
         let h2 = graph.append_handle("c");
         graph.create_edge(&Edge(h1,h2));
         let biedged = handlegraph_to_biedged_graph(&graph);
-        println!("{:#?}", Dot::with_config(&biedged, &[Config::NodeNoLabel]));
+        println!("{:#?}", Dot::with_config(&biedged.0, &[Config::NodeNoLabel]));
+        println!("Black edges: {:#?}", biedged.1);
+        println!("Gray edges: {:#?}", biedged.2);
         //println!("Biedged {:#?}",Dot::new(&biedged));
 
         println!();
