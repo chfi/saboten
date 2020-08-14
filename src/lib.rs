@@ -12,9 +12,46 @@ use std::path::PathBuf;
 
 use gfa::parser::parse_gfa;
 
+// Traits
+trait GraphInternals {
+    // Node functions
+    fn add_node(&mut self, id: u64);
+    fn remove_node(&mut self, id: u64);
+
+    // Edge functions
+    fn add_edge(&mut self, from: u64, to: u64, edge_type: BiedgedEdge);
+    fn remove_edge(&mut self, from: u64, to: u64);
+    fn remove_edge_with_type(&mut self, from: u64, to: u64, edge_type: BiedgedEdge);
+    
+    fn get_gray_edges(&self) -> Vec<BiedgedEdge>;
+    fn get_black_edges(&self) -> Vec<BiedgedEdge>;
+}
+
+enum BiedgedEdgeType {
+    Black,
+    Gray,
+}
+// An edge of the biedged graph
+#[derive(Debug)]
+struct BiedgedEdge {
+    from : u64,
+    to : u64,
+    //edge_type : BiedgedEdgeType
+}
+
+/// Biedged graph class
+struct BiedgedGraph {
+    graph : UnGraphMap::<u64, String>,
+    black_edges : Vec<BiedgedEdge>,
+    gray_edges : Vec<BiedgedEdge>
+}
+
+//TODO: continue OOP
+
+
 /// Convert a GFA to a biedged graph if file exists
 /// otherwise return None
-fn gfa_to_biedged_graph(path : &PathBuf) -> Option<(UnGraphMap::<u64, String>,Vec<String>,Vec<String>)> {
+fn gfa_to_biedged_graph(path : &PathBuf) -> Option<BiedgedGraph> {
     if let Some(gfa) = parse_gfa(path) {
         let graph = HashGraph::from_gfa(&gfa);
         Some(handlegraph_to_biedged_graph(&graph))
@@ -24,7 +61,7 @@ fn gfa_to_biedged_graph(path : &PathBuf) -> Option<(UnGraphMap::<u64, String>,Ve
 }
 
 /// Convert a handlegraph to a biedged graph
-fn handlegraph_to_biedged_graph(graph: &HashGraph) -> (UnGraphMap::<u64, String>, Vec<String>, Vec<String>) {
+fn handlegraph_to_biedged_graph(graph: &HashGraph) -> BiedgedGraph {
     let mut biedged : UnGraphMap::<u64, String> = UnGraphMap::new();
 
     // Create queue
@@ -43,8 +80,8 @@ fn handlegraph_to_biedged_graph(graph: &HashGraph) -> (UnGraphMap::<u64, String>
     q.push_back(node_id);
 
     //Store black and grey edges
-    let mut black_edges : Vec<String> = Vec::new();
-    let mut gray_edges : Vec<String> = Vec::new();
+    let mut black_edges : Vec<BiedgedEdge> = Vec::new();
+    let mut gray_edges : Vec<BiedgedEdge> = Vec::new();
 
     while let Some(curr_node) = q.pop_front() {
 
@@ -63,11 +100,10 @@ fn handlegraph_to_biedged_graph(graph: &HashGraph) -> (UnGraphMap::<u64, String>
         
         // The two nodes are connected
         let id_edge = format!("B: {}",current_handle.unpack_number());
-        let edge = id_edge.clone();
         biedged.add_edge(node_1, node_2, id_edge);
 
         // Add edge to black edges
-        black_edges.push(edge);
+        black_edges.push(BiedgedEdge{from: node_1, to: node_2});
 
         // Look for neighbors in the Handlegraph, add edges in the biedged graph
         for neighbor in handle_edges_iter(graph, current_handle, Direction::Right) {
@@ -77,11 +113,10 @@ fn handlegraph_to_biedged_graph(graph: &HashGraph) -> (UnGraphMap::<u64, String>
 
             // Add edge from neighbor to 
             let id_edge = format!("G: {}->{}",curr_node, neighbor.id());
-            let edge = id_edge.clone();
             biedged.add_edge(node_2, neighbor_node_biedged, id_edge);
 
             // Add edge to gray edges
-            gray_edges.push(edge.clone());
+            gray_edges.push(BiedgedEdge{from: node_2, to: neighbor_node_biedged});
 
             // Add to queue
             q.push_back(neighbor.id());
@@ -90,7 +125,49 @@ fn handlegraph_to_biedged_graph(graph: &HashGraph) -> (UnGraphMap::<u64, String>
         visited_nodes.insert(curr_node);
     }
 
-    (biedged,black_edges,gray_edges)
+    // Create Biedged graph
+    let biedged_graph = BiedgedGraph {
+        graph : biedged,
+        black_edges : black_edges,
+        gray_edges : gray_edges
+    };
+
+    biedged_graph
+}
+
+/// STEP 1: Contract edges
+fn contract_edges(biedged_graph : &mut BiedgedGraph) {
+    for edge in &biedged_graph.gray_edges {
+
+        let start_node = edge.from;
+        let end_node = edge.to;
+
+        // Store adjacent nodes
+        let mut adjacency_nodes : Vec<u64> = Vec::new();
+        let adj_1 : Vec<u64> = biedged_graph.graph.edges(start_node).map(|x| x.0).collect();
+        let adj_2 : Vec<u64> = biedged_graph.graph.edges(end_node).map(|x| x.0).collect();
+        adjacency_nodes.extend(adj_1.iter());
+        adjacency_nodes.extend(adj_2.iter());
+        
+        // Remove existing nodes, edges will also be removed
+        biedged_graph.graph.remove_node(start_node);
+        biedged_graph.graph.remove_node(end_node);
+
+        // Add new node
+        let node = biedged_graph.graph.add_node(start_node);
+
+        for adj_node in adjacency_nodes {
+            biedged_graph.graph.add_edge(node, adj_node, String::from("New node"));
+        }
+        
+        //TODO: finish function
+
+        // Remove the edge from the graph
+        biedged_graph.graph.remove_edge(edge.from, edge.to);
+    }
+
+    biedged_graph.gray_edges.remove(0);
+    assert!(biedged_graph.gray_edges.is_empty());
 }
 
 #[cfg(test)]
@@ -103,7 +180,7 @@ mod tests {
         let path = PathBuf::from("./input/samplePath3.gfa");
         let graph = HashGraph::from_gfa(&parse_gfa(&path).unwrap());
         let biedged = gfa_to_biedged_graph(&path).unwrap();
-        println!("{:?}", Dot::with_config(&biedged.0, &[Config::EdgeNoLabel]));
+        println!("{:?}", Dot::with_config(&biedged.graph, &[Config::EdgeNoLabel]));
         println!("{:?}", graph);
     }
 
@@ -114,9 +191,9 @@ mod tests {
         let h2 = graph.append_handle("c");
         graph.create_edge(&Edge(h1,h2));
         let biedged = handlegraph_to_biedged_graph(&graph);
-        println!("{:#?}", Dot::with_config(&biedged.0, &[Config::NodeNoLabel]));
-        println!("Black edges: {:#?}", biedged.1);
-        println!("Gray edges: {:#?}", biedged.2);
+        println!("{:#?}", Dot::with_config(&biedged.graph, &[Config::NodeNoLabel]));
+        println!("Black edges: {:#?}", biedged.black_edges);
+        println!("Gray edges: {:#?}", biedged.gray_edges);
         //println!("Biedged {:#?}",Dot::new(&biedged));
 
         println!();
