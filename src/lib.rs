@@ -16,30 +16,121 @@ use std::io;
 use gfa::parser::parse_gfa;
 
 // Traits
-trait GraphInternals {
+trait NodeFunctions {
     // Node functions
-    fn add_node(&mut self, id: u64);
-    fn remove_node(&mut self, id: u64);
+    fn add_node(&mut self, id: u64) -> Option<u64>;
+    fn remove_node(&mut self, id: u64) -> Option<u64>;
+    //fn remove_nodes_incident_with_edge(&mut self, node: &BiedgedNode)
 
-    // Edge functions
-    fn add_edge(&mut self, from: u64, to: u64, edge_type: BiedgedEdge);
-    fn remove_edge(&mut self, from: u64, to: u64);
-    fn remove_edge_with_type(&mut self, from: u64, to: u64, edge_type: BiedgedEdge);
-    
-    fn get_gray_edges(&self) -> Vec<BiedgedEdge>;
-    fn get_black_edges(&self) -> Vec<BiedgedEdge>;
+    //fn get_nodes(&self) -> &Vec<BiedgedNode>;
+    //fn get_nodes_mut(&mut self) -> &mut Vec<BiedgedNode>;
 }
 
+trait EdgeFunctions {
+    // Edge functions
+    fn add_edge(&mut self, from: u64, to: u64, edge_type: BiedgedEdgeType) -> Option<BiedgedEdge>;
+    fn remove_edge(&mut self, from: u64, to: u64) -> Option<BiedgedEdge>;
+    //fn remove_edges_incident_to_node(&mut self, node: &BiedgedNode)
+    //fn contract_edge(&mut self, edge: &BiedgedEdge)
+    
+    // Immutable getter/setter
+    fn get_gray_edges(&self) -> &Vec<BiedgedEdge>;
+    fn get_black_edges(&self) -> &Vec<BiedgedEdge>;
+
+    // Mutable getter/setters
+    fn get_gray_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
+    fn get_black_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
+}
+
+impl NodeFunctions for BiedgedGraph {
+    fn add_node(&mut self, id: u64) -> Option<u64> {
+        Some(self.graph.add_node(id))
+    }
+
+    fn remove_node(&mut self, id: u64) -> Option<u64> {
+        if self.graph.contains_node(id) {
+            self.graph.remove_node(id);
+            Some(id)
+        } else {
+            None
+        }
+    }
+}
+
+impl EdgeFunctions for BiedgedGraph {
+
+    // TODO: think which string to use
+    fn add_edge(&mut self, from: u64, to: u64, edge_type: BiedgedEdgeType) -> Option<BiedgedEdge> {
+        
+        let edge_to_add = BiedgedEdge{from: from, to: to, };
+
+        if edge_type == BiedgedEdgeType::Black {
+            self.graph.add_edge(from, to, String::from(""));
+            self.black_edges.push(BiedgedEdge{from: from, to: to});
+            Some(edge_to_add)
+        } else if edge_type == BiedgedEdgeType::Gray {
+            self.graph.add_edge(from, to, String::from(""));
+            self.gray_edges.push(BiedgedEdge{from: from, to: to});
+            Some(edge_to_add)
+        } else {
+            None
+        }
+    }
+    
+    fn remove_edge(&mut self, from: u64, to: u64) -> Option<BiedgedEdge> {
+        
+        let edge_to_remove = BiedgedEdge{from: from, to: to};
+
+        if self.graph.contains_edge(from, to) && self.black_edges.contains(&edge_to_remove) {
+            self.graph.remove_edge(from, to);
+            self.black_edges.iter().position(|x| *x == edge_to_remove).map(|e| self.black_edges.remove(e));
+            Some(edge_to_remove)
+        } else if self.graph.contains_edge(from, to) && self.gray_edges.contains(&edge_to_remove) {
+            self.graph.remove_edge(from, to);
+            self.gray_edges.iter().position(|x| *x == edge_to_remove).map(|e| self.gray_edges.remove(e));
+            Some(edge_to_remove)
+        } else {
+            None
+        }
+    }
+
+    fn get_gray_edges(&self) -> &Vec<BiedgedEdge> {
+        self.gray_edges.as_ref()
+    }
+    fn get_black_edges(&self) -> &Vec<BiedgedEdge> {
+        self.black_edges.as_ref()
+    }
+
+    fn get_gray_edges_mut(&mut self) -> &mut Vec<BiedgedEdge> {
+        self.gray_edges.as_mut()
+    }
+    fn get_black_edges_mut(&mut self) -> &mut Vec<BiedgedEdge> {
+        self.black_edges.as_mut()
+    }
+}
+
+#[derive(PartialEq)]
 enum BiedgedEdgeType {
     Black,
     Gray,
 }
-// An edge of the biedged graph
-#[derive(Debug, Clone, Copy)]
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct BiedgedEdge {
     from : u64,
     to : u64,
-    //edge_type : BiedgedEdgeType
+}
+#[derive(Debug, Clone, Copy)]
+struct BiedgedEdgeGray {
+    from : u64,
+    to : u64,
+    handlegraph_edge : (u64,u64)
+}
+#[derive(Debug, Clone, Copy)]
+struct BiedgedEdgeBlack {
+    from : u64,
+    to : u64,
+    handlegraph_node : u64
 }
 
 /// Biedged graph class
@@ -47,9 +138,12 @@ struct BiedgedGraph {
     graph : UnGraphMap::<u64, String>,
     black_edges : Vec<BiedgedEdge>,
     gray_edges : Vec<BiedgedEdge>
+    //nodes : Vec<BiedgedNode>
 }
 
-//TODO: continue OOP
+struct BiedgedNode {
+    id : u64
+}
 
 
 /// Convert a GFA to a biedged graph if file exists
