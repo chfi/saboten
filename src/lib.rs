@@ -9,6 +9,9 @@ use handlegraph::handle::Direction;
 use std::collections::VecDeque;
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::fs::File;
+use std::io::Write;
+use std::io;
 
 use gfa::parser::parse_gfa;
 
@@ -157,17 +160,26 @@ fn contract_edges(biedged_graph : &mut BiedgedGraph) {
         let node = biedged_graph.graph.add_node(start_node);
 
         for adj_node in adjacency_nodes {
-            biedged_graph.graph.add_edge(node, adj_node, String::from("New node"));
+            biedged_graph.graph.add_edge(node, adj_node, format!("New edge"));
         }
-        
-        //TODO: finish function
 
         // Remove the edge from the graph
-        biedged_graph.graph.remove_edge(edge.from, edge.to);
+        //biedged_graph.graph.remove_edge(edge.from, edge.to);
     }
 
-    biedged_graph.gray_edges.remove(0);
-    assert!(biedged_graph.gray_edges.is_empty());
+    //biedged_graph.gray_edges.remove(0);
+    //assert!(biedged_graph.gray_edges.is_empty());
+}
+
+/// Print the biedged graph to a .dot file. This file can then be used by
+/// various tools (i.e. Graphviz) to produce a graphical representation of the graph
+/// i.e. dot -Tpng graph.dot -o graph.png
+fn biedged_to_dot(graph : &BiedgedGraph, path : &PathBuf) -> std::io::Result<()> {
+    let mut f = File::create(path).unwrap();
+    //let output = format!("{}", Dot::with_config(&graph.graph, &[Config::EdgeNoLabel]));
+    let output = format!("{}", Dot::with_config(&graph.graph, &[Config::NodeNoLabel]));
+    f.write_all(&output.as_bytes())?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -214,8 +226,32 @@ mod tests {
         // println!("{:?}",h2.as_integer());
         // println!("{:?}",h2.flip().as_integer());
         // println!("{:?}",h2.id());
-        // println!("{:?}",h2.unpack_number());
+        // println!("{:?}",h2.unpack_number()); 
+    }
 
+    #[test]
+    fn it_works_3() {
+        let mut graph = HashGraph::new();
+        let h1 = graph.append_handle("a");
+        let h2 = graph.append_handle("c");
+        let h3 = graph.append_handle("t");
+        let h4 = graph.append_handle("g");
         
+        graph.create_edge(&Edge(h1,h2));
+        graph.create_edge(&Edge(h2,h4));
+        graph.create_edge(&Edge(h1,h3));
+        graph.create_edge(&Edge(h3,h4));
+        
+        let mut biedged = handlegraph_to_biedged_graph(&graph);
+        biedged_to_dot(&biedged, &PathBuf::from("original.dot"));
+        // println!("{:#?}", Dot::with_config(&biedged.graph, &[Config::NodeNoLabel]));
+        contract_edges(&mut biedged);
+        biedged_to_dot(&biedged, &PathBuf::from("modified.dot"));
+        // println!("Modified \n {:#?}", Dot::with_config(&biedged.graph, &[Config::NodeNoLabel]));
+
+        // // Print to file
+        // let mut f = File::create("example1.dot").unwrap();
+        // let output = format!("{}", Dot::with_config(&biedged.graph, &[Config::EdgeNoLabel]));
+        // f.write_all(&output.as_bytes());
     }
 }
