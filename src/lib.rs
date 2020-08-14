@@ -35,7 +35,7 @@ enum BiedgedEdgeType {
     Gray,
 }
 // An edge of the biedged graph
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct BiedgedEdge {
     from : u64,
     to : u64,
@@ -140,8 +140,17 @@ fn handlegraph_to_biedged_graph(graph: &HashGraph) -> BiedgedGraph {
 
 /// STEP 1: Contract edges
 fn contract_edges(biedged_graph : &mut BiedgedGraph) {
-    for edge in &biedged_graph.gray_edges {
 
+    // Create queue
+    // NOTE: this is a Queue based implementation, this was done
+    // in order not to get a stack overflow
+    let mut q: VecDeque<BiedgedEdge> = VecDeque::new();
+
+    // Add all gray edges to queue
+    biedged_graph.gray_edges.iter().for_each(|x| q.push_back(*x));
+
+    while let Some(edge) = q.pop_front() {
+        
         let start_node = edge.from;
         let end_node = edge.to;
 
@@ -151,29 +160,53 @@ fn contract_edges(biedged_graph : &mut BiedgedGraph) {
         let adj_2 : Vec<u64> = biedged_graph.graph.edges(end_node).map(|x| x.0).collect();
         adjacency_nodes.extend(adj_1.iter());
         adjacency_nodes.extend(adj_2.iter());
+        adjacency_nodes.dedup();
         
         // Remove existing nodes, edges will also be removed
         biedged_graph.graph.remove_node(start_node);
         biedged_graph.graph.remove_node(end_node);
+
+        //let to_remove_black : Vec<&BiedgedEdge> = biedged_graph.black_edges.iter().filter(|x| x.from == start_node || x.to == start_node).collect();
+        //let to_remove_gray : Vec<&BiedgedEdge> = biedged_graph.gray_edges.iter().filter(|x| x.from == end_node || x.to == end_node).collect();
+        //biedged_graph.black_edges.retain(|x| !(x.from == start_node || x.to == start_node));
+        //biedged_graph.gray_edges.retain(|x| !(x.from == start_node || x.to == start_node));
+        
 
         // Add new node
         let node = biedged_graph.graph.add_node(start_node);
 
         for adj_node in adjacency_nodes {
             biedged_graph.graph.add_edge(node, adj_node, format!("New edge"));
+            //biedged_graph.gray_edges.push(BiedgedEdge{from: node, to: adj_node});
+            //q.push_back(BiedgedEdge{from: node, to: adj_node});
         }
 
-        // Remove the edge from the graph
-        //biedged_graph.graph.remove_edge(edge.from, edge.to);
+        // Update gray edges in queue with new node
+        for gray_edge in q.iter_mut() {
+            if gray_edge.from == start_node {
+                gray_edge.from = node;
+            } else if gray_edge.to == end_node {
+                gray_edge.to = node;
+            }
+        }
+
+
+        // Update gray edges in graph with new node
+        for gray_edge in biedged_graph.gray_edges.iter_mut() {
+            if gray_edge.from == start_node {
+                gray_edge.from = node;
+            } else if gray_edge.to == end_node {
+                gray_edge.to = node;
+            }
+        }
+
     }
 
-    //biedged_graph.gray_edges.remove(0);
-    //assert!(biedged_graph.gray_edges.is_empty());
 }
 
 /// Print the biedged graph to a .dot file. This file can then be used by
 /// various tools (i.e. Graphviz) to produce a graphical representation of the graph
-/// i.e. dot -Tpng graph.dot -o graph.png
+/// (i.e. dot -Tpng graph.dot -o graph.png)
 fn biedged_to_dot(graph : &BiedgedGraph, path : &PathBuf) -> std::io::Result<()> {
     let mut f = File::create(path).unwrap();
     //let output = format!("{}", Dot::with_config(&graph.graph, &[Config::EdgeNoLabel]));
