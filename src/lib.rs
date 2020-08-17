@@ -20,38 +20,40 @@ trait NodeFunctions {
     // Node functions
     fn add_node(&mut self, id: u64) -> Option<u64>;
     fn remove_node(&mut self, id: u64) -> Option<u64>;
-    fn remove_nodes_incident_with_edge(&mut self, edge: &BiedgedEdge) -> Option<Vec<BiedgedEdge>>;
+    fn remove_nodes_incident_with_edge(&mut self, from: u64, to: u64) -> Option<Vec<BiedgedEdge>>;
 
     fn get_adjacent_nodes(&self, id: u64) -> Option<Vec<u64>>;
 
     fn get_nodes(&self) -> &Vec<BiedgedNode>;
-    fn get_nodes_mut(&mut self) -> &mut Vec<BiedgedNode>;
+    //fn get_nodes_mut(&mut self) -> &mut Vec<BiedgedNode>;
 }
 
 trait EdgeFunctions {
     // Edge functions
     fn add_edge(&mut self, from: u64, to: u64, edge_type: BiedgedEdgeType) -> Option<BiedgedEdge>;
     fn remove_edge(&mut self, from: u64, to: u64) -> Option<BiedgedEdge>;
-    fn remove_edges_incident_to_node(&mut self, node: &BiedgedNode) -> Option<Vec<BiedgedEdge>>;
-    fn contract_edge(&mut self, edge: &BiedgedEdge);
+    fn remove_edges_incident_to_node(&mut self, id: u64) -> Option<Vec<BiedgedEdge>>;
+    fn contract_edge(&mut self, from: u64, to: u64);
     
     // Immutable getter/setter
     fn get_gray_edges(&self) -> &Vec<BiedgedEdge>;
     fn get_black_edges(&self) -> &Vec<BiedgedEdge>;
 
     // Mutable getter/setters
-    fn get_gray_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
-    fn get_black_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
+    //fn get_gray_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
+    //fn get_black_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
 }
 
 impl NodeFunctions for BiedgedGraph {
     fn add_node(&mut self, id: u64) -> Option<u64> {
+        self.nodes.push(BiedgedNode{id:id});
         Some(self.graph.add_node(id))
     }
 
     fn remove_node(&mut self, id: u64) -> Option<u64> {
         if self.graph.contains_node(id) {
             self.graph.remove_node(id);
+            self.nodes.retain(|x| x.id != id);
 
             // Remove all incident edges from Vecs
             self.black_edges.retain(|x| !(x.from == id || x.to == id));
@@ -64,17 +66,18 @@ impl NodeFunctions for BiedgedGraph {
     }
 
     //TODO: needs testing
-    fn remove_nodes_incident_with_edge(&mut self, edge: &BiedgedEdge) -> Option<Vec<BiedgedEdge>> {
+    fn remove_nodes_incident_with_edge(&mut self, from: u64, to: u64) -> Option<Vec<BiedgedEdge>> {
+        let edge : &BiedgedEdge = &BiedgedEdge{from:from, to:to};
         let mut removed_edges : Vec<BiedgedEdge> = Vec::new();
         if self.black_edges.contains(edge) {
-            self.remove_node(edge.from);
-            self.remove_node(edge.to);
+            self.remove_node(from);
+            self.remove_node(to);
             removed_edges = self.black_edges.iter().filter(|x| *x == edge).map(|x| *x).collect();
             self.black_edges.retain(|x| !(x == edge));
             Some(removed_edges)
         } else if self.gray_edges.contains(edge) {
-            self.remove_node(edge.from);
-            self.remove_node(edge.to);
+            self.remove_node(from);
+            self.remove_node(to);
             removed_edges = self.gray_edges.iter().filter(|x| *x == edge).map(|x| *x).collect();
             self.gray_edges.retain(|x| !(x == edge));
             Some(removed_edges)
@@ -86,7 +89,7 @@ impl NodeFunctions for BiedgedGraph {
     fn get_adjacent_nodes(&self, id: u64) -> Option<Vec<u64>> {
 
         if self.graph.contains_node(id) {
-            let adjacent_nodes : Vec<u64> = self.graph.edges(id).map(|x| x.0).collect();
+            let adjacent_nodes : Vec<u64> = self.graph.edges(id).map(|x| x.1).collect();
             Some(adjacent_nodes)
         } else {
             None
@@ -97,9 +100,9 @@ impl NodeFunctions for BiedgedGraph {
         self.nodes.as_ref()
     }
 
-    fn get_nodes_mut(&mut self) -> &mut Vec<BiedgedNode> {
-        self.nodes.as_mut()
-    }
+    // fn get_nodes_mut(&mut self) -> &mut Vec<BiedgedNode> {
+    //     self.nodes.as_mut()
+    // }
 }
 
 impl EdgeFunctions for BiedgedGraph {
@@ -139,15 +142,22 @@ impl EdgeFunctions for BiedgedGraph {
         }
     }
 
-    fn remove_edges_incident_to_node(&mut self, node: &BiedgedNode) -> Option<Vec<BiedgedEdge>> {
+    fn remove_edges_incident_to_node(&mut self, id: u64) -> Option<Vec<BiedgedEdge>> {
         
-        if self.nodes.contains(node) {
-            self.graph.remove_node(node.id); // edges should be removed automatically in petgraph
+        if self.nodes.contains(&BiedgedNode{id:id}) && self.graph.contains_node(id) {
             let mut incident_edges : Vec<BiedgedEdge> = Vec::new();
-            let mut black_edges : Vec<BiedgedEdge> = self.black_edges.iter().filter(|x| x.from == node.id || x.to == node.id).map(|x| *x).collect();
-            let mut gray_edges : Vec<BiedgedEdge> = self.gray_edges.iter().filter(|x| x.from == node.id || x.to == node.id).map(|x| *x).collect();
+            let mut black_edges : Vec<BiedgedEdge> = self.black_edges.iter().filter(|x| x.from == id || x.to == id).map(|x| *x).collect();
+            let mut gray_edges : Vec<BiedgedEdge> = self.gray_edges.iter().filter(|x| x.from == id || x.to == id).map(|x| *x).collect();
+            
+            self.black_edges.retain(|x| !(x.from == id || x.to == id));
+            self.gray_edges.retain(|x| !(x.from == id || x.to == id));
+            
             incident_edges.append(&mut black_edges);
             incident_edges.append(&mut gray_edges);
+
+            for edge in &incident_edges {
+                self.graph.remove_edge(edge.from, edge.to);
+            }
             
             Some(incident_edges)
         } else {
@@ -156,20 +166,21 @@ impl EdgeFunctions for BiedgedGraph {
 
     }
 
-    fn contract_edge(&mut self, edge: &BiedgedEdge) {
+    fn contract_edge(&mut self, from: u64, to: u64) {
         let mut adjacent_nodes : Vec<u64> = Vec::new();
-        let mut first_node_adjacent_nodes : Vec<u64> = self.get_adjacent_nodes(edge.from).unwrap();
-        let mut second_node_adjacent_nodes : Vec<u64> = self.get_adjacent_nodes(edge.to).unwrap();
+        let mut first_node_adjacent_nodes : Vec<u64> = self.get_adjacent_nodes(from).unwrap();
+        let mut second_node_adjacent_nodes : Vec<u64> = self.get_adjacent_nodes(to).unwrap();
         adjacent_nodes.append(&mut first_node_adjacent_nodes);
         adjacent_nodes.append(&mut second_node_adjacent_nodes);
 
-        self.remove_node(edge.from);
-        self.remove_node(edge.to);
+        self.remove_node(from);
+        self.remove_node(to);
         // All adjacent edges will also be removed
 
         //TODO: decide which id to use
-        let added_node = self.add_node(100).unwrap();
+        let added_node = self.add_node(from).unwrap();
 
+        //TODO: check color
         for adj_node in adjacent_nodes {
             self.add_edge(added_node, adj_node, BiedgedEdgeType::Gray);
         }
@@ -183,12 +194,12 @@ impl EdgeFunctions for BiedgedGraph {
         self.black_edges.as_ref()
     }
 
-    fn get_gray_edges_mut(&mut self) -> &mut Vec<BiedgedEdge> {
-        self.gray_edges.as_mut()
-    }
-    fn get_black_edges_mut(&mut self) -> &mut Vec<BiedgedEdge> {
-        self.black_edges.as_mut()
-    }
+    // fn get_gray_edges_mut(&mut self) -> &mut Vec<BiedgedEdge> {
+    //     self.gray_edges.as_mut()
+    // }
+    // fn get_black_edges_mut(&mut self) -> &mut Vec<BiedgedEdge> {
+    //     self.black_edges.as_mut()
+    // }
 }
 
 #[derive(PartialEq)]
@@ -226,6 +237,12 @@ pub struct BiedgedGraph {
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct BiedgedNode {
     id : u64
+}
+
+impl BiedgedGraph {
+    fn new() -> BiedgedGraph {
+        BiedgedGraph{graph: UnGraphMap::new(), black_edges: Vec::new(), gray_edges: Vec::new(), nodes: Vec::new()}
+    }
 }
 
 
@@ -404,71 +421,247 @@ mod tests {
     use super::*;
     use handlegraph::mutablehandlegraph::MutableHandleGraph;
 
+    // #[test]
+    // fn it_works() {
+    //     let path = PathBuf::from("./input/samplePath3.gfa");
+    //     let graph = HashGraph::from_gfa(&parse_gfa(&path).unwrap());
+    //     let biedged = gfa_to_biedged_graph(&path).unwrap();
+    //     //println!("{:?}", Dot::with_config(&biedged.graph, &[Config::EdgeNoLabel]));
+    //     //println!("{:?}", graph);
+    // }
+
+    // #[test]
+    // fn it_works_2() {
+    //     let mut graph = HashGraph::new();
+    //     let h1 = graph.append_handle("a");
+    //     let h2 = graph.append_handle("c");
+    //     graph.create_edge(&Edge(h1,h2));
+    //     let biedged = handlegraph_to_biedged_graph(&graph);
+    //     println!("{:#?}", Dot::with_config(&biedged.graph, &[Config::NodeNoLabel]));
+    //     println!("Black edges: {:#?}", biedged.black_edges);
+    //     println!("Gray edges: {:#?}", biedged.gray_edges);
+    //     //println!("Biedged {:#?}",Dot::new(&biedged));
+
+    //     println!();
+
+    //     println!("{:?}",graph);
+    //     println!("{:?}",h1.as_integer());
+    //     println!("{:?}",h1.flip().as_integer());
+        
+    //     println!();
+    //     //NodeId
+    //     println!("{:?}",h1.id());
+    //     //NodeId as u64
+    //     println!("{:?}",h1.unpack_number());
+    //     //NodeId does not change
+    //     println!("{:?}",h1.flip().unpack_number());
+
+    //     // println!("");
+    //     // println!("{:?}",h2.as_integer());
+    //     // println!("{:?}",h2.flip().as_integer());
+    //     // println!("{:?}",h2.id());
+    //     // println!("{:?}",h2.unpack_number()); 
+    // }
+
+    // #[test]
+    // fn it_works_3() {
+    //     let mut graph = HashGraph::new();
+    //     let h1 = graph.append_handle("a");
+    //     let h2 = graph.append_handle("c");
+    //     let h3 = graph.append_handle("t");
+    //     let h4 = graph.append_handle("g");
+        
+    //     graph.create_edge(&Edge(h1,h2));
+    //     graph.create_edge(&Edge(h2,h4));
+    //     graph.create_edge(&Edge(h1,h3));
+    //     graph.create_edge(&Edge(h3,h4));
+        
+    //     let mut biedged = handlegraph_to_biedged_graph(&graph);
+    //     biedged_to_dot(&biedged, &PathBuf::from("original.dot"));
+    //     // println!("{:#?}", Dot::with_config(&biedged.graph, &[Config::NodeNoLabel]));
+    //     contract_edges(&mut biedged);
+    //     biedged_to_dot(&biedged, &PathBuf::from("modified.dot"));
+    //     // println!("Modified \n {:#?}", Dot::with_config(&biedged.graph, &[Config::NodeNoLabel]));
+
+    //     // // Print to file
+    //     // let mut f = File::create("example1.dot").unwrap();
+    //     // let output = format!("{}", Dot::with_config(&biedged.graph, &[Config::EdgeNoLabel]));
+    //     // f.write_all(&output.as_bytes());
+    // }
+
     #[test]
-    fn it_works() {
-        let path = PathBuf::from("./input/samplePath3.gfa");
-        let graph = HashGraph::from_gfa(&parse_gfa(&path).unwrap());
-        let biedged = gfa_to_biedged_graph(&path).unwrap();
-        //println!("{:?}", Dot::with_config(&biedged.graph, &[Config::EdgeNoLabel]));
-        //println!("{:?}", graph);
+    fn test_new() {
+        let graph : BiedgedGraph = BiedgedGraph::new(); 
+        assert!(graph.graph.node_count() == 0);
+        assert!(graph.get_black_edges().len() == 0);
+        assert!(graph.get_gray_edges().len() == 0);
+        assert!(graph.get_nodes().len() == 0);
     }
 
     #[test]
-    fn it_works_2() {
-        let mut graph = HashGraph::new();
-        let h1 = graph.append_handle("a");
-        let h2 = graph.append_handle("c");
-        graph.create_edge(&Edge(h1,h2));
-        let biedged = handlegraph_to_biedged_graph(&graph);
-        println!("{:#?}", Dot::with_config(&biedged.graph, &[Config::NodeNoLabel]));
-        println!("Black edges: {:#?}", biedged.black_edges);
-        println!("Gray edges: {:#?}", biedged.gray_edges);
-        //println!("Biedged {:#?}",Dot::new(&biedged));
-
-        println!();
-
-        println!("{:?}",graph);
-        println!("{:?}",h1.as_integer());
-        println!("{:?}",h1.flip().as_integer());
-        
-        println!();
-        //NodeId
-        println!("{:?}",h1.id());
-        //NodeId as u64
-        println!("{:?}",h1.unpack_number());
-        //NodeId does not change
-        println!("{:?}",h1.flip().unpack_number());
-
-        // println!("");
-        // println!("{:?}",h2.as_integer());
-        // println!("{:?}",h2.flip().as_integer());
-        // println!("{:?}",h2.id());
-        // println!("{:?}",h2.unpack_number()); 
+    fn test_add_node() {
+        let mut graph : BiedgedGraph = BiedgedGraph::new(); 
+        graph.add_node(10);
+        assert!(graph.graph.contains_node(10));
+        assert!(graph.get_nodes().len() == 1);
+        assert!(*graph.get_nodes().get(0).unwrap() == BiedgedNode{id:10});
     }
 
     #[test]
-    fn it_works_3() {
-        let mut graph = HashGraph::new();
-        let h1 = graph.append_handle("a");
-        let h2 = graph.append_handle("c");
-        let h3 = graph.append_handle("t");
-        let h4 = graph.append_handle("g");
-        
-        graph.create_edge(&Edge(h1,h2));
-        graph.create_edge(&Edge(h2,h4));
-        graph.create_edge(&Edge(h1,h3));
-        graph.create_edge(&Edge(h3,h4));
-        
-        let mut biedged = handlegraph_to_biedged_graph(&graph);
-        biedged_to_dot(&biedged, &PathBuf::from("original.dot"));
-        // println!("{:#?}", Dot::with_config(&biedged.graph, &[Config::NodeNoLabel]));
-        contract_edges(&mut biedged);
-        biedged_to_dot(&biedged, &PathBuf::from("modified.dot"));
-        // println!("Modified \n {:#?}", Dot::with_config(&biedged.graph, &[Config::NodeNoLabel]));
-
-        // // Print to file
-        // let mut f = File::create("example1.dot").unwrap();
-        // let output = format!("{}", Dot::with_config(&biedged.graph, &[Config::EdgeNoLabel]));
-        // f.write_all(&output.as_bytes());
+    fn test_remove_node() {
+        let mut graph : BiedgedGraph = BiedgedGraph::new(); 
+        graph.add_node(10);
+        graph.remove_node(10);
+        assert!(!graph.graph.contains_node(10));
+        assert!(graph.get_nodes().len() == 0);
+        assert!(graph.get_nodes().get(0) == None);
     }
+    
+    #[test]
+    fn test_get_nodes() {
+        let mut graph : BiedgedGraph = BiedgedGraph::new(); 
+        graph.add_node(10);
+        graph.add_node(20);
+        graph.add_node(30);
+
+        assert!(graph.get_nodes().len() == 3);
+        assert!(*graph.get_nodes().get(0).unwrap() == BiedgedNode{id:10});
+        assert!(*graph.get_nodes().get(1).unwrap() == BiedgedNode{id:20});
+        assert!(*graph.get_nodes().get(2).unwrap() == BiedgedNode{id:30});
+    }
+
+    #[test]
+    fn test_get_adjacent_nodes() {
+        let mut graph : BiedgedGraph = BiedgedGraph::new(); 
+        graph.add_node(10);
+        graph.add_node(20);
+        graph.add_node(30);
+
+        graph.add_edge(10, 20, BiedgedEdgeType::Black);
+        graph.add_edge(10, 30, BiedgedEdgeType::Gray);
+
+        let adjacent_nodes = graph.get_adjacent_nodes(10).unwrap();
+        assert!(adjacent_nodes.len() == 2);
+        assert!(adjacent_nodes.contains(&20));
+        assert!(adjacent_nodes.contains(&30));
+
+        // Check if node can be either starting or ending
+        graph.add_node(0);
+        graph.add_edge(0, 10, BiedgedEdgeType::Black);
+        let adjacent_nodes = graph.get_adjacent_nodes(10).unwrap();
+        assert!(adjacent_nodes.len() == 3);
+        assert!(adjacent_nodes.contains(&0));
+    }
+
+    #[test]
+    fn test_add_edge() {
+        let mut graph : BiedgedGraph = BiedgedGraph::new(); 
+        graph.add_node(10);
+        graph.add_node(20);
+        graph.add_node(30);
+        
+        graph.add_edge(10, 20, BiedgedEdgeType::Black);
+        assert!(graph.graph.contains_edge(10, 20));
+        assert!(graph.get_black_edges().len() == 1);
+        assert!(graph.get_black_edges().contains(&BiedgedEdge{from:10,to:20}));
+
+        graph.add_edge(20, 30, BiedgedEdgeType::Gray);
+        assert!(graph.graph.contains_edge(20, 30));
+        assert!(graph.get_gray_edges().len() == 1);
+        assert!(graph.get_gray_edges().contains(&BiedgedEdge{from:20,to:30}));
+    }
+
+    #[test]
+    fn test_remove_edge() {
+        let mut graph : BiedgedGraph = BiedgedGraph::new(); 
+        graph.add_node(10);
+        graph.add_node(20);
+        graph.add_edge(10, 20, BiedgedEdgeType::Black);
+
+        graph.remove_edge(10, 20);
+        assert!(!graph.graph.contains_edge(10, 20));
+        assert!(graph.get_black_edges().len() == 0);
+        assert!(!graph.get_black_edges().contains(&BiedgedEdge{from:10,to:20}));
+    }
+
+    #[test]
+    fn test_remove_node_and_adjacent_edges() {
+        let mut graph : BiedgedGraph = BiedgedGraph::new(); 
+        graph.add_node(10);
+        graph.add_node(20);
+        graph.add_node(30);
+        graph.add_edge(10, 20, BiedgedEdgeType::Black);
+        graph.add_edge(10, 30, BiedgedEdgeType::Gray);
+
+        graph.remove_node(10);
+        assert!(!graph.graph.contains_edge(10, 20));
+        assert!(!graph.graph.contains_edge(10, 30));
+        assert!(graph.get_black_edges().len() == 0);
+        assert!(graph.get_gray_edges().len() == 0);
+        assert!(!graph.get_black_edges().contains(&BiedgedEdge{from:10,to:20}));
+        assert!(!graph.get_gray_edges().contains(&BiedgedEdge{from:10,to:30}));
+    }
+
+    #[test]
+    fn test_remove_edges_adjacent_to_node() {
+        let mut graph : BiedgedGraph = BiedgedGraph::new(); 
+        graph.add_node(10);
+        graph.add_node(20);
+        graph.add_node(30);
+        graph.add_edge(10, 20, BiedgedEdgeType::Black);
+        graph.add_edge(10, 30, BiedgedEdgeType::Gray);
+
+        graph.remove_edges_incident_to_node(10);
+        
+        assert!{graph.graph.contains_node(10)};
+        assert!(graph.get_nodes().contains(&BiedgedNode{id:10}));
+        
+        assert!(!graph.graph.contains_edge(10, 20));
+        assert!(!graph.graph.contains_edge(10, 30));
+        assert!(graph.get_black_edges().len() == 0);
+        assert!(graph.get_gray_edges().len() == 0);
+        assert!(!graph.get_black_edges().contains(&BiedgedEdge{from:10,to:20}));
+        assert!(!graph.get_gray_edges().contains(&BiedgedEdge{from:10,to:30}));
+    }
+
+    #[test]
+    fn test_remove_nodes_incident_with_edge() {
+        let mut graph : BiedgedGraph = BiedgedGraph::new(); 
+        graph.add_node(10);
+        graph.add_node(20);
+        graph.add_node(30);
+        graph.add_edge(10, 20, BiedgedEdgeType::Black);
+        graph.add_edge(10, 30, BiedgedEdgeType::Gray);
+
+        graph.remove_nodes_incident_with_edge(10,20);
+        
+        assert!{!graph.graph.contains_node(10)};
+        assert!{!graph.graph.contains_node(20)};
+        assert!(!graph.get_nodes().contains(&BiedgedNode{id:10}));
+        assert!(!graph.get_nodes().contains(&BiedgedNode{id:20}));
+        assert!(!graph.graph.contains_edge(10, 20));
+    }
+
+    #[test]
+    fn test_contract_edge() {
+        let mut graph : BiedgedGraph = BiedgedGraph::new(); 
+        graph.add_node(10);
+        graph.add_node(20);
+        graph.add_node(30);
+        graph.add_edge(10, 20, BiedgedEdgeType::Black);
+        graph.add_edge(10, 30, BiedgedEdgeType::Gray);
+        graph.add_edge(20, 30, BiedgedEdgeType::Black);
+
+        graph.contract_edge(10,20);
+        
+        assert!{!graph.graph.contains_node(20)};
+        assert!(graph.graph.edge_count() == 2);
+        
+        // Print to file
+        let mut f = File::create("example1.dot").unwrap();
+        let output = format!("{}", Dot::with_config(&graph.graph, &[Config::EdgeNoLabel]));
+        f.write_all(&output.as_bytes());
+    }
+
+    
 }
