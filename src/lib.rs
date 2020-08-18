@@ -14,6 +14,7 @@ use std::io::Write;
 use std::io;
 
 use gfa::parser::parse_gfa;
+use std::iter::FromIterator;
 
 // Traits
 trait NodeFunctions {
@@ -35,13 +36,16 @@ trait EdgeFunctions {
     fn remove_edge(&mut self, from: u64, to: u64) -> Option<BiedgedEdge>;
     fn remove_edges_incident_to_node(&mut self, id: u64) -> Option<Vec<BiedgedEdge>>;
     fn contract_edge(&mut self, from: u64, to: u64);
+
+    fn edges_count(&self) -> usize;
+    //fn get_edges(&self) -> &Vec<BiedgedEdge>;
     
     // Immutable getter/setter
     fn get_gray_edges(&self) -> &Vec<BiedgedEdge>;
     fn get_black_edges(&self) -> &Vec<BiedgedEdge>;
 
     // Mutable getter/setters
-    //fn get_gray_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
+    fn get_gray_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
     //fn get_black_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
 }
 
@@ -225,7 +229,7 @@ impl EdgeFunctions for BiedgedGraph {
         // All adjacent edges will also be removed
 
         //TODO: decide which id to use
-        let added_node = self.add_node(100).unwrap();
+        let added_node = self.add_node(from).unwrap();
 
         for adj_node in adjacent_nodes_by_black_edge {
             if adj_node != from && adj_node != to {
@@ -241,6 +245,13 @@ impl EdgeFunctions for BiedgedGraph {
 
     }
 
+    fn edges_count(&self) -> usize {
+        self.get_black_edges().len() + self.get_gray_edges().len()
+    }
+    // fn get_edges(&self) -> &Vec<BiedgedEdge> {
+    //     &Vec::from_iter(self.black_edges.into_iter().chain(self.gray_edges.into_iter()))
+    // }
+
     fn get_gray_edges(&self) -> &Vec<BiedgedEdge> {
         self.gray_edges.as_ref()
     }
@@ -248,9 +259,9 @@ impl EdgeFunctions for BiedgedGraph {
         self.black_edges.as_ref()
     }
 
-    // fn get_gray_edges_mut(&mut self) -> &mut Vec<BiedgedEdge> {
-    //     self.gray_edges.as_mut()
-    // }
+    fn get_gray_edges_mut(&mut self) -> &mut Vec<BiedgedEdge> {
+         self.gray_edges.as_mut()
+    }
     // fn get_black_edges_mut(&mut self) -> &mut Vec<BiedgedEdge> {
     //     self.black_edges.as_mut()
     // }
@@ -394,67 +405,11 @@ pub fn handlegraph_to_biedged_graph(graph: &HashGraph) -> BiedgedGraph {
 }
 
 /// STEP 1: Contract edges
-fn contract_edges(biedged_graph : &mut BiedgedGraph) {
+fn contract_all_gray_edges(biedged_graph : &mut BiedgedGraph) {
 
-    // Create queue
-    // NOTE: this is a Queue based implementation, this was done
-    // in order not to get a stack overflow
-    let mut q: VecDeque<BiedgedEdge> = VecDeque::new();
-
-    // Add all gray edges to queue
-    biedged_graph.gray_edges.iter().for_each(|x| q.push_back(*x));
-
-    while let Some(edge) = q.pop_front() {
-        
-        let start_node = edge.from;
-        let end_node = edge.to;
-
-        // Store adjacent nodes
-        let mut adjacency_nodes : Vec<u64> = Vec::new();
-        let adj_1 : Vec<u64> = biedged_graph.graph.edges(start_node).map(|x| x.0).collect();
-        let adj_2 : Vec<u64> = biedged_graph.graph.edges(end_node).map(|x| x.0).collect();
-        adjacency_nodes.extend(adj_1.iter());
-        adjacency_nodes.extend(adj_2.iter());
-        adjacency_nodes.dedup();
-        
-        // Remove existing nodes, edges will also be removed
-        biedged_graph.graph.remove_node(start_node);
-        biedged_graph.graph.remove_node(end_node);
-
-        //let to_remove_black : Vec<&BiedgedEdge> = biedged_graph.black_edges.iter().filter(|x| x.from == start_node || x.to == start_node).collect();
-        //let to_remove_gray : Vec<&BiedgedEdge> = biedged_graph.gray_edges.iter().filter(|x| x.from == end_node || x.to == end_node).collect();
-        //biedged_graph.black_edges.retain(|x| !(x.from == start_node || x.to == start_node));
-        //biedged_graph.gray_edges.retain(|x| !(x.from == start_node || x.to == start_node));
-        
-
-        // Add new node
-        let node = biedged_graph.graph.add_node(start_node);
-
-        for adj_node in adjacency_nodes {
-            biedged_graph.graph.add_edge(node, adj_node, format!("New edge"));
-            //biedged_graph.gray_edges.push(BiedgedEdge{from: node, to: adj_node});
-            //q.push_back(BiedgedEdge{from: node, to: adj_node});
-        }
-
-        // Update gray edges in queue with new node
-        for gray_edge in q.iter_mut() {
-            if gray_edge.from == start_node {
-                gray_edge.from = node;
-            } else if gray_edge.to == end_node {
-                gray_edge.to = node;
-            }
-        }
-
-
-        // Update gray edges in graph with new node
-        for gray_edge in biedged_graph.gray_edges.iter_mut() {
-            if gray_edge.from == start_node {
-                gray_edge.from = node;
-            } else if gray_edge.to == end_node {
-                gray_edge.to = node;
-            }
-        }
-
+    while !biedged_graph.get_gray_edges().is_empty() {
+        let curr_edge = biedged_graph.get_gray_edges().get(0).unwrap().clone();
+        biedged_graph.contract_edge(curr_edge.from, curr_edge.to);
     }
 
 }
@@ -725,10 +680,57 @@ mod tests {
 
         graph.contract_edge(10,20);
         
-        assert!(graph.graph.contains_node(100));
+        assert!(graph.graph.contains_node(10));
         assert!(!graph.get_nodes().contains(&BiedgedNode{id:20}));
         assert!(!graph.graph.contains_node(20));
         assert!(graph.graph.edge_count() == 1);
+    }
+
+    #[test]
+    fn test_contract_all_gray_edges() {
+        let mut graph : BiedgedGraph = BiedgedGraph::new(); 
+        
+        //First Handlegraph node
+        graph.add_node(10);
+        graph.add_node(11);
+        graph.add_edge(10, 11, BiedgedEdgeType::Black);
+
+        //Second Handlegraph node
+        graph.add_node(20);
+        graph.add_node(21);
+        graph.add_edge(20, 21, BiedgedEdgeType::Black);
+
+        //Third Handlegraph node
+        graph.add_node(30);
+        graph.add_node(31);
+        graph.add_edge(30, 31, BiedgedEdgeType::Black);
+
+        //Forth Handlegraph node
+        graph.add_node(40);
+        graph.add_node(41);
+        graph.add_edge(40, 41, BiedgedEdgeType::Black);
+
+        //Add Handlegraph edges
+        graph.add_edge(11, 20, BiedgedEdgeType::Gray);
+        graph.add_edge(11, 30, BiedgedEdgeType::Gray);
+        graph.add_edge(21, 40, BiedgedEdgeType::Gray);
+        graph.add_edge(31, 40, BiedgedEdgeType::Gray);
+
+        contract_all_gray_edges(&mut graph);
+
+        println!("{:#?}", Dot::with_config(&graph.graph, &[Config::NodeNoLabel]));
+        println!("Nodes: {:#?}", graph.get_nodes());
+        println!("Gray_edges {:#?}", graph.get_gray_edges());
+        println!("Black_edges {:#?}", graph.get_black_edges());
+
+
+        assert!(graph.get_nodes().len() == 4);
+        assert!(graph.get_black_edges().len() == 4);
+
+        // NOTE: petgraph does not actually support multiple edges between two given nodes
+        // however, they are allowed in Biedged Graphs. For this reason it is better to use
+        // the count_edges function provided by the EdgeFunctions trait.
+        assert!(graph.graph.edge_count() == 3);
     }
 
     
