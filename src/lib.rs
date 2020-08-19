@@ -307,7 +307,36 @@ struct BiedgedNode {
 impl BiedgedGraph {
     fn new() -> BiedgedGraph {
         BiedgedGraph{graph: UnGraphMap::new(), black_edges: Vec::new(), gray_edges: Vec::new(), nodes: Vec::new()}
+    }    
+
+    /// Print the biedged graph to a .dot file. This file can then be used by
+    /// various tools (i.e. Graphviz) to produce a graphical representation of the graph
+    /// (i.e. dot -Tpng graph.dot -o graph.png)
+    fn biedged_to_dot(&self, path : &PathBuf) -> std::io::Result<()> {
+        let mut f = File::create(path).unwrap();
+        //let output = format!("{}", Dot::with_config(&graph.graph, &[Config::EdgeNoLabel]));
+        let output = format!("{}", Dot::with_config(&self.graph, &[Config::NodeNoLabel]));
+        f.write_all(&output.as_bytes())?;
+        Ok(())
     }
+
+    /// STEP 1: Contract all gray edges
+    pub fn contract_all_gray_edges(&mut self) {
+        while !self.get_gray_edges().is_empty() {
+            let curr_edge = self.get_gray_edges().get(0).unwrap().clone();
+            self.contract_edge(curr_edge.from, curr_edge.to);
+        }
+    }
+
+    /// STEP 2: Find 3-edge connected components
+    /// makes use of chfi's rs-3-edge, which can be found at:
+    /// https://github.com/chfi/rs-3-edge
+    pub fn find_3_edge_connected_components(&self) {
+
+    }
+
+
+
 }
 
 
@@ -402,27 +431,6 @@ pub fn handlegraph_to_biedged_graph(graph: &HashGraph) -> BiedgedGraph {
     };
 
     biedged_graph
-}
-
-/// STEP 1: Contract edges
-fn contract_all_gray_edges(biedged_graph : &mut BiedgedGraph) {
-
-    while !biedged_graph.get_gray_edges().is_empty() {
-        let curr_edge = biedged_graph.get_gray_edges().get(0).unwrap().clone();
-        biedged_graph.contract_edge(curr_edge.from, curr_edge.to);
-    }
-
-}
-
-/// Print the biedged graph to a .dot file. This file can then be used by
-/// various tools (i.e. Graphviz) to produce a graphical representation of the graph
-/// (i.e. dot -Tpng graph.dot -o graph.png)
-fn biedged_to_dot(graph : &BiedgedGraph, path : &PathBuf) -> std::io::Result<()> {
-    let mut f = File::create(path).unwrap();
-    //let output = format!("{}", Dot::with_config(&graph.graph, &[Config::EdgeNoLabel]));
-    let output = format!("{}", Dot::with_config(&graph.graph, &[Config::NodeNoLabel]));
-    f.write_all(&output.as_bytes())?;
-    Ok(())
 }
 
 #[cfg(test)]
@@ -716,7 +724,7 @@ mod tests {
         graph.add_edge(21, 40, BiedgedEdgeType::Gray);
         graph.add_edge(31, 40, BiedgedEdgeType::Gray);
 
-        contract_all_gray_edges(&mut graph);
+        graph.contract_all_gray_edges();
 
         println!("{:#?}", Dot::with_config(&graph.graph, &[Config::NodeNoLabel]));
         println!("Nodes: {:#?}", graph.get_nodes());
