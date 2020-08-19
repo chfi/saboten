@@ -305,14 +305,14 @@ pub struct BiedgedNode {
 }
 
 impl BiedgedGraph {
-    fn new() -> BiedgedGraph {
+    pub fn new() -> BiedgedGraph {
         BiedgedGraph{graph: UnGraphMap::new(), black_edges: Vec::new(), gray_edges: Vec::new(), nodes: Vec::new()}
     }    
 
     /// Print the biedged graph to a .dot file. This file can then be used by
     /// various tools (i.e. Graphviz) to produce a graphical representation of the graph
     /// (i.e. dot -Tpng graph.dot -o graph.png)
-    fn biedged_to_dot(&self, path : &PathBuf) -> std::io::Result<()> {
+    pub fn biedged_to_dot(&self, path : &PathBuf) -> std::io::Result<()> {
         let mut f = File::create(path).unwrap();
         //let output = format!("{}", Dot::with_config(&graph.graph, &[Config::EdgeNoLabel]));
         let output = format!("{}", Dot::with_config(&self.graph, &[Config::NodeNoLabel]));
