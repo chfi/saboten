@@ -17,7 +17,7 @@ use gfa::parser::parse_gfa;
 use std::iter::FromIterator;
 
 // Traits
-trait NodeFunctions {
+pub trait NodeFunctions {
     // Node functions
     fn add_node(&mut self, id: u64) -> Option<u64>;
     fn remove_node(&mut self, id: u64) -> Option<u64>;
@@ -30,7 +30,7 @@ trait NodeFunctions {
     //fn get_nodes_mut(&mut self) -> &mut Vec<BiedgedNode>;
 }
 
-trait EdgeFunctions {
+pub trait EdgeFunctions {
     // Edge functions
     fn add_edge(&mut self, from: u64, to: u64, edge_type: BiedgedEdgeType) -> Option<BiedgedEdge>;
     fn remove_edge(&mut self, from: u64, to: u64) -> Option<BiedgedEdge>;
@@ -268,13 +268,13 @@ impl EdgeFunctions for BiedgedGraph {
 }
 
 #[derive(PartialEq)]
-enum BiedgedEdgeType {
+pub enum BiedgedEdgeType {
     Black,
     Gray,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct BiedgedEdge {
+pub struct BiedgedEdge {
     from : u64,
     to : u64,
 }
@@ -300,7 +300,7 @@ pub struct BiedgedGraph {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct BiedgedNode {
+pub struct BiedgedNode {
     id : u64
 }
 
