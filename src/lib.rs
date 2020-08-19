@@ -275,8 +275,8 @@ pub enum BiedgedEdgeType {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BiedgedEdge {
-    from : u64,
-    to : u64,
+    pub from : u64,
+    pub to : u64,
 }
 #[derive(Debug, Clone, Copy)]
 struct BiedgedEdgeGray {

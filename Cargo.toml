@@ -10,3 +10,4 @@ edition = "2018"
 petgraph = "0.5.0"
 handlegraph = "0.2.0"
 gfa = "0.2.3"
+three-edge-connected = { git = "https://github.com/chfi/rs-3-edge" }
