@@ -16,6 +16,16 @@ use std::io;
 use gfa::parser::parse_gfa;
 use std::iter::FromIterator;
 
+use three_edge_connected::*;
+use three_edge_connected::graph::Graph;
+use three_edge_connected::state::State;
+use std::collections::HashMap;
+use std::collections::BTreeMap;
+use three_edge_connected::graph::AdjacencyList;
+use three_edge_connected::graph::BTreeGraph;
+use bstr::io::*;
+use bstr::{BStr, BString};
+
 // Traits
 pub trait NodeFunctions {
     // Node functions
@@ -332,14 +342,72 @@ impl BiedgedGraph {
         }
     }
 
+
+
     /// STEP 2: Find 3-edge connected components
     /// makes use of chfi's rs-3-edge, which can be found at:
     /// https://github.com/chfi/rs-3-edge
-    pub fn find_3_edge_connected_components(&self) {
+    
+    /// Private function to generate a Graph as defined in rs-3-edge
+    fn from_biedged_graph(&self) -> Graph {
 
+        let mut graph: BTreeMap<usize, AdjacencyList> = BTreeMap::new();
+        let mut name_map: HashMap<BString, usize> = HashMap::new();
+        let mut inv_names = Vec::new();
+
+        let mut get_ix = |name: &BStr| {
+            if let Some(ix) = name_map.get(name) {
+                *ix
+            } else {
+                let ix = name_map.len();
+                name_map.insert(name.into(), ix);
+                inv_names.push(name.into());
+                ix
+            }
+        };
+
+        // Black edges
+        self.get_black_edges();
+        for black_edge in self.get_black_edges() {
+            
+            let from_ix = get_ix(BString::from(format!("{:#?}",black_edge.from)).as_ref());
+            let to_ix = get_ix(BString::from(format!("{:#?}",black_edge.to)).as_ref());
+
+            graph.entry(from_ix).or_default().push(to_ix);
+            graph.entry(to_ix).or_default().push(from_ix);
+        }
+
+        Graph { graph, inv_names }
     }
 
+    /// Private function to obtain connected components
+    /// Writes each component to terminal
+    fn obtain_complex_components(
+        &self,
+        inv_names: &[BString],
+        components: &[Vec<usize>],
+    ) -> Vec<Vec<u64>> {
+        let mut complex_components : Vec<Vec<u64>> = Vec::new();
+        for component in components {
+            let mut current_component : Vec<u64> = Vec::new();
+            if component.len() > 1 {
+                component.iter().enumerate().for_each(|(i, j)| {
+                    let temp : String = format!("{}", inv_names[*j]);
+                    current_component.push(temp.parse::<u64>().unwrap());
+                });
+                complex_components.push(current_component);
+            }
+        }
+        complex_components
+    }
 
+    pub fn find_3_edge_connected_components(&self) {
+        let graph = self.from_biedged_graph();
+        let mut state = State::initialize(&graph.graph);
+        algorithm::three_edge_connect(&graph.graph, &mut state);
+        let components = self.obtain_complex_components(&graph.inv_names, state.components());
+        println!("Components: {:#?}",components);
+    }
 
 }
 
