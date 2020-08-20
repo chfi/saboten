@@ -307,7 +307,11 @@ pub struct BiedgedNode {
 impl BiedgedGraph {
     pub fn new() -> BiedgedGraph {
         BiedgedGraph{graph: UnGraphMap::new(), black_edges: Vec::new(), gray_edges: Vec::new(), nodes: Vec::new()}
-    }    
+    }
+
+    pub fn new2() -> BiedgedGraph {
+        BiedgedGraph::new()
+    }
 
     /// Print the biedged graph to a .dot file. This file can then be used by
     /// various tools (i.e. Graphviz) to produce a graphical representation of the graph
