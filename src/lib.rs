@@ -381,7 +381,7 @@ impl BiedgedGraph {
     }
 
     /// Private function to obtain connected components
-    /// Writes each component to terminal
+    /// of length greater than 1
     fn obtain_complex_components(
         &self,
         inv_names: &[BString],
@@ -401,13 +401,89 @@ impl BiedgedGraph {
         complex_components
     }
 
-    pub fn find_3_edge_connected_components(&self) {
+    fn merge_3_connected_components(&mut self, components : &Vec<Vec<u64>>) {
+        for component in components {
+            self.merge_nodes_in_component(component);
+        }
+    }
+    fn merge_nodes_in_component(&mut self, component : &Vec<u64>) {
+        let mut adj_vertices : HashSet<u64> = HashSet::new();
+
+        for nodeId in component {
+            for node in self.get_adjacent_nodes(*nodeId).unwrap() {
+                if !component.contains(&node) {
+                    adj_vertices.insert(node);
+                }
+            }
+            // Remove all edges incident to nodeId
+            self.remove_edges_incident_to_node(*nodeId);
+            // Remove node
+            self.remove_node(*nodeId);
+        }
+
+        // TODO: Decide which nodeId to use
+        self.add_node(*component.get(0).unwrap());
+        for node in adj_vertices {
+            // TODO: keep track if edge was incoming or outcoming
+            self.add_edge(100, node, BiedgedEdgeType::Black);
+        }
+
+    }
+
+    pub fn find_3_edge_connected_components(&mut self) {
         let graph = self.from_biedged_graph();
         let mut state = State::initialize(&graph.graph);
         algorithm::three_edge_connect(&graph.graph, &mut state);
         let components = self.obtain_complex_components(&graph.inv_names, state.components());
-        println!("Components: {:#?}",components);
+        self.merge_3_connected_components(&components);
     }
+
+
+    /// STEP 3: Find loops and contract edges inside them
+    
+    // Find loops using a DFS
+    fn find_loops(&mut self) -> Vec<Vec<BiedgedEdge>> {
+        let mut loops : Vec<Vec<BiedgedEdge>> = Vec::new();
+        let mut dfs_stack : Vec<u64> = Vec::new();
+        let mut visited_nodes_set : HashSet<u64> = HashSet::new();
+        
+        let start_node = self.get_nodes().iter().map(|x| x.id).min().unwrap();
+        dfs_stack.push(start_node);
+
+        while let Some(id) = dfs_stack.pop() {
+            let adj_nodes = self.get_adjacent_nodes(id).unwrap();
+            for node in adj_nodes {
+                if !visited_nodes_set.contains(&node) {
+                    dfs_stack.push(node);
+                } else {
+                    // Found loop
+                    let mut current_component : Vec<BiedgedEdge> = Vec::new();
+                    current_component.push(BiedgedEdge{from:id,to:node});
+                    loops.push(current_component);
+                }
+                
+            }
+            visited_nodes_set.insert(id);
+        }
+
+        loops
+    }
+
+    fn contract_loop_edges(&mut self, loop_edges: Vec<Vec<BiedgedEdge>>) {
+        for loop_components in loop_edges {
+            for edge in loop_components {
+                self.contract_edge(edge.from, edge.to);
+            }
+        }
+    }
+
+    pub fn contract_loops(&mut self) {
+        let mut loop_edges : Vec<Vec<BiedgedEdge>> = Vec::new();
+        loop_edges = self.find_loops();
+        self.contract_loop_edges(loop_edges);
+    }
+
+
 
 }
 
