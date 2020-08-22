@@ -152,3 +152,124 @@ pub fn contract_loops(biedged: &mut BiedgedGraph) {
     loop_edges = find_loops(biedged);
     contract_loop_edges(biedged, loop_edges);
 }
+
+
+// ----------------------------------- TESTS -------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::biedgedgraph::*;
+
+    fn graph_from_paper() -> BiedgedGraph {
+        let mut graph: BiedgedGraph = BiedgedGraph::new();
+        
+        // Add nodes
+        for i in 0..35 {
+            graph.add_node(i);
+        }
+
+        // Add edges
+
+        // Node a
+        graph.add_edge(0, 1, BiedgedEdgeType::Black);
+        
+        graph.add_edge(1, 2, BiedgedEdgeType::Gray);
+        graph.add_edge(1, 3, BiedgedEdgeType::Gray);
+
+        // Node b
+        graph.add_edge(2, 4, BiedgedEdgeType::Black);
+
+        // Node c
+        graph.add_edge(3, 5, BiedgedEdgeType::Black);
+
+        graph.add_edge(4, 6, BiedgedEdgeType::Gray);
+        graph.add_edge(5, 6, BiedgedEdgeType::Gray);
+
+        // Node d
+        graph.add_edge(6, 7, BiedgedEdgeType::Black);
+
+        graph.add_edge(7, 8, BiedgedEdgeType::Gray);
+        graph.add_edge(7, 9, BiedgedEdgeType::Gray);
+
+        // Node e
+        graph.add_edge(8, 10, BiedgedEdgeType::Black);
+
+        // Node f
+        graph.add_edge(9, 11, BiedgedEdgeType::Black);
+
+        graph.add_edge(10, 12, BiedgedEdgeType::Gray);
+        graph.add_edge(11, 12, BiedgedEdgeType::Gray);
+
+        // Node g
+        graph.add_edge(12, 13, BiedgedEdgeType::Black);
+
+        graph.add_edge(11, 14, BiedgedEdgeType::Gray);
+
+        // Node h
+        graph.add_edge(14, 15, BiedgedEdgeType::Black);
+
+        graph.add_edge(15, 16, BiedgedEdgeType::Gray);
+        graph.add_edge(15, 17, BiedgedEdgeType::Gray);
+
+        // Node i
+        graph.add_edge(17, 18, BiedgedEdgeType::Black);
+
+        graph.add_edge(18, 16, BiedgedEdgeType::Gray);
+
+        // Node j
+        graph.add_edge(16, 19, BiedgedEdgeType::Black);
+
+        graph.add_edge(13, 20, BiedgedEdgeType::Gray);
+        graph.add_edge(13, 21, BiedgedEdgeType::Gray);
+
+        // Node k
+        graph.add_edge(20, 22, BiedgedEdgeType::Black);
+
+        graph.add_edge(22, 21, BiedgedEdgeType::Gray);
+        graph.add_edge(19, 21, BiedgedEdgeType::Gray);
+
+        // Node l
+        graph.add_edge(21, 23, BiedgedEdgeType::Black);
+
+        graph.add_edge(23, 24, BiedgedEdgeType::Gray);
+
+        // Node m
+        graph.add_edge(24, 25, BiedgedEdgeType::Black);
+
+        graph.add_edge(25, 26, BiedgedEdgeType::Gray);
+        graph.add_edge(25, 27, BiedgedEdgeType::Gray);
+
+        // Node n
+        graph.add_edge(26, 28, BiedgedEdgeType::Black);
+
+        // Node o
+        graph.add_edge(27, 29, BiedgedEdgeType::Black);
+
+        graph.add_edge(28, 30, BiedgedEdgeType::Gray);
+        graph.add_edge(29, 30, BiedgedEdgeType::Gray);
+
+        // Node p
+        graph.add_edge(30, 31, BiedgedEdgeType::Black);
+
+        graph.add_edge(31, 24, BiedgedEdgeType::Gray);
+
+        graph.add_edge(31, 32, BiedgedEdgeType::Gray);
+        graph.add_edge(31, 33, BiedgedEdgeType::Gray);
+
+        // Node q
+        graph.add_edge(32, 34, BiedgedEdgeType::Black);
+
+        // Node r
+        graph.add_edge(33, 35, BiedgedEdgeType::Black);
+
+        graph
+    }
+
+    #[test]
+    fn test_contract_all_gray_edges_paper() {
+        let mut graph: BiedgedGraph = graph_from_paper();
+        contract_all_gray_edges(&mut graph);
+        assert!(graph.get_gray_edges().len() == 0);
+        assert!(graph.get_black_edges().len() == 18, "Is insted: {:#?}", graph.get_black_edges().len());
+    }
+}
