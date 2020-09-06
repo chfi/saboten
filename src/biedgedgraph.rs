@@ -1,18 +1,22 @@
-use petgraph::dot::{Config, Dot};
-use petgraph::prelude::*;
+use petgraph::{
+    dot::{Config, Dot},
+    prelude::*,
+};
 
-use handlegraph::handle::Direction;
-use handlegraph::handle::*;
-use handlegraph::handlegraph::*;
-use handlegraph::hashgraph::*;
+use handlegraph::{
+    handle::{Direction, *},
+    handlegraph::*,
+    hashgraph::*,
+};
 
 use gfa::parser::parse_gfa;
 
-use std::collections::HashSet;
-use std::collections::VecDeque;
-use std::fs::File;
-use std::io::Write;
-use std::path::PathBuf;
+use std::{
+    collections::{HashSet, VecDeque},
+    fs::File,
+    io::Write,
+    path::PathBuf,
+};
 
 /// A biedged graph is a graph with two types of edges: black edges and gray edges, such that each vertex is
 /// incident with at most one black edge. More information can be found in:
@@ -20,6 +24,7 @@ use std::path::PathBuf;
 
 /// This implementation is basically a wrapper over Petgraph. This was necessary since Petgraph does not provide
 /// ways to handle edge coloring, and also some other functions necessary to obtain a Cactus Graph.
+#[derive(Default)]
 pub struct BiedgedGraph {
     // The actual graph implementation, backed by Petgraph. The nodes have an id of type u64,
     // the edges can include non-empty Strings
@@ -112,7 +117,7 @@ impl NodeFunctions for BiedgedGraph {
     /// Remove the node with the given id, and all its incident edges
     fn remove_node(&mut self, id: u64) -> Option<u64> {
         if self.graph.contains_node(id) {
-            let removed = self.graph.remove_node(id);
+            let _ = self.graph.remove_node(id);
             self.nodes.retain(|x| x.id != id);
 
             // Remove all incident edges from Vecs
@@ -229,16 +234,13 @@ impl EdgeFunctions for BiedgedGraph {
     /// if at least one between from and to does not exist.
     fn add_edge(&mut self, from: u64, to: u64, edge_type: BiedgedEdgeType) -> Option<BiedgedEdge> {
         if self.graph.contains_node(from) && self.graph.contains_node(to) {
-            let edge_to_add = BiedgedEdge { from: from, to: to };
-            if edge_type == BiedgedEdgeType::Black {
-                self.graph.add_edge(from, to, String::from(""));
-                self.black_edges.push(BiedgedEdge { from: from, to: to });
-                Some(edge_to_add)
-            } else {
-                self.graph.add_edge(from, to, String::from(""));
-                self.gray_edges.push(BiedgedEdge { from: from, to: to });
-                Some(edge_to_add)
+            let edge_to_add = BiedgedEdge { from, to };
+            self.graph.add_edge(from, to, String::from(""));
+            match edge_type {
+                BiedgedEdgeType::Black => self.black_edges.push(edge_to_add),
+                BiedgedEdgeType::Gray => self.gray_edges.push(edge_to_add),
             }
+            Some(edge_to_add)
         } else {
             None
         }
@@ -249,20 +251,17 @@ impl EdgeFunctions for BiedgedGraph {
     fn remove_edge(&mut self, from: u64, to: u64) -> Option<BiedgedEdge> {
         let edge_to_remove = BiedgedEdge { from: from, to: to };
 
-        if self.graph.contains_edge(from, to) && self.black_edges.contains(&edge_to_remove) {
+        if self.graph.contains_edge(from, to) {
             self.graph.remove_edge(from, to);
-            self.black_edges
-                .iter()
-                .position(|x| *x == edge_to_remove)
-                .map(|e| self.black_edges.remove(e));
-            Some(edge_to_remove)
-        } else if self.graph.contains_edge(from, to) && self.gray_edges.contains(&edge_to_remove) {
-            self.graph.remove_edge(from, to);
-            self.gray_edges
-                .iter()
-                .position(|x| *x == edge_to_remove)
-                .map(|e| self.gray_edges.remove(e));
-            Some(edge_to_remove)
+            if self.black_edges.contains(&edge_to_remove) {
+                self.black_edges.retain(|edge| edge != &edge_to_remove);
+                Some(edge_to_remove)
+            } else if self.gray_edges.contains(&edge_to_remove) {
+                self.gray_edges.retain(|edge| edge != &edge_to_remove);
+                Some(edge_to_remove)
+            } else {
+                panic!("this should be impossible!");
+            }
         } else {
             None
         }
@@ -376,12 +375,7 @@ impl EdgeFunctions for BiedgedGraph {
 impl BiedgedGraph {
     /// Create a new "empty" biedged graph
     pub fn new() -> BiedgedGraph {
-        BiedgedGraph {
-            graph: UnGraphMap::new(),
-            black_edges: Vec::new(),
-            gray_edges: Vec::new(),
-            nodes: Vec::new(),
-        }
+        Default::default()
     }
 
     /// Create a biedged graph from a Handlegraph
@@ -499,15 +493,6 @@ mod tests {
     use super::*;
     use crate::biedged_to_cactus::contract_all_gray_edges;
     //use handlegraph::mutablehandlegraph::MutableHandleGraph;
-
-    #[test]
-    fn test_new() {
-        let graph: BiedgedGraph = BiedgedGraph::new();
-        assert!(graph.graph.node_count() == 0);
-        assert!(graph.get_black_edges().len() == 0);
-        assert!(graph.get_gray_edges().len() == 0);
-        assert!(graph.get_nodes().len() == 0);
-    }
 
     #[test]
     fn test_add_node() {

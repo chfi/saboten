@@ -1,20 +1,18 @@
 use crate::biedgedgraph::*;
 
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    path::PathBuf,
+};
+
 use handlegraph::hashgraph::*;
 
-use std::collections::HashSet;
-use std::path::PathBuf;
+use three_edge_connected::{
+    graph::{AdjacencyList, Graph},
+    state::State,
+    *,
+};
 
-
-use gfa::parser::parse_gfa;
-
-use three_edge_connected::*;
-use three_edge_connected::graph::Graph;
-use three_edge_connected::state::State;
-use std::collections::HashMap;
-use std::collections::BTreeMap;
-
-use three_edge_connected::graph::AdjacencyList;
 use bstr::{BStr, BString};
 
 /// STEP 1: Contract all gray edges
@@ -107,7 +105,7 @@ pub fn find_3_edge_connected_components(biedged: &mut BiedgedGraph) {
     let mut state = State::initialize(&graph.graph);
     algorithm::three_edge_connect(&graph.graph, &mut state);
     let components = obtain_complex_components(&graph.inv_names, state.components());
-    merge_3_connected_components(biedged,&components);
+    merge_3_connected_components(biedged, &components);
 }
 
 /// STEP 3: Find loops and contract edges inside them
@@ -153,7 +151,6 @@ pub fn contract_loops(biedged: &mut BiedgedGraph) {
     contract_loop_edges(biedged, loop_edges);
 }
 
-
 // ----------------------------------- TESTS -------------------------------
 #[cfg(test)]
 mod tests {
@@ -162,7 +159,7 @@ mod tests {
 
     fn graph_from_paper() -> BiedgedGraph {
         let mut graph: BiedgedGraph = BiedgedGraph::new();
-        
+
         // Add nodes
         for i in 0..35 {
             graph.add_node(i);
@@ -172,7 +169,7 @@ mod tests {
 
         // Node a
         graph.add_edge(0, 1, BiedgedEdgeType::Black);
-        
+
         graph.add_edge(1, 2, BiedgedEdgeType::Gray);
         graph.add_edge(1, 3, BiedgedEdgeType::Gray);
 
@@ -270,6 +267,10 @@ mod tests {
         let mut graph: BiedgedGraph = graph_from_paper();
         contract_all_gray_edges(&mut graph);
         assert!(graph.get_gray_edges().len() == 0);
-        assert!(graph.get_black_edges().len() == 18, "Is insted: {:#?}", graph.get_black_edges().len());
+        assert!(
+            graph.get_black_edges().len() == 18,
+            "Is insted: {:#?}",
+            graph.get_black_edges().len()
+        );
     }
 }
