@@ -28,16 +28,16 @@ use std::{
 pub struct BiedgedGraph {
     // The actual graph implementation, backed by Petgraph. The nodes have an id of type u64,
     // the edges can include non-empty Strings
-    graph: UnGraphMap<u64, String>,
+    pub(crate) graph: UnGraphMap<u64, String>,
 
     // A Vec containing all the gray edges
-    black_edges: Vec<BiedgedEdge>,
+    pub(crate) black_edges: Vec<BiedgedEdge>,
 
     // A Vec containing all the black edges
-    gray_edges: Vec<BiedgedEdge>,
+    pub(crate) gray_edges: Vec<BiedgedEdge>,
 
     // A Vec containing all nodes in the graph
-    nodes: Vec<BiedgedNode>,
+    pub(crate) nodes: Vec<BiedgedNode>,
 }
 // NOTE: nodes from the nodes Vec are in a 1:1 relationship with nodes in the graph (i.e. if a node
 // can be found by self.nodes.contains(id), it will be present exactly once in self.graph).
@@ -491,7 +491,6 @@ impl BiedgedGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::biedged_to_cactus::contract_all_gray_edges;
     //use handlegraph::mutablehandlegraph::MutableHandleGraph;
 
     #[test]
@@ -668,54 +667,5 @@ mod tests {
         assert!(!graph.get_nodes().contains(&BiedgedNode { id: 20 }));
         assert!(!graph.graph.contains_node(20));
         assert!(graph.graph.edge_count() == 1);
-    }
-
-    #[test]
-    fn test_contract_all_gray_edges() {
-        let mut graph: BiedgedGraph = BiedgedGraph::new();
-
-        //First Handlegraph node
-        graph.add_node(10);
-        graph.add_node(11);
-        graph.add_edge(10, 11, BiedgedEdgeType::Black);
-
-        //Second Handlegraph node
-        graph.add_node(20);
-        graph.add_node(21);
-        graph.add_edge(20, 21, BiedgedEdgeType::Black);
-
-        //Third Handlegraph node
-        graph.add_node(30);
-        graph.add_node(31);
-        graph.add_edge(30, 31, BiedgedEdgeType::Black);
-
-        //Forth Handlegraph node
-        graph.add_node(40);
-        graph.add_node(41);
-        graph.add_edge(40, 41, BiedgedEdgeType::Black);
-
-        //Add Handlegraph edges
-        graph.add_edge(11, 20, BiedgedEdgeType::Gray);
-        graph.add_edge(11, 30, BiedgedEdgeType::Gray);
-        graph.add_edge(21, 40, BiedgedEdgeType::Gray);
-        graph.add_edge(31, 40, BiedgedEdgeType::Gray);
-
-        contract_all_gray_edges(&mut graph);
-
-        println!(
-            "{:#?}",
-            Dot::with_config(&graph.graph, &[Config::NodeNoLabel])
-        );
-        println!("Nodes: {:#?}", graph.get_nodes());
-        println!("Gray_edges {:#?}", graph.get_gray_edges());
-        println!("Black_edges {:#?}", graph.get_black_edges());
-
-        assert!(graph.get_nodes().len() == 4);
-        assert!(graph.get_black_edges().len() == 4);
-
-        // NOTE: petgraph does not actually support multiple edges between two given nodes
-        // however, they are allowed in Biedged Graphs. For this reason it is better to use
-        // the count_edges function provided by the EdgeFunctions trait.
-        assert!(graph.graph.edge_count() == 3);
     }
 }
