@@ -132,7 +132,10 @@ fn find_loops(biedged: &mut BiedgedGraph) -> Vec<Vec<BiedgedEdge>> {
     loops
 }
 
-fn contract_loop_edges(biedged: &mut BiedgedGraph, loop_edges: Vec<Vec<BiedgedEdge>>) {
+fn contract_loop_edges(
+    biedged: &mut BiedgedGraph,
+    loop_edges: Vec<Vec<BiedgedEdge>>,
+) {
     for loop_components in loop_edges {
         for edge in loop_components {
             biedged.contract_edge(edge.from, edge.to);
@@ -153,106 +156,135 @@ mod tests {
     use crate::biedgedgraph::*;
 
     fn graph_from_paper() -> BiedgedGraph {
-        let mut graph: BiedgedGraph = BiedgedGraph::new();
+        let mut graph = BiedgedGraph::new();
 
         // Add nodes
-        for i in 0..35 {
-            graph.add_node(i);
+        for i in 0..18 {
+            let n = 10 * (i + 1);
+            graph.add_node(n);
+            graph.add_node(n + 1);
         }
 
         // Add edges
 
         // Node a
-        graph.add_edge(0, 1, BiedgedEdgeType::Black);
-
-        graph.add_edge(1, 2, BiedgedEdgeType::Gray);
-        graph.add_edge(1, 3, BiedgedEdgeType::Gray);
+        graph.add_edge(10, 11, BiedgedEdgeType::Black);
 
         // Node b
-        graph.add_edge(2, 4, BiedgedEdgeType::Black);
+        graph.add_edge(20, 21, BiedgedEdgeType::Black);
 
         // Node c
-        graph.add_edge(3, 5, BiedgedEdgeType::Black);
-
-        graph.add_edge(4, 6, BiedgedEdgeType::Gray);
-        graph.add_edge(5, 6, BiedgedEdgeType::Gray);
-
-        // Node d
-        graph.add_edge(6, 7, BiedgedEdgeType::Black);
-
-        graph.add_edge(7, 8, BiedgedEdgeType::Gray);
-        graph.add_edge(7, 9, BiedgedEdgeType::Gray);
-
-        // Node e
-        graph.add_edge(8, 10, BiedgedEdgeType::Black);
-
-        // Node f
-        graph.add_edge(9, 11, BiedgedEdgeType::Black);
-
-        graph.add_edge(10, 12, BiedgedEdgeType::Gray);
-        graph.add_edge(11, 12, BiedgedEdgeType::Gray);
-
-        // Node g
-        graph.add_edge(12, 13, BiedgedEdgeType::Black);
-
-        graph.add_edge(11, 14, BiedgedEdgeType::Gray);
-
-        // Node h
-        graph.add_edge(14, 15, BiedgedEdgeType::Black);
-
-        graph.add_edge(15, 16, BiedgedEdgeType::Gray);
-        graph.add_edge(15, 17, BiedgedEdgeType::Gray);
-
-        // Node i
-        graph.add_edge(17, 18, BiedgedEdgeType::Black);
-
-        graph.add_edge(18, 16, BiedgedEdgeType::Gray);
-
-        // Node j
-        graph.add_edge(16, 19, BiedgedEdgeType::Black);
-
-        graph.add_edge(13, 20, BiedgedEdgeType::Gray);
-        graph.add_edge(13, 21, BiedgedEdgeType::Gray);
-
-        // Node k
-        graph.add_edge(20, 22, BiedgedEdgeType::Black);
-
-        graph.add_edge(22, 21, BiedgedEdgeType::Gray);
-        graph.add_edge(19, 21, BiedgedEdgeType::Gray);
-
-        // Node l
-        graph.add_edge(21, 23, BiedgedEdgeType::Black);
-
-        graph.add_edge(23, 24, BiedgedEdgeType::Gray);
-
-        // Node m
-        graph.add_edge(24, 25, BiedgedEdgeType::Black);
-
-        graph.add_edge(25, 26, BiedgedEdgeType::Gray);
-        graph.add_edge(25, 27, BiedgedEdgeType::Gray);
-
-        // Node n
-        graph.add_edge(26, 28, BiedgedEdgeType::Black);
-
-        // Node o
-        graph.add_edge(27, 29, BiedgedEdgeType::Black);
-
-        graph.add_edge(28, 30, BiedgedEdgeType::Gray);
-        graph.add_edge(29, 30, BiedgedEdgeType::Gray);
-
-        // Node p
         graph.add_edge(30, 31, BiedgedEdgeType::Black);
 
-        graph.add_edge(31, 24, BiedgedEdgeType::Gray);
+        // Node d
+        graph.add_edge(40, 41, BiedgedEdgeType::Black);
 
-        graph.add_edge(31, 32, BiedgedEdgeType::Gray);
-        graph.add_edge(31, 33, BiedgedEdgeType::Gray);
+        // Node e
+        graph.add_edge(50, 51, BiedgedEdgeType::Black);
+
+        // Node f
+        graph.add_edge(60, 61, BiedgedEdgeType::Black);
+
+        // Node g
+        graph.add_edge(70, 71, BiedgedEdgeType::Black);
+
+        // Node h
+        graph.add_edge(80, 81, BiedgedEdgeType::Black);
+
+        // Node i
+        graph.add_edge(90, 91, BiedgedEdgeType::Black);
+
+        // Node j
+        graph.add_edge(100, 101, BiedgedEdgeType::Black);
+
+        // Node k
+        graph.add_edge(110, 111, BiedgedEdgeType::Black);
+
+        // Node l
+        graph.add_edge(120, 121, BiedgedEdgeType::Black);
+
+        // Node m
+        graph.add_edge(130, 131, BiedgedEdgeType::Black);
+
+        // Node n
+        graph.add_edge(140, 141, BiedgedEdgeType::Black);
+
+        // Node o
+        graph.add_edge(150, 151, BiedgedEdgeType::Black);
+
+        // Node p
+        graph.add_edge(160, 161, BiedgedEdgeType::Black);
 
         // Node q
-        graph.add_edge(32, 34, BiedgedEdgeType::Black);
+        graph.add_edge(170, 171, BiedgedEdgeType::Black);
 
         // Node r
-        graph.add_edge(33, 35, BiedgedEdgeType::Black);
+        graph.add_edge(180, 181, BiedgedEdgeType::Black);
+
+        // a-b
+        graph.add_edge(11, 20, BiedgedEdgeType::Gray);
+        // a-c
+        graph.add_edge(11, 30, BiedgedEdgeType::Gray);
+
+        // b-d
+        graph.add_edge(21, 40, BiedgedEdgeType::Gray);
+        // c-d
+        graph.add_edge(31, 40, BiedgedEdgeType::Gray);
+
+        // d-e
+        graph.add_edge(41, 50, BiedgedEdgeType::Gray);
+        // d-f
+        graph.add_edge(41, 60, BiedgedEdgeType::Gray);
+
+        // e-g
+        graph.add_edge(51, 70, BiedgedEdgeType::Gray);
+
+        // f-g
+        graph.add_edge(61, 70, BiedgedEdgeType::Gray);
+
+        // f-h
+        graph.add_edge(61, 80, BiedgedEdgeType::Gray);
+
+        // g-k
+        graph.add_edge(71, 110, BiedgedEdgeType::Gray);
+        // g-l
+        graph.add_edge(71, 120, BiedgedEdgeType::Gray);
+
+        // h-i
+        graph.add_edge(81, 90, BiedgedEdgeType::Gray);
+        // h-j
+        graph.add_edge(81, 100, BiedgedEdgeType::Gray);
+
+        // i-j
+        graph.add_edge(91, 100, BiedgedEdgeType::Gray);
+
+        // j-l
+        graph.add_edge(101, 120, BiedgedEdgeType::Gray);
+
+        // k-l
+        graph.add_edge(110, 120, BiedgedEdgeType::Gray);
+
+        // l-m
+        graph.add_edge(121, 130, BiedgedEdgeType::Gray);
+
+        // m-n
+        graph.add_edge(131, 140, BiedgedEdgeType::Gray);
+        // m-o
+        graph.add_edge(131, 150, BiedgedEdgeType::Gray);
+
+        // n-p
+        graph.add_edge(141, 160, BiedgedEdgeType::Gray);
+
+        // o-p
+        graph.add_edge(151, 160, BiedgedEdgeType::Gray);
+
+        // p-m
+        graph.add_edge(161, 130, BiedgedEdgeType::Gray);
+
+        // p-q
+        graph.add_edge(161, 170, BiedgedEdgeType::Gray);
+        // p-r
+        graph.add_edge(161, 180, BiedgedEdgeType::Gray);
 
         graph
     }
@@ -312,7 +344,10 @@ mod tests {
     fn paper_contract_all_gray_edges() {
         let mut graph: BiedgedGraph = graph_from_paper();
         contract_all_gray_edges(&mut graph);
+
         println!("gray edges: {}", graph.get_gray_edges().len());
+        println!("black edges: {}", graph.get_black_edges().len());
+        println!("nodes: {}", graph.get_nodes().len());
         // assert!(graph.get_gray_edges().len() == 0);
         assert!(
             graph.get_black_edges().len() == 18,
