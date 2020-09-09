@@ -1,7 +1,4 @@
-use petgraph::{
-    dot::{Config, Dot},
-    prelude::*,
-};
+use petgraph::prelude::*;
 
 use handlegraph::{
     handle::{Direction, *},
@@ -28,7 +25,7 @@ use std::{
 pub struct BiedgedGraph {
     // The actual graph implementation, backed by Petgraph. The nodes have an id of type u64,
     // the edges can include non-empty Strings
-    pub(crate) graph: UnGraphMap<u64, String>,
+    pub(crate) graph: UnGraphMap<u64, ()>,
 
     // A Vec containing all the gray edges
     pub(crate) black_edges: Vec<BiedgedEdge>,
@@ -164,11 +161,11 @@ impl NodeFunctions for BiedgedGraph {
     /// Returns all the adjacents nodes to a node with a given id, that is all the nodes
     /// with an edge from/to the given id.
     fn get_adjacent_nodes(&self, id: u64) -> Option<Vec<u64>> {
-        if self.graph.contains_node(id) {
-            let adjacent_nodes: Vec<u64> = self.graph.edges(id).map(|x| x.1).collect();
-            Some(adjacent_nodes)
-        } else {
+        let adjacent_nodes: Vec<_> = self.graph.neighbors(id).collect();
+        if adjacent_nodes.is_empty() {
             None
+        } else {
+            Some(adjacent_nodes)
         }
     }
 
@@ -235,7 +232,7 @@ impl EdgeFunctions for BiedgedGraph {
     fn add_edge(&mut self, from: u64, to: u64, edge_type: BiedgedEdgeType) -> Option<BiedgedEdge> {
         if self.graph.contains_node(from) && self.graph.contains_node(to) {
             let edge_to_add = BiedgedEdge { from, to };
-            self.graph.add_edge(from, to, String::from(""));
+            self.graph.add_edge(from, to, ());
             match edge_type {
                 BiedgedEdgeType::Black => self.black_edges.push(edge_to_add),
                 BiedgedEdgeType::Gray => self.gray_edges.push(edge_to_add),
@@ -380,7 +377,7 @@ impl BiedgedGraph {
 
     /// Create a biedged graph from a Handlegraph
     pub fn handlegraph_to_biedged_graph(graph: &HashGraph) -> BiedgedGraph {
-        let mut biedged: UnGraphMap<u64, String> = UnGraphMap::new();
+        let mut biedged: UnGraphMap<u64, ()> = UnGraphMap::new();
 
         // Create queue
         // NOTE: this is a Queue based implementation, this was done
@@ -418,8 +415,8 @@ impl BiedgedGraph {
             let node_2 = biedged.add_node(right_id);
 
             // The two nodes are connected
-            let id_edge = format!("B: {}", current_handle.unpack_number());
-            biedged.add_edge(node_1, node_2, id_edge);
+            // let id_edge = format!("B: {}", current_handle.unpack_number());
+            biedged.add_edge(node_1, node_2, ());
 
             // Add nodes to vec
             nodes.push(BiedgedNode { id: left_id });
@@ -437,8 +434,8 @@ impl BiedgedGraph {
                 let neighbor_node_biedged = biedged.add_node(neighbor.as_integer());
 
                 // Add edge from neighbor to
-                let id_edge = format!("G: {}->{}", curr_node, neighbor.id());
-                biedged.add_edge(node_2, neighbor_node_biedged, id_edge);
+                // let id_edge = format!("G: {}->{}", curr_node, neighbor.id());
+                biedged.add_edge(node_2, neighbor_node_biedged, ());
 
                 // Add edge to gray edges
                 gray_edges.push(BiedgedEdge {
@@ -475,23 +472,32 @@ impl BiedgedGraph {
         }
     }
 
+    /* temporarily disabled; need to use with_attr_getters because the
+       () edge weights don't work otherwise (() doesn't implement
+       Display)
+
     /// Print the biedged graph to a .dot file. This file can then be used by
     /// various tools (i.e. Graphviz) to produce a graphical representation of the graph
     /// (i.e. dot -Tpng graph.dot -o graph.png)
     pub fn biedged_to_dot(&self, path: &PathBuf) -> std::io::Result<()> {
+        use petgraph::dot::{Config, Dot};
+
         let mut f = File::create(path).unwrap();
-        //let output = format!("{}", Dot::with_config(&graph.graph, &[Config::EdgeNoLabel]));
-        let output = format!("{}", Dot::with_config(&self.graph, &[Config::NodeNoLabel]));
+        // let output = format!("{}", Dot::with_config(&graph.graph, &[Config::EdgeNoLabel]));
+        let output = format!(
+            "{:?}",
+            Dot::with_config(&self.graph, &[Config::NodeNoLabel])
+        );
         f.write_all(&output.as_bytes())?;
         Ok(())
     }
+    */
 }
 
 // ----------------------------------- TESTS -------------------------------
 #[cfg(test)]
 mod tests {
     use super::*;
-    //use handlegraph::mutablehandlegraph::MutableHandleGraph;
 
     #[test]
     fn test_add_node() {

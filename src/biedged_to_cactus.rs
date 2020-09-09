@@ -1,11 +1,6 @@
 use crate::biedgedgraph::*;
 
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    path::PathBuf,
-};
-
-use handlegraph::hashgraph::*;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use three_edge_connected::{
     graph::{AdjacencyList, Graph},
@@ -293,6 +288,8 @@ mod tests {
         graph.add_edge(31, 40, BiedgedEdgeType::Gray);
 
         contract_all_gray_edges(&mut graph);
+
+        use petgraph::dot::{Config, Dot};
 
         println!(
             "{:#?}",
