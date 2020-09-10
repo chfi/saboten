@@ -387,7 +387,7 @@ impl BiedgedGraph {
     }
 
     /// Create a biedged graph from a Handlegraph
-    pub fn handlegraph_to_biedged_graph(graph: &HashGraph) -> BiedgedGraph {
+    pub fn from_handlegraph<T: HandleGraph>(graph: &T) -> BiedgedGraph {
         let mut biedged: UnGraphMap<u64, ()> = UnGraphMap::new();
 
         // Create queue
@@ -397,7 +397,7 @@ impl BiedgedGraph {
 
         // Start from the node with the lowest id
         // will probably always be 1, but this is safer
-        let node_id = graph.min_id;
+        let node_id = graph.min_node_id();
 
         // Store which nodes have already been visited
         let mut visited_nodes: HashSet<NodeId> = HashSet::new();
@@ -440,9 +440,12 @@ impl BiedgedGraph {
             });
 
             // Look for neighbors in the Handlegraph, add edges in the biedged graph
-            for neighbor in handle_edges_iter(graph, current_handle, Direction::Right) {
+            for neighbor in
+                handle_edges_iter(graph, current_handle, Direction::Right)
+            {
                 // Add first node for neighbor
-                let neighbor_node_biedged = biedged.add_node(neighbor.as_integer());
+                let neighbor_node_biedged =
+                    biedged.add_node(neighbor.as_integer());
 
                 // Add edge from neighbor to
                 // let id_edge = format!("G: {}->{}", curr_node, neighbor.id());
@@ -475,12 +478,9 @@ impl BiedgedGraph {
     /// Convert a GFA to a biedged graph if file exists
     /// otherwise return None
     pub fn gfa_to_biedged_graph(path: &PathBuf) -> Option<BiedgedGraph> {
-        if let Some(gfa) = parse_gfa(path) {
-            let graph = HashGraph::from_gfa(&gfa);
-            Some(BiedgedGraph::handlegraph_to_biedged_graph(&graph))
-        } else {
-            None
-        }
+        let gfa = parse_gfa(path)?;
+        let graph = HashGraph::from_gfa(&gfa);
+        Some(BiedgedGraph::from_handlegraph(&graph))
     }
 
     /* temporarily disabled; need to use with_attr_getters because the
@@ -681,8 +681,13 @@ mod tests {
         graph.contract_edge(10, 20);
 
         assert!(graph.graph.contains_node(10));
-        assert!(!graph.get_nodes().contains(&BiedgedNode { id: 20 }));
+        assert!(graph.graph.contains_node(30));
         assert!(!graph.graph.contains_node(20));
-        assert!(graph.graph.edge_count() == 1);
+
+        assert!(graph.graph.edge_count() == 2);
+
+        assert!(!graph.get_nodes().contains(&BiedgedNode { id: 20 }));
+        assert!(graph.black_edges.len() == 2);
+        assert!(graph.gray_edges.len() == 1);
     }
 }

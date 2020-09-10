@@ -2,11 +2,7 @@ use crate::biedgedgraph::*;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use three_edge_connected::{
-    graph::{AdjacencyList, Graph},
-    state::State,
-    *,
-};
+use three_edge_connected as t_e_c;
 
 use bstr::{BStr, BString};
 
@@ -23,8 +19,9 @@ pub fn contract_all_gray_edges(biedged: &mut BiedgedGraph) {
 /// https://github.com/chfi/rs-3-edge
 
 /// Generate a Graph as defined in rs-3-edge from a biedged graph
-fn from_biedged_graph(biedged: &mut BiedgedGraph) -> Graph {
-    let mut graph: BTreeMap<usize, AdjacencyList> = BTreeMap::new();
+fn from_biedged_graph(biedged: &mut BiedgedGraph) -> t_e_c::graph::Graph {
+    let mut graph: BTreeMap<usize, t_e_c::graph::AdjacencyList> =
+        BTreeMap::new();
     let mut name_map: HashMap<BString, usize> = HashMap::new();
     let mut inv_names = Vec::new();
 
@@ -41,18 +38,23 @@ fn from_biedged_graph(biedged: &mut BiedgedGraph) -> Graph {
 
     // Black edges
     for black_edge in biedged.get_black_edges() {
-        let from_ix = get_ix(BString::from(format!("{:#?}", black_edge.from)).as_ref());
-        let to_ix = get_ix(BString::from(format!("{:#?}", black_edge.to)).as_ref());
+        let from_ix =
+            get_ix(BString::from(format!("{:#?}", black_edge.from)).as_ref());
+        let to_ix =
+            get_ix(BString::from(format!("{:#?}", black_edge.to)).as_ref());
 
         graph.entry(from_ix).or_default().push(to_ix);
         graph.entry(to_ix).or_default().push(from_ix);
     }
 
-    Graph { graph, inv_names }
+    t_e_c::graph::Graph { graph, inv_names }
 }
 
 /// Obtain connected components of length greater than 1
-fn obtain_complex_components(inv_names: &[BString], components: &[Vec<usize>]) -> Vec<Vec<u64>> {
+fn obtain_complex_components(
+    inv_names: &[BString],
+    components: &[Vec<usize>],
+) -> Vec<Vec<u64>> {
     let mut complex_components: Vec<Vec<u64>> = Vec::new();
     for component in components {
         let mut current_component: Vec<u64> = Vec::new();
@@ -67,7 +69,10 @@ fn obtain_complex_components(inv_names: &[BString], components: &[Vec<usize>]) -
     complex_components
 }
 
-fn merge_3_connected_components(biedged: &mut BiedgedGraph, components: &Vec<Vec<u64>>) {
+fn merge_3_connected_components(
+    biedged: &mut BiedgedGraph,
+    components: &Vec<Vec<u64>>,
+) {
     for component in components {
         merge_nodes_in_component(biedged, component);
     }
@@ -97,9 +102,12 @@ fn merge_nodes_in_component(biedged: &mut BiedgedGraph, component: &Vec<u64>) {
 
 pub fn find_3_edge_connected_components(biedged: &mut BiedgedGraph) {
     let graph = from_biedged_graph(biedged);
-    let mut state = State::initialize(&graph.graph);
-    algorithm::three_edge_connect(&graph.graph, &mut state);
-    let components = obtain_complex_components(&graph.inv_names, state.components());
+    let mut state = t_e_c::state::State::initialize(&graph.graph);
+
+    t_e_c::algorithm::three_edge_connect(&graph.graph, &mut state);
+
+    let components =
+        obtain_complex_components(&graph.inv_names, state.components());
     merge_3_connected_components(biedged, &components);
 }
 
@@ -345,10 +353,7 @@ mod tests {
         let mut graph: BiedgedGraph = graph_from_paper();
         contract_all_gray_edges(&mut graph);
 
-        println!("gray edges: {}", graph.get_gray_edges().len());
-        println!("black edges: {}", graph.get_black_edges().len());
-        println!("nodes: {}", graph.get_nodes().len());
-        // assert!(graph.get_gray_edges().len() == 0);
+        assert!(graph.get_gray_edges().len() == 0);
         assert!(
             graph.get_black_edges().len() == 18,
             "Expected 18 black edges, is actually {:#?}",
