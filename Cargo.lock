@@ -100,17 +100,6 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 
 [[package]]
 name = "gfa"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b257a39a24b53cb0082e6f103a42c662cb157aa5bbc31befe3e7ecb1e0f10285"
-dependencies = [
- "bstr",
- "lazy_static",
- "regex",
-]
-
-[[package]]
-name = "gfa"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc15b404705b5aae2fbb76797b2a9fd69061c480d52659f7369a880132f1153e"
@@ -130,7 +119,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4fac0e2d3a6389e5108d2c00f61f134ea9f5dc605697e513a475e4a380041ea"
 dependencies = [
  "bstr",
- "gfa 0.6.2",
+ "gfa",
 ]
 
 [[package]]
@@ -296,7 +285,7 @@ name = "rs-cactusgraph"
 version = "0.1.0"
 dependencies = [
  "bstr",
- "gfa 0.6.2",
+ "gfa",
  "handlegraph",
  "petgraph",
  "three-edge-connected",
@@ -396,10 +385,10 @@ dependencies = [
 [[package]]
 name = "three-edge-connected"
 version = "0.1.0"
-source = "git+https://github.com/chfi/rs-3-edge#d2b6e5a4e77db0c90309bdb0ae6d7127a96691c5"
+source = "git+https://github.com/chfi/rs-3-edge?rev=d34f1871557ef72cfb0b4b33e3f6c66df533437e#d34f1871557ef72cfb0b4b33e3f6c66df533437e"
 dependencies = [
  "bstr",
- "gfa 0.5.0",
+ "gfa",
  "structopt",
 ]
 

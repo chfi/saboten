@@ -17,84 +17,32 @@ pub fn contract_all_gray_edges(biedged: &mut BiedgedGraph) {
 /// STEP 2: Find 3-edge connected components
 /// makes use of chfi's rs-3-edge, which can be found at:
 /// https://github.com/chfi/rs-3-edge
-
-/// Generate a Graph as defined in rs-3-edge from a biedged graph
-fn from_biedged_graph(biedged: &mut BiedgedGraph) -> t_e_c::graph::Graph {
-    let mut graph: BTreeMap<usize, t_e_c::graph::AdjacencyList> =
-        BTreeMap::new();
-    let mut name_map: HashMap<BString, usize> = HashMap::new();
-    let mut inv_names = Vec::new();
-
-    let mut get_ix = |name: &BStr| {
-        if let Some(ix) = name_map.get(name) {
-            *ix
-        } else {
-            let ix = name_map.len();
-            name_map.insert(name.into(), ix);
-            inv_names.push(name.into());
-            ix
-        }
-    };
-
-    // Black edges
-    for black_edge in biedged.get_black_edges() {
-        let from_ix =
-            get_ix(BString::from(format!("{:#?}", black_edge.from)).as_ref());
-        let to_ix =
-            get_ix(BString::from(format!("{:#?}", black_edge.to)).as_ref());
-
-        graph.entry(from_ix).or_default().push(to_ix);
-        graph.entry(to_ix).or_default().push(from_ix);
-    }
-
-    t_e_c::graph::Graph { graph, inv_names }
-}
-
-/// Obtain connected components of length greater than 1
-fn obtain_complex_components(
-    inv_names: &[BString],
-    components: &[Vec<usize>],
-) -> Vec<Vec<u64>> {
-    let mut complex_components: Vec<Vec<u64>> = Vec::new();
-
-    for component in components {
-        let mut current_component: Vec<u64> = Vec::new();
-        if component.len() > 1 {
-            component.iter().for_each(|j| {
-                let temp: String = format!("{}", inv_names[*j]);
-                current_component.push(temp.parse::<u64>().unwrap());
-            });
-            complex_components.push(current_component);
-        }
-    }
-    complex_components
-}
-
 fn merge_3_connected_components(
     biedged: &mut BiedgedGraph,
-    components: &[Vec<u64>],
+    components: &[Vec<usize>],
 ) {
     for component in components {
         merge_nodes_in_component(biedged, component);
     }
 }
-fn merge_nodes_in_component(biedged: &mut BiedgedGraph, component: &[u64]) {
+fn merge_nodes_in_component(biedged: &mut BiedgedGraph, component: &[usize]) {
     let mut adj_vertices: HashSet<u64> = HashSet::new();
 
     for node_id in component {
-        for node in biedged.get_adjacent_nodes(*node_id).unwrap() {
-            if !component.contains(&node) {
+        let node_id = *node_id as u64;
+        for node in biedged.get_adjacent_nodes(node_id).unwrap() {
+            if !component.contains(&(node as usize)) {
                 adj_vertices.insert(node);
             }
         }
         // Remove all edges incident to nodeId
-        biedged.remove_edges_incident_to_node(*node_id);
+        biedged.remove_edges_incident_to_node(node_id);
         // Remove node
-        biedged.remove_node(*node_id);
+        biedged.remove_node(node_id);
     }
 
     // TODO: Decide which nodeId to use
-    biedged.add_node(*component.get(0).unwrap());
+    biedged.add_node(*component.get(0).unwrap() as u64);
     for node in adj_vertices {
         // TODO: keep track if edge was incoming or outcoming
         biedged.add_edge(100, node, BiedgedEdgeType::Black);
@@ -102,14 +50,16 @@ fn merge_nodes_in_component(biedged: &mut BiedgedGraph, component: &[u64]) {
 }
 
 pub fn find_3_edge_connected_components(biedged: &mut BiedgedGraph) {
-    let graph = from_biedged_graph(biedged);
-    let mut state = t_e_c::state::State::initialize(&graph.graph);
+    let graph = t_e_c::Graph::from_edges(
+        biedged
+            .get_black_edges()
+            .iter()
+            .map(|b| (b.from as usize, b.to as usize)),
+    );
 
-    t_e_c::algorithm::three_edge_connect(&graph.graph, &mut state);
+    let components = t_e_c::find_components(&graph.graph);
 
-    let components =
-        obtain_complex_components(&graph.inv_names, state.components());
-    merge_3_connected_components(biedged, &components);
+    merge_3_connected_components(biedged, components.as_ref());
 }
 
 /// STEP 3: Find loops and contract edges inside them
