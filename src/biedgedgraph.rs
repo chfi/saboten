@@ -10,8 +10,60 @@ use gfa::parser::parse_gfa;
 
 use std::{
     collections::{HashSet, VecDeque},
+    ops::{Add, AddAssign, Sub, SubAssign},
     path::PathBuf,
 };
+
+/// To make a petgraph Graph(Map) into a multigraph, we track the
+/// number of black and gray edges between two nodes by using this
+/// struct as the edge weight type
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct BiedgedWeight {
+    black: usize,
+    gray: usize,
+}
+
+impl BiedgedWeight {
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl Add for BiedgedWeight {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            black: self.black + other.black,
+            gray: self.gray + other.gray,
+        }
+    }
+}
+
+impl AddAssign for BiedgedWeight {
+    fn add_assign(&mut self, other: Self) {
+        self.black += other.black;
+        self.gray += other.gray;
+    }
+}
+
+impl Sub for BiedgedWeight {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self {
+            black: self.black - other.black,
+            gray: self.gray - other.gray,
+        }
+    }
+}
+
+impl SubAssign for BiedgedWeight {
+    fn sub_assign(&mut self, other: Self) {
+        self.black -= other.black;
+        self.gray -= other.gray;
+    }
+}
 
 /// A biedged graph is a graph with two types of edges: black edges and gray edges, such that each vertex is
 /// incident with at most one black edge. More information can be found in:
@@ -23,7 +75,7 @@ use std::{
 pub struct BiedgedGraph {
     // The actual graph implementation, backed by Petgraph. The nodes have an id of type u64,
     // the edges can include non-empty Strings
-    pub(crate) graph: UnGraphMap<u64, ()>,
+    pub(crate) graph: UnGraphMap<u64, BiedgedWeight>,
 
     // A Vec containing all the gray edges
     pub(crate) black_edges: Vec<BiedgedEdge>,
@@ -236,7 +288,7 @@ impl EdgeFunctions for BiedgedGraph {
     ) -> Option<BiedgedEdge> {
         if self.graph.contains_node(from) && self.graph.contains_node(to) {
             let edge_to_add = BiedgedEdge { from, to };
-            self.graph.add_edge(from, to, ());
+            self.graph.add_edge(from, to, BiedgedWeight::new());
             match edge_type {
                 BiedgedEdgeType::Black => self.black_edges.push(edge_to_add),
                 BiedgedEdgeType::Gray => self.gray_edges.push(edge_to_add),
@@ -377,7 +429,7 @@ impl BiedgedGraph {
 
     /// Create a biedged graph from a Handlegraph
     pub fn from_handlegraph<T: HandleGraph>(graph: &T) -> BiedgedGraph {
-        let mut biedged: UnGraphMap<u64, ()> = UnGraphMap::new();
+        let mut biedged: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
         // Create queue
         // NOTE: this is a Queue based implementation, this was done
@@ -416,7 +468,7 @@ impl BiedgedGraph {
 
             // The two nodes are connected
             // let id_edge = format!("B: {}", current_handle.unpack_number());
-            biedged.add_edge(node_1, node_2, ());
+            biedged.add_edge(node_1, node_2, BiedgedWeight::new());
 
             // Add nodes to vec
             nodes.push(BiedgedNode { id: left_id });
@@ -438,7 +490,11 @@ impl BiedgedGraph {
 
                 // Add edge from neighbor to
                 // let id_edge = format!("G: {}->{}", curr_node, neighbor.id());
-                biedged.add_edge(node_2, neighbor_node_biedged, ());
+                biedged.add_edge(
+                    node_2,
+                    neighbor_node_biedged,
+                    BiedgedWeight::new(),
+                );
 
                 // Add edge to gray edges
                 gray_edges.push(BiedgedEdge {
