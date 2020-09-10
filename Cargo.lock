@@ -56,7 +56,14 @@ dependencies = [
  "lazy_static",
  "memchr",
  "regex-automata",
+ "serde",
 ]
+
+[[package]]
+name = "bytemuck"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41aa2ec95ca3b5c54cf73c91acf06d24f4495d5f1b1c12506ae3483d646177ac"
 
 [[package]]
 name = "byteorder"
@@ -93,16 +100,6 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 
 [[package]]
 name = "gfa"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e59272fc676eef4704e83c3f8b3dbeee1e446c874b0b95e865d4679d374ac07b"
-dependencies = [
- "lazy_static",
- "nom",
-]
-
-[[package]]
-name = "gfa"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b257a39a24b53cb0082e6f103a42c662cb157aa5bbc31befe3e7ecb1e0f10285"
@@ -113,12 +110,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "handlegraph"
-version = "0.2.0"
+name = "gfa"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "688852bda4d2bf8e565b5853b02d0e7070ceefe665573a4559f7bf0bb24235a0"
+checksum = "fc15b404705b5aae2fbb76797b2a9fd69061c480d52659f7369a880132f1153e"
 dependencies = [
- "gfa 0.2.3",
+ "bstr",
+ "bytemuck",
+ "lazy_static",
+ "nom",
+ "regex",
+ "serde",
+]
+
+[[package]]
+name = "handlegraph"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4fac0e2d3a6389e5108d2c00f61f134ea9f5dc605697e513a475e4a380041ea"
+dependencies = [
+ "bstr",
+ "gfa 0.6.2",
 ]
 
 [[package]]
@@ -197,7 +209,6 @@ checksum = "ffb4262d26ed83a1c0a33a38fe2bb15797329c85770da05e6b828ddb782627af"
 dependencies = [
  "lexical-core",
  "memchr",
- "regex",
  "version_check",
 ]
 
@@ -285,7 +296,7 @@ name = "rs-cactusgraph"
 version = "0.1.0"
 dependencies = [
  "bstr",
- "gfa 0.2.3",
+ "gfa 0.6.2",
  "handlegraph",
  "petgraph",
  "three-edge-connected",
@@ -296,6 +307,26 @@ name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
+
+[[package]]
+name = "serde"
+version = "1.0.115"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e54c9a88f2da7238af84b5101443f0c0d0a3bbdc455e34a5c9497b1903ed55d5"
+dependencies = [
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_derive"
+version = "1.0.115"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "609feed1d0a73cc36a0182a840a9b37b4a82f0b1150369f0536a9e3f2a31dc48"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "static_assertions"

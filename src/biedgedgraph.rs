@@ -6,7 +6,9 @@ use handlegraph::{
     hashgraph::*,
 };
 
-use gfa::parser::parse_gfa;
+use gfa::{gfa::GFA, parser::GFAParser};
+
+use bstr::BString;
 
 use std::{
     collections::{HashSet, VecDeque},
@@ -511,7 +513,7 @@ impl BiedgedGraph {
 
             // Look for neighbors in the Handlegraph, add edges in the biedged graph
             for neighbor in
-                handle_edges_iter(graph, current_handle, Direction::Right)
+                graph.handle_edges_iter(current_handle, Direction::Right)
             {
                 // Add first node for neighbor
                 let neighbor_node_biedged =
@@ -549,7 +551,8 @@ impl BiedgedGraph {
     /// Convert a GFA to a biedged graph if file exists
     /// otherwise return None
     pub fn gfa_to_biedged_graph(path: &PathBuf) -> Option<BiedgedGraph> {
-        let gfa = parse_gfa(path)?;
+        let parser = GFAParser::new();
+        let gfa: GFA<BString, ()> = parser.parse_file(path).ok()?;
         let graph = HashGraph::from_gfa(&gfa);
         Some(BiedgedGraph::from_handlegraph(&graph))
     }

@@ -56,6 +56,7 @@ fn obtain_complex_components(
     components: &[Vec<usize>],
 ) -> Vec<Vec<u64>> {
     let mut complex_components: Vec<Vec<u64>> = Vec::new();
+
     for component in components {
         let mut current_component: Vec<u64> = Vec::new();
         if component.len() > 1 {
@@ -167,8 +168,8 @@ mod tests {
         let mut graph = BiedgedGraph::new();
 
         // Add nodes
-        for i in 0..18 {
-            let n = 10 * (i + 1);
+        for i in 1..=18 {
+            let n = 10 * i;
             graph.add_node(n);
             graph.add_node(n + 1);
         }
