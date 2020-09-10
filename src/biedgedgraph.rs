@@ -70,7 +70,11 @@ pub trait NodeFunctions {
     // Node functions
     fn add_node(&mut self, id: u64) -> Option<u64>;
     fn remove_node(&mut self, id: u64) -> Option<u64>;
-    fn remove_nodes_incident_with_edge(&mut self, from: u64, to: u64) -> Option<Vec<BiedgedEdge>>;
+    fn remove_nodes_incident_with_edge(
+        &mut self,
+        from: u64,
+        to: u64,
+    ) -> Option<Vec<BiedgedEdge>>;
 
     fn get_adjacent_nodes(&self, id: u64) -> Option<Vec<u64>>;
     fn get_adjacent_nodes_by_edge_type(
@@ -87,9 +91,17 @@ pub trait NodeFunctions {
 // coherence between self.graph and self.black_edges/self.gray_edges
 pub trait EdgeFunctions {
     // Edge functions
-    fn add_edge(&mut self, from: u64, to: u64, edge_type: BiedgedEdgeType) -> Option<BiedgedEdge>;
+    fn add_edge(
+        &mut self,
+        from: u64,
+        to: u64,
+        edge_type: BiedgedEdgeType,
+    ) -> Option<BiedgedEdge>;
     fn remove_edge(&mut self, from: u64, to: u64) -> Option<BiedgedEdge>;
-    fn remove_edges_incident_to_node(&mut self, id: u64) -> Option<Vec<BiedgedEdge>>;
+    fn remove_edges_incident_to_node(
+        &mut self,
+        id: u64,
+    ) -> Option<Vec<BiedgedEdge>>;
     fn contract_edge(&mut self, from: u64, to: u64);
 
     fn edges_count(&self) -> usize;
@@ -128,7 +140,11 @@ impl NodeFunctions for BiedgedGraph {
     }
 
     /// Remove the two nodes at the ends of the given edge
-    fn remove_nodes_incident_with_edge(&mut self, from: u64, to: u64) -> Option<Vec<BiedgedEdge>> {
+    fn remove_nodes_incident_with_edge(
+        &mut self,
+        from: u64,
+        to: u64,
+    ) -> Option<Vec<BiedgedEdge>> {
         let edge: &BiedgedEdge = &BiedgedEdge { from: from, to: to };
         let mut removed_edges: Vec<BiedgedEdge> = Vec::new();
         if self.black_edges.contains(edge) {
@@ -179,36 +195,21 @@ impl NodeFunctions for BiedgedGraph {
         if self.graph.contains_node(id) {
             let mut adj_nodes: Vec<u64> = Vec::new();
 
-            if edge_type == BiedgedEdgeType::Black {
-                let adj_black_edges: Vec<&BiedgedEdge> = self
-                    .black_edges
-                    .iter()
-                    .filter(|x| x.from == id || x.to == id)
-                    .collect();
+            let adj_edges = if edge_type == BiedgedEdgeType::Black {
+                &self.black_edges
+            } else {
+                &self.gray_edges
+            }
+            .iter()
+            .filter(|x| x.from == id || x.to == id);
 
-                for edge in adj_black_edges {
-                    if edge.from == id {
-                        adj_nodes.push(edge.to);
-                    } else {
-                        adj_nodes.push(edge.from);
-                    }
-                }
-            } else if edge_type == BiedgedEdgeType::Gray {
-                let adj_gray_edges: Vec<&BiedgedEdge> = self
-                    .gray_edges
-                    .iter()
-                    .filter(|x| x.from == id || x.to == id)
-                    .collect();
-
-                for edge in adj_gray_edges {
-                    if edge.from == id {
-                        adj_nodes.push(edge.to);
-                    } else {
-                        adj_nodes.push(edge.from);
-                    }
+            for edge in adj_edges {
+                if edge.from == id {
+                    adj_nodes.push(edge.to);
+                } else {
+                    adj_nodes.push(edge.from);
                 }
             }
-
             Some(adj_nodes)
         } else {
             None
@@ -229,7 +230,12 @@ impl EdgeFunctions for BiedgedGraph {
     // TODO: think which string to use
     /// Add an edge between the the two nodes specified by from and to. Returns None
     /// if at least one between from and to does not exist.
-    fn add_edge(&mut self, from: u64, to: u64, edge_type: BiedgedEdgeType) -> Option<BiedgedEdge> {
+    fn add_edge(
+        &mut self,
+        from: u64,
+        to: u64,
+        edge_type: BiedgedEdgeType,
+    ) -> Option<BiedgedEdge> {
         if self.graph.contains_node(from) && self.graph.contains_node(to) {
             let edge_to_add = BiedgedEdge { from, to };
             self.graph.add_edge(from, to, ());
@@ -266,8 +272,13 @@ impl EdgeFunctions for BiedgedGraph {
 
     /// Remove all the edges incident to the node with the given id, while leaving the node
     /// itself intact.
-    fn remove_edges_incident_to_node(&mut self, id: u64) -> Option<Vec<BiedgedEdge>> {
-        if self.nodes.contains(&BiedgedNode { id: id }) && self.graph.contains_node(id) {
+    fn remove_edges_incident_to_node(
+        &mut self,
+        id: u64,
+    ) -> Option<Vec<BiedgedEdge>> {
+        if self.nodes.contains(&BiedgedNode { id: id })
+            && self.graph.contains_node(id)
+        {
             let mut incident_edges: Vec<BiedgedEdge> = Vec::new();
             let mut black_edges: Vec<BiedgedEdge> = self
                 .black_edges
@@ -318,23 +329,23 @@ impl EdgeFunctions for BiedgedGraph {
             .get_adjacent_nodes_by_edge_type(to, BiedgedEdgeType::Gray)
             .unwrap();
 
-        adjacent_nodes_by_black_edge.append(&mut first_node_adjacent_nodes_black);
-        adjacent_nodes_by_black_edge.append(&mut second_node_adjacent_nodes_black);
+        adjacent_nodes_by_black_edge
+            .append(&mut first_node_adjacent_nodes_black);
+        adjacent_nodes_by_black_edge
+            .append(&mut second_node_adjacent_nodes_black);
 
         adjacent_nodes_by_gray_edge.append(&mut first_node_adjacent_nodes_gray);
-        adjacent_nodes_by_gray_edge.append(&mut second_node_adjacent_nodes_gray);
+        adjacent_nodes_by_gray_edge
+            .append(&mut second_node_adjacent_nodes_gray);
 
         self.remove_node(from).unwrap();
         self.remove_node(to).unwrap();
         // All adjacent edges will also be removed
 
-        //TODO: decide which id to use
         let added_node = self.add_node(from).unwrap();
 
         for adj_node in adjacent_nodes_by_black_edge {
-            if adj_node != from && adj_node != to {
-                self.add_edge(added_node, adj_node, BiedgedEdgeType::Black);
-            }
+            self.add_edge(added_node, adj_node, BiedgedEdgeType::Black);
         }
 
         for adj_node in adjacent_nodes_by_gray_edge {
