@@ -10,8 +10,6 @@ use gfa::parser::parse_gfa;
 
 use std::{
     collections::{HashSet, VecDeque},
-    fs::File,
-    io::Write,
     path::PathBuf,
 };
 
@@ -68,7 +66,7 @@ pub struct BiedgedEdge {
 // coherence between self.graph and self.nodes
 pub trait NodeFunctions {
     // Node functions
-    fn add_node(&mut self, id: u64) -> Option<u64>;
+    fn add_node(&mut self, id: u64) -> u64;
     fn remove_node(&mut self, id: u64) -> Option<u64>;
     fn remove_nodes_incident_with_edge(
         &mut self,
@@ -108,19 +106,19 @@ pub trait EdgeFunctions {
     //fn get_edges(&self) -> &Vec<BiedgedEdge>;
 
     // Immutable getter/setter
-    fn get_gray_edges(&self) -> &Vec<BiedgedEdge>;
-    fn get_black_edges(&self) -> &Vec<BiedgedEdge>;
+    fn get_gray_edges(&self) -> &[BiedgedEdge];
+    fn get_black_edges(&self) -> &[BiedgedEdge];
 
     // Mutable getter/setters
-    fn get_gray_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
+    fn get_gray_edges_mut(&mut self) -> &mut [BiedgedEdge];
     //fn get_black_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
 }
 
 impl NodeFunctions for BiedgedGraph {
     /// Add the node with the given id to the graph
-    fn add_node(&mut self, id: u64) -> Option<u64> {
-        self.nodes.push(BiedgedNode { id: id });
-        Some(self.graph.add_node(id))
+    fn add_node(&mut self, id: u64) -> u64 {
+        self.nodes.push(BiedgedNode { id });
+        self.graph.add_node(id)
     }
 
     /// Remove the node with the given id, and all its incident edges
@@ -145,8 +143,8 @@ impl NodeFunctions for BiedgedGraph {
         from: u64,
         to: u64,
     ) -> Option<Vec<BiedgedEdge>> {
-        let edge: &BiedgedEdge = &BiedgedEdge { from: from, to: to };
-        let mut removed_edges: Vec<BiedgedEdge> = Vec::new();
+        let edge = &BiedgedEdge { from, to };
+        let removed_edges: Vec<BiedgedEdge>;
         if self.black_edges.contains(edge) {
             self.remove_node(from);
             self.remove_node(to);
@@ -154,7 +152,7 @@ impl NodeFunctions for BiedgedGraph {
                 .black_edges
                 .iter()
                 .filter(|x| *x == edge)
-                .map(|x| *x)
+                .copied()
                 .collect();
             self.black_edges.retain(|x| !(x == edge));
             Some(removed_edges)
@@ -165,7 +163,7 @@ impl NodeFunctions for BiedgedGraph {
                 .gray_edges
                 .iter()
                 .filter(|x| *x == edge)
-                .map(|x| *x)
+                .copied()
                 .collect();
             self.gray_edges.retain(|x| !(x == edge));
             Some(removed_edges)
@@ -252,7 +250,7 @@ impl EdgeFunctions for BiedgedGraph {
     /// Remove an edge between the the two nodes specified by from and to. Returns None
     /// if the edge between from and to does not exist.
     fn remove_edge(&mut self, from: u64, to: u64) -> Option<BiedgedEdge> {
-        let edge_to_remove = BiedgedEdge { from: from, to: to };
+        let edge_to_remove = BiedgedEdge { from, to };
 
         if self.graph.contains_edge(from, to) {
             self.graph.remove_edge(from, to);
@@ -276,28 +274,19 @@ impl EdgeFunctions for BiedgedGraph {
         &mut self,
         id: u64,
     ) -> Option<Vec<BiedgedEdge>> {
-        if self.nodes.contains(&BiedgedNode { id: id })
+        if self.nodes.contains(&BiedgedNode { id })
             && self.graph.contains_node(id)
         {
-            let mut incident_edges: Vec<BiedgedEdge> = Vec::new();
-            let mut black_edges: Vec<BiedgedEdge> = self
+            let incident_edges: Vec<_> = self
                 .black_edges
                 .iter()
+                .chain(self.gray_edges.iter())
                 .filter(|x| x.from == id || x.to == id)
-                .map(|x| *x)
-                .collect();
-            let mut gray_edges: Vec<BiedgedEdge> = self
-                .gray_edges
-                .iter()
-                .filter(|x| x.from == id || x.to == id)
-                .map(|x| *x)
+                .copied()
                 .collect();
 
             self.black_edges.retain(|x| !(x.from == id || x.to == id));
             self.gray_edges.retain(|x| !(x.from == id || x.to == id));
-
-            incident_edges.append(&mut black_edges);
-            incident_edges.append(&mut gray_edges);
 
             for edge in &incident_edges {
                 self.graph.remove_edge(edge.from, edge.to);
@@ -338,11 +327,11 @@ impl EdgeFunctions for BiedgedGraph {
         adjacent_nodes_by_gray_edge
             .append(&mut second_node_adjacent_nodes_gray);
 
+        // All adjacent edges will also be removed
         self.remove_node(from).unwrap();
         self.remove_node(to).unwrap();
-        // All adjacent edges will also be removed
 
-        let added_node = self.add_node(from).unwrap();
+        let added_node = self.add_node(from);
 
         for adj_node in adjacent_nodes_by_black_edge {
             self.add_edge(added_node, adj_node, BiedgedEdgeType::Black);
@@ -364,15 +353,15 @@ impl EdgeFunctions for BiedgedGraph {
     // }
 
     /// Return all the gray edges in the graph
-    fn get_gray_edges(&self) -> &Vec<BiedgedEdge> {
-        self.gray_edges.as_ref()
+    fn get_gray_edges(&self) -> &[BiedgedEdge] {
+        &self.gray_edges
     }
     /// Return all the black edges in the graph
-    fn get_black_edges(&self) -> &Vec<BiedgedEdge> {
-        self.black_edges.as_ref()
+    fn get_black_edges(&self) -> &[BiedgedEdge] {
+        &self.black_edges.as_ref()
     }
 
-    fn get_gray_edges_mut(&mut self) -> &mut Vec<BiedgedEdge> {
+    fn get_gray_edges_mut(&mut self) -> &mut [BiedgedEdge] {
         self.gray_edges.as_mut()
     }
     // fn get_black_edges_mut(&mut self) -> &mut Vec<BiedgedEdge> {
@@ -464,15 +453,12 @@ impl BiedgedGraph {
             visited_nodes.insert(curr_node);
         }
 
-        // Create Biedged graph
-        let biedged_graph = BiedgedGraph {
+        BiedgedGraph {
             graph: biedged,
-            black_edges: black_edges,
-            gray_edges: gray_edges,
-            nodes: nodes,
-        };
-
-        biedged_graph
+            black_edges,
+            gray_edges,
+            nodes,
+        }
     }
 
     /// Convert a GFA to a biedged graph if file exists

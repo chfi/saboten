@@ -9,7 +9,7 @@ use bstr::{BStr, BString};
 /// STEP 1: Contract all gray edges
 pub fn contract_all_gray_edges(biedged: &mut BiedgedGraph) {
     while !biedged.get_gray_edges().is_empty() {
-        let curr_edge = biedged.get_gray_edges().get(0).unwrap().clone();
+        let curr_edge = *biedged.get_gray_edges().get(0).unwrap();
         biedged.contract_edge(curr_edge.from, curr_edge.to);
     }
 }
@@ -71,25 +71,25 @@ fn obtain_complex_components(
 
 fn merge_3_connected_components(
     biedged: &mut BiedgedGraph,
-    components: &Vec<Vec<u64>>,
+    components: &[Vec<u64>],
 ) {
     for component in components {
         merge_nodes_in_component(biedged, component);
     }
 }
-fn merge_nodes_in_component(biedged: &mut BiedgedGraph, component: &Vec<u64>) {
+fn merge_nodes_in_component(biedged: &mut BiedgedGraph, component: &[u64]) {
     let mut adj_vertices: HashSet<u64> = HashSet::new();
 
-    for nodeId in component {
-        for node in biedged.get_adjacent_nodes(*nodeId).unwrap() {
+    for node_id in component {
+        for node in biedged.get_adjacent_nodes(*node_id).unwrap() {
             if !component.contains(&node) {
                 adj_vertices.insert(node);
             }
         }
         // Remove all edges incident to nodeId
-        biedged.remove_edges_incident_to_node(*nodeId);
+        biedged.remove_edges_incident_to_node(*node_id);
         // Remove node
-        biedged.remove_node(*nodeId);
+        biedged.remove_node(*node_id);
     }
 
     // TODO: Decide which nodeId to use
@@ -152,7 +152,7 @@ fn contract_loop_edges(
 }
 
 pub fn contract_loops(biedged: &mut BiedgedGraph) {
-    let mut loop_edges: Vec<Vec<BiedgedEdge>> = Vec::new();
+    let loop_edges: Vec<Vec<BiedgedEdge>>;
     loop_edges = find_loops(biedged);
     contract_loop_edges(biedged, loop_edges);
 }
