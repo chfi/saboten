@@ -19,13 +19,25 @@ use std::{
 /// struct as the edge weight type
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct BiedgedWeight {
-    black: usize,
-    gray: usize,
+    pub black: usize,
+    pub gray: usize,
 }
 
 impl BiedgedWeight {
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         Default::default()
+    }
+
+    pub fn new(black: usize, gray: usize) -> Self {
+        BiedgedWeight { black, gray }
+    }
+
+    pub fn black(black: usize) -> Self {
+        BiedgedWeight { black, gray: 0 }
+    }
+
+    pub fn gray(gray: usize) -> Self {
+        BiedgedWeight { black: 0, gray }
     }
 }
 
@@ -119,7 +131,9 @@ pub struct BiedgedEdge {
 pub trait NodeFunctions {
     // Node functions
     fn add_node(&mut self, id: u64) -> u64;
+
     fn remove_node(&mut self, id: u64) -> Option<u64>;
+
     fn remove_nodes_incident_with_edge(
         &mut self,
         from: u64,
@@ -127,6 +141,7 @@ pub trait NodeFunctions {
     ) -> Option<Vec<BiedgedEdge>>;
 
     fn get_adjacent_nodes(&self, id: u64) -> Option<Vec<u64>>;
+
     fn get_adjacent_nodes_by_edge_type(
         &self,
         id: u64,
@@ -147,11 +162,14 @@ pub trait EdgeFunctions {
         to: u64,
         edge_type: BiedgedEdgeType,
     ) -> Option<BiedgedEdge>;
+
     fn remove_edge(&mut self, from: u64, to: u64) -> Option<BiedgedEdge>;
+
     fn remove_edges_incident_to_node(
         &mut self,
         id: u64,
     ) -> Option<Vec<BiedgedEdge>>;
+
     fn contract_edge(&mut self, from: u64, to: u64);
 
     fn edges_count(&self) -> usize;
@@ -288,11 +306,22 @@ impl EdgeFunctions for BiedgedGraph {
     ) -> Option<BiedgedEdge> {
         if self.graph.contains_node(from) && self.graph.contains_node(to) {
             let edge_to_add = BiedgedEdge { from, to };
-            self.graph.add_edge(from, to, BiedgedWeight::new());
+            let mut new_weight = self
+                .graph
+                .edge_weight(from, to)
+                .copied()
+                .unwrap_or_default();
             match edge_type {
-                BiedgedEdgeType::Black => self.black_edges.push(edge_to_add),
-                BiedgedEdgeType::Gray => self.gray_edges.push(edge_to_add),
+                BiedgedEdgeType::Black => {
+                    new_weight += BiedgedWeight::black(1);
+                    self.black_edges.push(edge_to_add)
+                }
+                BiedgedEdgeType::Gray => {
+                    new_weight += BiedgedWeight::gray(1);
+                    self.gray_edges.push(edge_to_add)
+                }
             }
+            self.graph.add_edge(from, to, new_weight);
             Some(edge_to_add)
         } else {
             None
@@ -468,7 +497,7 @@ impl BiedgedGraph {
 
             // The two nodes are connected
             // let id_edge = format!("B: {}", current_handle.unpack_number());
-            biedged.add_edge(node_1, node_2, BiedgedWeight::new());
+            biedged.add_edge(node_1, node_2, BiedgedWeight::empty());
 
             // Add nodes to vec
             nodes.push(BiedgedNode { id: left_id });
@@ -493,7 +522,7 @@ impl BiedgedGraph {
                 biedged.add_edge(
                     node_2,
                     neighbor_node_biedged,
-                    BiedgedWeight::new(),
+                    BiedgedWeight::empty(),
                 );
 
                 // Add edge to gray edges
