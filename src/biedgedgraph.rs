@@ -197,6 +197,7 @@ impl NodeFunctions for BiedgedGraph {
     fn remove_node(&mut self, id: u64) -> Option<u64> {
         if self.graph.contains_node(id) {
             let _ = self.graph.remove_node(id);
+
             self.nodes.retain(|x| x.id != id);
 
             // Remove all incident edges from Vecs
@@ -594,16 +595,6 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_node() {
-        let mut graph: BiedgedGraph = BiedgedGraph::new();
-        graph.add_node(10);
-        graph.remove_node(10);
-        assert!(!graph.graph.contains_node(10));
-        assert!(graph.get_nodes().len() == 0);
-        assert!(graph.get_nodes().get(0) == None);
-    }
-
-    #[test]
     fn test_get_nodes() {
         let mut graph: BiedgedGraph = BiedgedGraph::new();
         graph.add_node(10);
@@ -648,17 +639,34 @@ mod tests {
 
         graph.add_edge(10, 20, BiedgedEdgeType::Black);
         assert!(graph.graph.contains_edge(10, 20));
-        assert!(graph.get_black_edges().len() == 1);
+        assert_eq!(graph.get_black_edges().len(), 1);
         assert!(graph
             .get_black_edges()
             .contains(&BiedgedEdge { from: 10, to: 20 }));
 
+        assert_eq!(
+            Some(&BiedgedWeight { black: 1, gray: 0 }),
+            graph.graph.edge_weight(10, 20)
+        );
+
         graph.add_edge(20, 30, BiedgedEdgeType::Gray);
         assert!(graph.graph.contains_edge(20, 30));
-        assert!(graph.get_gray_edges().len() == 1);
+        assert_eq!(graph.get_gray_edges().len(), 1);
         assert!(graph
             .get_gray_edges()
             .contains(&BiedgedEdge { from: 20, to: 30 }));
+
+        assert_eq!(
+            Some(&BiedgedWeight { black: 0, gray: 1 }),
+            graph.graph.edge_weight(20, 30)
+        );
+
+        graph.add_edge(20, 30, BiedgedEdgeType::Black);
+
+        assert_eq!(
+            Some(&BiedgedWeight { black: 1, gray: 1 }),
+            graph.graph.edge_weight(20, 30)
+        );
     }
 
     #[test]
@@ -752,7 +760,32 @@ mod tests {
         graph.add_edge(10, 30, BiedgedEdgeType::Gray);
         graph.add_edge(20, 30, BiedgedEdgeType::Black);
 
+        assert_eq!(None, graph.graph.edge_weight(10, 10));
+        assert_eq!(
+            Some(&BiedgedWeight { black: 0, gray: 1 }),
+            graph.graph.edge_weight(10, 30)
+        );
+        assert_eq!(
+            Some(&BiedgedWeight { black: 1, gray: 0 }),
+            graph.graph.edge_weight(10, 20)
+        );
+        assert_eq!(
+            Some(&BiedgedWeight { black: 1, gray: 0 }),
+            graph.graph.edge_weight(20, 30)
+        );
+
         graph.contract_edge(10, 20);
+
+        assert_eq!(
+            Some(&BiedgedWeight { black: 1, gray: 0 }),
+            graph.graph.edge_weight(10, 10)
+        );
+        assert_eq!(
+            Some(&BiedgedWeight { black: 1, gray: 1 }),
+            graph.graph.edge_weight(10, 30)
+        );
+        assert_eq!(None, graph.graph.edge_weight(10, 20));
+        assert_eq!(None, graph.graph.edge_weight(20, 30));
 
         assert!(graph.graph.contains_node(10));
         assert!(graph.graph.contains_node(30));
