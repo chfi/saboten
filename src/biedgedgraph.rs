@@ -136,12 +136,6 @@ pub trait NodeFunctions {
 
     fn remove_node(&mut self, id: u64) -> Option<u64>;
 
-    fn remove_nodes_incident_with_edge(
-        &mut self,
-        from: u64,
-        to: u64,
-    ) -> Option<Vec<BiedgedEdge>>;
-
     fn get_adjacent_nodes(&self, id: u64) -> Option<Vec<u64>>;
 
     fn get_adjacent_nodes_by_edge_type(
@@ -205,41 +199,6 @@ impl NodeFunctions for BiedgedGraph {
             self.gray_edges.retain(|x| !(x.from == id || x.to == id));
 
             Some(id)
-        } else {
-            None
-        }
-    }
-
-    /// Remove the two nodes at the ends of the given edge
-    fn remove_nodes_incident_with_edge(
-        &mut self,
-        from: u64,
-        to: u64,
-    ) -> Option<Vec<BiedgedEdge>> {
-        let edge = &BiedgedEdge { from, to };
-        let removed_edges: Vec<BiedgedEdge>;
-        if self.black_edges.contains(edge) {
-            self.remove_node(from);
-            self.remove_node(to);
-            removed_edges = self
-                .black_edges
-                .iter()
-                .filter(|x| *x == edge)
-                .copied()
-                .collect();
-            self.black_edges.retain(|x| !(x == edge));
-            Some(removed_edges)
-        } else if self.gray_edges.contains(edge) {
-            self.remove_node(from);
-            self.remove_node(to);
-            removed_edges = self
-                .gray_edges
-                .iter()
-                .filter(|x| *x == edge)
-                .copied()
-                .collect();
-            self.gray_edges.retain(|x| !(x == edge));
-            Some(removed_edges)
         } else {
             None
         }
@@ -730,24 +689,6 @@ mod tests {
         assert!(!graph
             .get_gray_edges()
             .contains(&BiedgedEdge { from: 10, to: 30 }));
-    }
-
-    #[test]
-    fn test_remove_nodes_incident_with_edge() {
-        let mut graph: BiedgedGraph = BiedgedGraph::new();
-        graph.add_node(10);
-        graph.add_node(20);
-        graph.add_node(30);
-        graph.add_edge(10, 20, BiedgedEdgeType::Black);
-        graph.add_edge(10, 30, BiedgedEdgeType::Gray);
-
-        graph.remove_nodes_incident_with_edge(10, 20);
-
-        assert! {!graph.graph.contains_node(10)};
-        assert! {!graph.graph.contains_node(20)};
-        assert!(!graph.get_nodes().contains(&BiedgedNode { id: 10 }));
-        assert!(!graph.get_nodes().contains(&BiedgedNode { id: 20 }));
-        assert!(!graph.graph.contains_edge(10, 20));
     }
 
     #[test]
