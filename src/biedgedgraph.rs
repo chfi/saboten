@@ -155,8 +155,8 @@ pub trait EdgeFunctions {
 
     fn contract_edge(&mut self, from: u64, to: u64);
 
+    /*
     fn edges_count(&self) -> usize;
-
     // Immutable getter/setter
     fn get_gray_edges(&self) -> &[BiedgedEdge];
     fn get_black_edges(&self) -> &[BiedgedEdge];
@@ -164,6 +164,7 @@ pub trait EdgeFunctions {
     // Mutable getter/setters
     fn get_gray_edges_mut(&mut self) -> &mut [BiedgedEdge];
     //fn get_black_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
+    */
 }
 
 impl NodeFunctions for BiedgedGraph {
@@ -275,33 +276,15 @@ impl EdgeFunctions for BiedgedGraph {
     /// Remove all the edges incident to the node with the given id, while leaving the node
     /// itself intact.
     fn remove_edges_incident_to_node(&mut self, id: u64) -> Vec<BiedgedEdge> {
-        if self.graph.contains_node(id) {
-            let neighbors: Vec<_> = self.graph.neighbors(id).collect();
-            for edge in edges.iter() {
-                let x: () = edge;
-                self.graph.remove_edge(edge.from, edge.to);
-            }
-            /*
-            let edges = self.graph.neighbors(id).
-            let incident_edges: Vec<_> = self
-                .black_edges
-                .iter()
-                .chain(self.gray_edges.iter())
-                .filter(|x| x.from == id || x.to == id)
-                .copied()
-                .collect();
-
-            self.black_edges.retain(|x| !(x.from == id || x.to == id));
-            self.gray_edges.retain(|x| !(x.from == id || x.to == id));
-
-            for edge in &incident_edges {
-            }
-            */
-
-            edges
-        } else {
-            vec![]
+        let edges: Vec<_> = self
+            .graph
+            .neighbors(id)
+            .map(|n| BiedgedEdge { from: id, to: n })
+            .collect();
+        for edge in edges {
+            self.graph.remove_edge(edge.from, edge.to);
         }
+        edges
     }
 
     /// Contract a given edge. For more information on edge contraction go to:
@@ -346,6 +329,7 @@ impl EdgeFunctions for BiedgedGraph {
         }
     }
 
+    /*
     /// Returns the number of edges in the graph
     fn edges_count(&self) -> usize {
         self.get_black_edges().len() + self.get_gray_edges().len()
@@ -363,6 +347,7 @@ impl EdgeFunctions for BiedgedGraph {
     fn get_gray_edges_mut(&mut self) -> &mut [BiedgedEdge] {
         self.gray_edges.as_mut()
     }
+    */
 }
 
 impl BiedgedGraph {
