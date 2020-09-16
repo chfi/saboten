@@ -91,6 +91,21 @@ pub struct BiedgedGraph {
     // the edges can include non-empty Strings
     pub(crate) graph: UnGraphMap<u64, BiedgedWeight>,
 }
+
+impl BiedgedGraph {
+    pub fn gray_edges(
+        &self,
+    ) -> impl Iterator<Item = (u64, u64, &BiedgedWeight)> {
+        self.graph.all_edges().filter(|(_, _, w)| w.gray > 0)
+    }
+
+    pub fn black_edges(
+        &self,
+    ) -> impl Iterator<Item = (u64, u64, &BiedgedWeight)> {
+        self.graph.all_edges().filter(|(_, _, w)| w.black > 0)
+    }
+}
+
 // NOTE: nodes from the nodes Vec are in a 1:1 relationship with nodes in the graph (i.e. if a node
 // can be found by self.nodes.contains(id), it will be present exactly once in self.graph).
 // However, this is not true with respect to the edges (i.e. self.black_edges could contain the same
@@ -531,10 +546,14 @@ mod tests {
 
         graph.add_edge(10, 20, BiedgedEdgeType::Black);
         assert!(graph.graph.contains_edge(10, 20));
-        assert_eq!(graph.get_black_edges().len(), 1);
-        assert!(graph
-            .get_black_edges()
-            .contains(&BiedgedEdge { from: 10, to: 20 }));
+        assert_eq!(graph.black_edges().len(), 1);
+        assert!(graph.black_edges().contains(
+            10,
+            20,
+            &BiedgedEdge { black: 1, gray: 0 }
+        ));
+        // .get_black_edges()
+        // .contains(&BiedgedEdge { from: 10, to: 20 }));
 
         assert_eq!(
             Some(&BiedgedWeight { black: 1, gray: 0 }),
