@@ -8,9 +8,9 @@ use bstr::{BStr, BString};
 
 /// STEP 1: Contract all gray edges
 pub fn contract_all_gray_edges(biedged: &mut BiedgedGraph) {
-    while !biedged.get_gray_edges().is_empty() {
-        let curr_edge = *biedged.get_gray_edges().get(0).unwrap();
-        biedged.contract_edge(curr_edge.from, curr_edge.to);
+    while biedged.gray_edge_count() > 0 {
+        let (from, to, _) = biedged.gray_edges().next().unwrap();
+        biedged.contract_edge(from, to);
     }
 }
 
@@ -52,9 +52,8 @@ fn merge_nodes_in_component(biedged: &mut BiedgedGraph, component: &[usize]) {
 pub fn find_3_edge_connected_components(biedged: &mut BiedgedGraph) {
     let graph = t_e_c::Graph::from_edges(
         biedged
-            .get_black_edges()
-            .iter()
-            .map(|b| (b.from as usize, b.to as usize)),
+            .black_edges()
+            .map(|(from, to, _)| (from as usize, to as usize)),
     );
 
     let components = t_e_c::find_components(&graph.graph);
