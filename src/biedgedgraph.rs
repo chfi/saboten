@@ -90,15 +90,6 @@ pub struct BiedgedGraph {
     // The actual graph implementation, backed by Petgraph. The nodes have an id of type u64,
     // the edges can include non-empty Strings
     pub(crate) graph: UnGraphMap<u64, BiedgedWeight>,
-
-    // A Vec containing all the gray edges
-    pub(crate) black_edges: Vec<BiedgedEdge>,
-
-    // A Vec containing all the black edges
-    pub(crate) gray_edges: Vec<BiedgedEdge>,
-
-    // A Vec containing all nodes in the graph
-    pub(crate) nodes: Vec<BiedgedNode>,
 }
 // NOTE: nodes from the nodes Vec are in a 1:1 relationship with nodes in the graph (i.e. if a node
 // can be found by self.nodes.contains(id), it will be present exactly once in self.graph).
@@ -144,7 +135,7 @@ pub trait NodeFunctions {
         edge_type: BiedgedEdgeType,
     ) -> Vec<u64>;
 
-    fn get_nodes(&self) -> &Vec<BiedgedNode>;
+    fn get_nodes(&self) -> Vec<BiedgedNode>;
 }
 
 // The EdgeFunctions trait includes functions necessary to handle edges, while maintaining
@@ -178,7 +169,6 @@ pub trait EdgeFunctions {
 impl NodeFunctions for BiedgedGraph {
     /// Add the node with the given id to the graph
     fn add_node(&mut self, id: u64) -> u64 {
-        self.nodes.push(BiedgedNode { id });
         self.graph.add_node(id)
     }
 
@@ -203,6 +193,15 @@ impl NodeFunctions for BiedgedGraph {
     ) -> Vec<u64> {
         let mut adj_nodes: Vec<u64> = Vec::new();
         if self.graph.contains_node(id) {
+            let adj_edges = self.graph.edges(id).filter(|(f, t, w)| {
+                if edge_type == BiedgedEdgeType::Black {
+                    w.black != 0
+                } else {
+                    w.gray != 0
+                }
+            });
+
+            /*
             let adj_edges = if edge_type == BiedgedEdgeType::Black {
                 &self.black_edges
             } else {
@@ -210,12 +209,13 @@ impl NodeFunctions for BiedgedGraph {
             }
             .iter()
             .filter(|x| x.from == id || x.to == id);
+            */
 
-            for edge in adj_edges {
-                if edge.from == id {
-                    adj_nodes.push(edge.to);
+            for (from, to, _) in adj_edges {
+                if from == id {
+                    adj_nodes.push(to);
                 } else {
-                    adj_nodes.push(edge.from);
+                    adj_nodes.push(from);
                 }
             }
         }
@@ -223,8 +223,8 @@ impl NodeFunctions for BiedgedGraph {
     }
 
     /// Return all the nodes in the graph
-    fn get_nodes(&self) -> &Vec<BiedgedNode> {
-        self.nodes.as_ref()
+    fn get_nodes(&self) -> Vec<BiedgedNode> {
+        self.graph.nodes().map(|id| BiedgedNode { id }).collect()
     }
 }
 
@@ -248,11 +248,9 @@ impl EdgeFunctions for BiedgedGraph {
             match edge_type {
                 BiedgedEdgeType::Black => {
                     new_weight += BiedgedWeight::black(1);
-                    self.black_edges.push(edge_to_add)
                 }
                 BiedgedEdgeType::Gray => {
                     new_weight += BiedgedWeight::gray(1);
-                    self.gray_edges.push(edge_to_add)
                 }
             }
             self.graph.add_edge(from, to, new_weight);
@@ -266,18 +264,9 @@ impl EdgeFunctions for BiedgedGraph {
     /// if the edge between from and to does not exist.
     fn remove_edge(&mut self, from: u64, to: u64) -> Option<BiedgedEdge> {
         let edge_to_remove = BiedgedEdge { from, to };
-
         if self.graph.contains_edge(from, to) {
             self.graph.remove_edge(from, to);
-            if self.black_edges.contains(&edge_to_remove) {
-                self.black_edges.retain(|edge| edge != &edge_to_remove);
-                Some(edge_to_remove)
-            } else if self.gray_edges.contains(&edge_to_remove) {
-                self.gray_edges.retain(|edge| edge != &edge_to_remove);
-                Some(edge_to_remove)
-            } else {
-                panic!("this should be impossible!");
-            }
+            Some(edge_to_remove)
         } else {
             None
         }
@@ -286,9 +275,14 @@ impl EdgeFunctions for BiedgedGraph {
     /// Remove all the edges incident to the node with the given id, while leaving the node
     /// itself intact.
     fn remove_edges_incident_to_node(&mut self, id: u64) -> Vec<BiedgedEdge> {
-        if self.nodes.contains(&BiedgedNode { id })
-            && self.graph.contains_node(id)
-        {
+        if self.graph.contains_node(id) {
+            let neighbors: Vec<_> = self.graph.neighbors(id).collect();
+            for edge in edges.iter() {
+                let x: () = edge;
+                self.graph.remove_edge(edge.from, edge.to);
+            }
+            /*
+            let edges = self.graph.neighbors(id).
             let incident_edges: Vec<_> = self
                 .black_edges
                 .iter()
@@ -301,10 +295,10 @@ impl EdgeFunctions for BiedgedGraph {
             self.gray_edges.retain(|x| !(x.from == id || x.to == id));
 
             for edge in &incident_edges {
-                self.graph.remove_edge(edge.from, edge.to);
             }
+            */
 
-            incident_edges
+            edges
         } else {
             vec![]
         }
@@ -459,12 +453,7 @@ impl BiedgedGraph {
             visited_nodes.insert(curr_node);
         }
 
-        BiedgedGraph {
-            graph: biedged,
-            black_edges,
-            gray_edges,
-            nodes,
-        }
+        BiedgedGraph { graph: biedged }
     }
 
     /// Convert a GFA to a biedged graph if file exists
@@ -694,7 +683,7 @@ mod tests {
         assert!(graph.graph.edge_count() == 2);
 
         // assert!(!graph.get_nodes().contains(&BiedgedNode { id: 20 }));
-        assert!(graph.black_edges.len() == 2);
-        assert!(graph.gray_edges.len() == 1);
+        // assert!(graph.black_edges.len() == 2);
+        // assert!(graph.gray_edges.len() == 1);
     }
 }
