@@ -555,15 +555,7 @@ mod tests {
         graph.add_edge(10, 20, BiedgedEdgeType::Black);
         assert!(graph.graph.contains_edge(10, 20));
 
-        // assert_eq!(graph.black_edges().sum(), 1);
-        // assert!(graph.black_edges().contains(
-        //     10,
-        //     20,
-        //     &BiedgedEdge { black: 1, gray: 0 }
-        // ));
-        // .get_black_edges()
-        // .contains(&BiedgedEdge { from: 10, to: 20 }));
-
+        assert_eq!(graph.black_edge_count(), 1);
         assert_eq!(
             Some(&BiedgedWeight { black: 1, gray: 0 }),
             graph.graph.edge_weight(10, 20)
@@ -572,9 +564,6 @@ mod tests {
         graph.add_edge(20, 30, BiedgedEdgeType::Gray);
         assert!(graph.graph.contains_edge(20, 30));
         assert_eq!(graph.gray_edge_count(), 1);
-        // assert!(graph
-        //     .get_gray_edges()
-        //     .contains(&BiedgedEdge { from: 20, to: 30 }));
 
         assert_eq!(
             Some(&BiedgedWeight { black: 0, gray: 1 }),
@@ -598,10 +587,7 @@ mod tests {
 
         graph.remove_edge(10, 20);
         assert!(!graph.graph.contains_edge(10, 20));
-        assert_eq!(graph.black_edges().sum(), 0);
-        // assert!(!graph
-        //     .get_black_edges()
-        //     .contains(&BiedgedEdge { from: 10, to: 20 }));
+        assert_eq!(graph.black_edge_count(), 0);
     }
 
     #[test]
@@ -614,16 +600,15 @@ mod tests {
         graph.add_edge(10, 30, BiedgedEdgeType::Gray);
 
         graph.remove_node(10);
+
         assert!(!graph.graph.contains_edge(10, 20));
         assert!(!graph.graph.contains_edge(10, 30));
-        assert!(graph.get_black_edges().len() == 0);
-        assert!(graph.get_gray_edges().len() == 0);
-        assert!(!graph
-            .get_black_edges()
-            .contains(&BiedgedEdge { from: 10, to: 20 }));
-        assert!(!graph
-            .get_gray_edges()
-            .contains(&BiedgedEdge { from: 10, to: 30 }));
+
+        assert_eq!(graph.black_edge_count(), 0);
+        assert_eq!(graph.gray_edge_count(), 0);
+
+        assert_eq!(None, graph.graph.edge_weight(10, 20));
+        assert_eq!(None, graph.graph.edge_weight(10, 30));
     }
 
     #[test]
@@ -637,19 +622,21 @@ mod tests {
 
         graph.remove_edges_incident_to_node(10);
 
-        assert! {graph.graph.contains_node(10)};
+        assert!(graph.graph.contains_node(10));
         assert!(graph.get_nodes().contains(&BiedgedNode { id: 10 }));
 
         assert!(!graph.graph.contains_edge(10, 20));
         assert!(!graph.graph.contains_edge(10, 30));
-        assert!(graph.get_black_edges().len() == 0);
-        assert!(graph.get_gray_edges().len() == 0);
+        assert_eq!(graph.black_edge_count(), 0);
+        assert_eq!(graph.gray_edge_count(), 0);
         assert!(!graph
-            .get_black_edges()
-            .contains(&BiedgedEdge { from: 10, to: 20 }));
+            .black_edges()
+            .find(|(from, to, _)| from == &10 && to == &20)
+            .is_some());
         assert!(!graph
-            .get_gray_edges()
-            .contains(&BiedgedEdge { from: 10, to: 30 }));
+            .gray_edges()
+            .find(|(from, to, _)| from == &10 && to == &30)
+            .is_some());
     }
 
     #[test]
@@ -695,8 +682,7 @@ mod tests {
 
         assert!(graph.graph.edge_count() == 2);
 
-        // assert!(!graph.get_nodes().contains(&BiedgedNode { id: 20 }));
-        // assert!(graph.black_edges.len() == 2);
-        // assert!(graph.gray_edges.len() == 1);
+        assert_eq!(graph.black_edge_count(), 2);
+        assert_eq!(graph.gray_edge_count(), 1);
     }
 }

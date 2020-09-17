@@ -287,11 +287,11 @@ mod tests {
             Dot::with_config(&graph.graph, &[Config::NodeNoLabel])
         );
         println!("Nodes: {:#?}", graph.get_nodes());
-        println!("Gray_edges {:#?}", graph.get_gray_edges());
-        println!("Black_edges {:#?}", graph.get_black_edges());
+        println!("Gray_edges {:#?}", graph.gray_edges().collect::<Vec<_>>());
+        println!("Black_edges {:#?}", graph.black_edges().collect::<Vec<_>>());
 
         assert!(graph.get_nodes().len() == 4);
-        assert!(graph.get_black_edges().len() == 4);
+        assert_eq!(graph.black_edge_count(), 4);
 
         // NOTE: petgraph does not actually support multiple edges between two given nodes
         // however, they are allowed in Biedged Graphs. For this reason it is better to use
@@ -304,12 +304,12 @@ mod tests {
         let mut graph: BiedgedGraph = graph_from_paper();
         contract_all_gray_edges(&mut graph);
 
-        assert!(graph.get_gray_edges().len() == 0);
-        assert!(
-            graph.get_black_edges().len() == 18,
+        assert_eq!(graph.gray_edge_count(), 0);
+        assert_eq!(
+            graph.black_edge_count(),
+            18,
             "Expected 18 black edges, is actually {:#?}",
-            graph.get_black_edges().len()
+            graph.black_edge_count()
         );
     }
-    */
 }
