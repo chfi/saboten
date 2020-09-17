@@ -82,43 +82,54 @@ impl SubAssign for BiedgedWeight {
 /// A biedged graph is a graph with two types of edges: black edges and gray edges, such that each vertex is
 /// incident with at most one black edge. More information can be found in:
 /// Superbubbles, Ultrabubbles, and Cacti by BENEDICT PATEN et al.
-
-/// This implementation is basically a wrapper over Petgraph. This was necessary since Petgraph does not provide
-/// ways to handle edge coloring, and also some other functions necessary to obtain a Cactus Graph.
 #[derive(Default)]
 pub struct BiedgedGraph {
-    // The actual graph implementation, backed by Petgraph. The nodes have an id of type u64,
-    // the edges can include non-empty Strings
     pub(crate) graph: UnGraphMap<u64, BiedgedWeight>,
 }
 
 impl BiedgedGraph {
+    /// Returns an iterator over the gray edges in the graph, where
+    /// the first two elements in the tuple are the `from` and `to`
+    /// nodes, and the third is the weight containing the number of
+    /// gray and black edges between the two nodes.
     pub fn gray_edges(
         &self,
     ) -> impl Iterator<Item = (u64, u64, &BiedgedWeight)> {
         self.graph.all_edges().filter(|(_, _, w)| w.gray > 0)
     }
 
+    /// Returns an iterator over the black edges in the graph, where
+    /// the first two elements in the tuple are the `from` and `to`
+    /// nodes, and the third is the weight containing the number of
+    /// gray and black edges between the two nodes.
     pub fn black_edges(
         &self,
     ) -> impl Iterator<Item = (u64, u64, &BiedgedWeight)> {
         self.graph.all_edges().filter(|(_, _, w)| w.black > 0)
     }
 
+    /// Produces the sum of the gray edges in the graph, counted using
+    /// the edge weights
     pub fn gray_edge_count(&self) -> usize {
         self.gray_edges().map(|(_, _, w)| w.gray).sum()
     }
 
+    /// Produces the sum of the black edges in the graph, counted using
+    /// the edge weights.
     pub fn black_edge_count(&self) -> usize {
         self.black_edges().map(|(_, _, w)| w.black).sum()
     }
-}
 
-// NOTE: nodes from the nodes Vec are in a 1:1 relationship with nodes in the graph (i.e. if a node
-// can be found by self.nodes.contains(id), it will be present exactly once in self.graph).
-// However, this is not true with respect to the edges (i.e. self.black_edges could contain the same
-// edge more than once, however in self.graph it will be present only once.) This is due to Petgraph
-// not supporting multiple edges between the same nodes.
+    /// Produces the sum of all edges in the graph, counted using the
+    /// edge weights. Note that black and gray edges are summed
+    /// together.
+    pub fn edges_count(&self) -> usize {
+        self.graph
+            .all_edges()
+            .map(|(_, _, w)| w.black + w.gray)
+            .sum()
+    }
+}
 
 /// A node in the biedged graph
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -177,17 +188,6 @@ pub trait EdgeFunctions {
     fn remove_edges_incident_to_node(&mut self, id: u64) -> Vec<BiedgedEdge>;
 
     fn contract_edge(&mut self, from: u64, to: u64);
-
-    /*
-    fn edges_count(&self) -> usize;
-    // Immutable getter/setter
-    fn get_gray_edges(&self) -> &[BiedgedEdge];
-    fn get_black_edges(&self) -> &[BiedgedEdge];
-
-    // Mutable getter/setters
-    fn get_gray_edges_mut(&mut self) -> &mut [BiedgedEdge];
-    //fn get_black_edges_mut(&mut self) -> &mut Vec<BiedgedEdge>;
-    */
 }
 
 impl NodeFunctions for BiedgedGraph {
@@ -217,23 +217,13 @@ impl NodeFunctions for BiedgedGraph {
     ) -> Vec<u64> {
         let mut adj_nodes: Vec<u64> = Vec::new();
         if self.graph.contains_node(id) {
-            let adj_edges = self.graph.edges(id).filter(|(f, t, w)| {
+            let adj_edges = self.graph.edges(id).filter(|(_, _, w)| {
                 if edge_type == BiedgedEdgeType::Black {
                     w.black != 0
                 } else {
                     w.gray != 0
                 }
             });
-
-            /*
-            let adj_edges = if edge_type == BiedgedEdgeType::Black {
-                &self.black_edges
-            } else {
-                &self.gray_edges
-            }
-            .iter()
-            .filter(|x| x.from == id || x.to == id);
-            */
 
             for (from, to, _) in adj_edges {
                 if from == id {
@@ -351,26 +341,6 @@ impl EdgeFunctions for BiedgedGraph {
             }
         }
     }
-
-    /*
-    /// Returns the number of edges in the graph
-    fn edges_count(&self) -> usize {
-        self.get_black_edges().len() + self.get_gray_edges().len()
-    }
-
-    /// Return all the gray edges in the graph
-    fn get_gray_edges(&self) -> &[BiedgedEdge] {
-        &self.gray_edges
-    }
-    /// Return all the black edges in the graph
-    fn get_black_edges(&self) -> &[BiedgedEdge] {
-        &self.black_edges.as_ref()
-    }
-
-    fn get_gray_edges_mut(&mut self) -> &mut [BiedgedEdge] {
-        self.gray_edges.as_mut()
-    }
-    */
 }
 
 impl BiedgedGraph {

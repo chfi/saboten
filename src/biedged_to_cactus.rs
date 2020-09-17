@@ -1,10 +1,8 @@
 use crate::biedgedgraph::*;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::HashSet;
 
 use three_edge_connected as t_e_c;
-
-use bstr::{BStr, BString};
 
 /// STEP 1: Contract all gray edges
 pub fn contract_all_gray_edges(biedged: &mut BiedgedGraph) {
@@ -111,7 +109,6 @@ pub fn contract_loops(biedged: &mut BiedgedGraph) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::biedgedgraph::*;
 
     fn graph_from_paper() -> BiedgedGraph {
         let mut graph = BiedgedGraph::new();
@@ -247,7 +244,6 @@ mod tests {
         graph
     }
 
-    /*
     #[test]
     fn simple_contract_all_gray_edges() {
         let mut graph: BiedgedGraph = BiedgedGraph::new();
