@@ -447,7 +447,7 @@ impl BiedgedGraph {
 
     /// Convert a GFA to a biedged graph if file exists
     /// otherwise return None
-    pub fn gfa_to_biedged_graph(path: &PathBuf) -> Option<BiedgedGraph> {
+    pub fn from_gfa_file(path: &PathBuf) -> Option<BiedgedGraph> {
         let parser = GFAParser::new();
         let gfa: GFA<BString, ()> = parser.parse_file(path).ok()?;
         let graph = HashGraph::from_gfa(&gfa);
