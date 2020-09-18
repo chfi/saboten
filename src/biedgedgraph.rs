@@ -381,12 +381,6 @@ impl BiedgedGraph {
         // Insert first value
         q.push_back(node_id);
 
-        // Store black and grey edges
-        let mut black_edges: Vec<BiedgedEdge> = Vec::new();
-        let mut gray_edges: Vec<BiedgedEdge> = Vec::new();
-        // Store nodes
-        let mut nodes: Vec<BiedgedNode> = Vec::new();
-
         while let Some(curr_node) = q.pop_front() {
             if visited_nodes.contains(&curr_node) {
                 continue;
@@ -401,19 +395,8 @@ impl BiedgedGraph {
             let node_1 = biedged.add_node(left_id);
             let node_2 = biedged.add_node(right_id);
 
-            // The two nodes are connected
-            // let id_edge = format!("B: {}", current_handle.unpack_number());
-            biedged.add_edge(node_1, node_2, BiedgedWeight::empty());
-
-            // Add nodes to vec
-            nodes.push(BiedgedNode { id: left_id });
-            nodes.push(BiedgedNode { id: right_id });
-
-            // Add edge to black edges
-            black_edges.push(BiedgedEdge {
-                from: node_1,
-                to: node_2,
-            });
+            // The two nodes are connected with a black edge
+            biedged.add_edge(node_1, node_2, BiedgedWeight::black(1));
 
             // Look for neighbors in the Handlegraph, add edges in the biedged graph
             for neighbor in
@@ -428,14 +411,8 @@ impl BiedgedGraph {
                 biedged.add_edge(
                     node_2,
                     neighbor_node_biedged,
-                    BiedgedWeight::empty(),
+                    BiedgedWeight::gray(1),
                 );
-
-                // Add edge to gray edges
-                gray_edges.push(BiedgedEdge {
-                    from: node_2,
-                    to: neighbor_node_biedged,
-                });
 
                 // Add to queue
                 q.push_back(neighbor.id());
