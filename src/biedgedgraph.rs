@@ -12,6 +12,8 @@ use bstr::BString;
 
 use std::{
     collections::{HashSet, VecDeque},
+    fs::File,
+    io::Write,
     ops::{Add, AddAssign, Sub, SubAssign},
     path::PathBuf,
 };
@@ -454,26 +456,21 @@ impl BiedgedGraph {
         Some(BiedgedGraph::from_handlegraph(&graph))
     }
 
-    /* temporarily disabled; need to use with_attr_getters because the
-       () edge weights don't work otherwise (() doesn't implement
-       Display)
-
     /// Print the biedged graph to a .dot file. This file can then be used by
     /// various tools (i.e. Graphviz) to produce a graphical representation of the graph
     /// (i.e. dot -Tpng graph.dot -o graph.png)
-    pub fn biedged_to_dot(&self, path: &PathBuf) -> std::io::Result<()> {
+    pub fn output_dot<T: Write>(&self, mut t: T) -> std::io::Result<()> {
         use petgraph::dot::{Config, Dot};
 
-        let mut f = File::create(path).unwrap();
+        // let mut f = File::create(path).unwrap();
         // let output = format!("{}", Dot::with_config(&graph.graph, &[Config::EdgeNoLabel]));
         let output = format!(
             "{:?}",
             Dot::with_config(&self.graph, &[Config::NodeNoLabel])
         );
-        f.write_all(&output.as_bytes())?;
+        t.write_all(&output.as_bytes())?;
         Ok(())
     }
-    */
 }
 
 // ----------------------------------- TESTS -------------------------------

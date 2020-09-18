@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{io::stdout, path::PathBuf};
 
 use structopt::StructOpt;
 
@@ -17,4 +17,7 @@ fn main() {
     biedged_to_cactus::contract_all_gray_edges(&mut be_graph);
     biedged_to_cactus::find_3_edge_connected_components(&mut be_graph);
     biedged_to_cactus::contract_loops(&mut be_graph);
+
+    let mut s = stdout();
+    be_graph.output_dot(&mut s).unwrap();
 }
