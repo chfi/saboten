@@ -12,3 +12,4 @@ handlegraph = "0.3.0"
 gfa = "0.6"
 three-edge-connected = { git = "https://github.com/chfi/rs-3-edge", rev = "d34f1871557ef72cfb0b4b33e3f6c66df533437e" }
 bstr = "0.2"
+structopt = "0.3"

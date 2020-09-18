@@ -26,20 +26,36 @@ pub struct BiedgedWeight {
 }
 
 impl BiedgedWeight {
+    /// An empty weight has zero edges of either color.
     pub fn empty() -> Self {
         Default::default()
     }
 
+    /// Construct a new edge weight with the provided edge counts.
     pub fn new(black: usize, gray: usize) -> Self {
         BiedgedWeight { black, gray }
     }
 
+    /// Construct a new edge weight with the provided black count,
+    /// with gray set to zero.
     pub fn black(black: usize) -> Self {
         BiedgedWeight { black, gray: 0 }
     }
 
+    /// Construct a new edge weight with the provided gray count,
+    /// with black set to zero.
     pub fn gray(gray: usize) -> Self {
         BiedgedWeight { black: 0, gray }
+    }
+
+    /// Extract the corresponding field based on the provided edge
+    /// type variant.
+    pub fn extract(&self, edge_type: BiedgedEdgeType) -> usize {
+        use BiedgedEdgeType::*;
+        match edge_type {
+            Black => self.black,
+            Gray => self.gray,
+        }
     }
 }
 
@@ -109,7 +125,7 @@ impl BiedgedGraph {
     }
 
     /// Produces the sum of the gray edges in the graph, counted using
-    /// the edge weights
+    /// the edge weights.
     pub fn gray_edge_count(&self) -> usize {
         self.gray_edges().map(|(_, _, w)| w.gray).sum()
     }
@@ -139,7 +155,7 @@ pub struct BiedgedNode {
 // NOTE: this is a struct and not a typedef because I plan on adding more fields to it
 
 /// An enum that represent the two possible types of edges: Black and Gray
-#[derive(PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum BiedgedEdgeType {
     Black,
     Gray,
@@ -217,21 +233,16 @@ impl NodeFunctions for BiedgedGraph {
     ) -> Vec<u64> {
         let mut adj_nodes: Vec<u64> = Vec::new();
         if self.graph.contains_node(id) {
-            let adj_edges = self.graph.edges(id).filter(|(_, _, w)| {
-                if edge_type == BiedgedEdgeType::Black {
-                    w.black != 0
-                } else {
-                    w.gray != 0
-                }
-            });
-
-            for (from, to, _) in adj_edges {
-                if from == id {
-                    adj_nodes.push(to);
-                } else {
-                    adj_nodes.push(from);
-                }
-            }
+            self.graph
+                .edges(id)
+                .filter(|(_, _, w)| w.extract(edge_type) != 0)
+                .for_each(|(from, to, _)| {
+                    if from == id {
+                        adj_nodes.push(to);
+                    } else {
+                        adj_nodes.push(from);
+                    }
+                });
         }
         adj_nodes
     }

@@ -288,6 +288,7 @@ dependencies = [
  "gfa",
  "handlegraph",
  "petgraph",
+ "structopt",
  "three-edge-connected",
 ]
 
