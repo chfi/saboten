@@ -54,9 +54,13 @@ pub fn find_3_edge_connected_components(biedged: &mut BiedgedGraph) {
             .map(|(from, to, _)| (from as usize, to as usize)),
     );
 
-    let components = t_e_c::find_components(&graph.graph);
+    let components: Vec<_> = t_e_c::find_components(&graph.graph)
+        .into_iter()
+        .filter(|c| c.len() > 1)
+        .collect();
 
-    merge_3_connected_components(biedged, components.as_ref());
+    merge_3_connected_components(biedged, &components);
+    // components
 }
 
 /// STEP 3: Find loops and contract edges inside them
