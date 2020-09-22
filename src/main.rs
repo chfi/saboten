@@ -34,7 +34,7 @@ fn paper_gfa() -> GFA<BString, ()> {
         ("a", "b"),
         ("a", "c"),
         ("b", "d"),
-        ("b", "d"),
+        ("c", "d"),
         ("d", "e"),
         ("d", "f"),
         ("e", "g"),
@@ -48,6 +48,8 @@ fn paper_gfa() -> GFA<BString, ()> {
         ("j", "l"),
         ("k", "l"),
         ("l", "m"),
+        ("m", "n"),
+        ("m", "o"),
         ("n", "p"),
         ("o", "p"),
         ("p", "m"),
@@ -60,7 +62,7 @@ fn paper_gfa() -> GFA<BString, ()> {
         from_orient: Orientation::Forward,
         to_segment: BString::from(t),
         to_orient: Orientation::Forward,
-        overlap: BString::from(""),
+        overlap: BString::from("0M"),
         optional: (),
     })
     .collect();
