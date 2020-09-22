@@ -6,12 +6,15 @@ use handlegraph::{
     hashgraph::*,
 };
 
-use gfa::{gfa::GFA, parser::GFAParser};
+use gfa::{
+    gfa::{Link, Orientation, Segment, GFA},
+    parser::GFAParser,
+};
 
 use bstr::BString;
 
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     fs::File,
     io::Write,
     ops::{Add, AddAssign, Sub, SubAssign},
@@ -102,7 +105,7 @@ impl SubAssign for BiedgedWeight {
 /// Superbubbles, Ultrabubbles, and Cacti by BENEDICT PATEN et al.
 #[derive(Default)]
 pub struct BiedgedGraph {
-    pub(crate) graph: UnGraphMap<u64, BiedgedWeight>,
+    pub graph: UnGraphMap<u64, BiedgedWeight>,
 }
 
 impl BiedgedGraph {
@@ -428,9 +431,56 @@ impl BiedgedGraph {
     /// otherwise return None
     pub fn from_gfa_file(path: &PathBuf) -> Option<BiedgedGraph> {
         let parser = GFAParser::new();
-        let gfa: GFA<BString, ()> = parser.parse_file(path).ok()?;
+        let gfa: GFA<usize, ()> = parser.parse_file(path).ok()?;
         let graph = HashGraph::from_gfa(&gfa);
         Some(BiedgedGraph::from_handlegraph(&graph))
+    }
+
+    pub fn from_gfa(gfa: &GFA<usize, ()>) -> BiedgedGraph {
+        let hash_graph = HashGraph::from_gfa(gfa);
+        BiedgedGraph::from_handlegraph(&hash_graph)
+    }
+
+    pub fn to_gfa(&self) -> GFA<usize, ()> {
+        let mut segments = Vec::new();
+        let mut links = Vec::new();
+
+        let (black, gray): (Vec<_>, Vec<_>) =
+            self.graph.all_edges().partition(|(_f, _t, w)| w.black > 0);
+
+        for (f, _t, _w) in black {
+            let id = f as usize;
+            let seg = Segment {
+                name: id,
+                sequence: BString::from("*"),
+                optional: (),
+            };
+            segments.push(seg);
+        }
+
+        for (f, t, _w) in gray {
+            let link = Link {
+                from_segment: f as usize,
+                from_orient: Orientation::Forward,
+                to_segment: t as usize,
+                to_orient: Orientation::Forward,
+                overlap: BString::from(""),
+                optional: (),
+            };
+            links.push(link);
+        }
+
+        segments.sort_by(|a, b| a.name.cmp(&b.name));
+        segments.dedup_by(|a, b| a.name == b.name);
+        links.sort_by(|f, t| f.from_segment.cmp(&t.from_segment));
+
+        GFA {
+            header: Default::default(),
+            segments,
+            links,
+            containments: vec![],
+            paths: vec![],
+        }
     }
 
     /// Print the biedged graph to a .dot file. This file can then be used by
