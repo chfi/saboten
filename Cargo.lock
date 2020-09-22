@@ -100,9 +100,9 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 
 [[package]]
 name = "gfa"
-version = "0.6.2"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc15b404705b5aae2fbb76797b2a9fd69061c480d52659f7369a880132f1153e"
+checksum = "5ebe1a0181c8a304aa81b812ad04d1a586bb64abbfaea2914e895ecc230c9ce9"
 dependencies = [
  "bstr",
  "bytemuck",
@@ -110,13 +110,14 @@ dependencies = [
  "nom",
  "regex",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
 name = "handlegraph"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4fac0e2d3a6389e5108d2c00f61f134ea9f5dc605697e513a475e4a380041ea"
+checksum = "885a4dcab73dcad20881acd42bac6d0d9b4662d83fbb874c6020070bf8551df3"
 dependencies = [
  "bstr",
  "gfa",
@@ -158,6 +159,12 @@ dependencies = [
  "autocfg",
  "hashbrown",
 ]
+
+[[package]]
+name = "itoa"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc6f3ad7b9d11a0c00842ff8de1b60ee58661048eb8049ed33c73594f359d7e6"
 
 [[package]]
 name = "lazy_static"
@@ -319,6 +326,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_json"
+version = "1.0.57"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "164eacbdb13512ec2745fb09d51fd5b22b0d65ed294a1dcf7285a360c80a675c"
+dependencies = [
+ "itoa",
+ "ryu",
+ "serde",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -386,7 +404,7 @@ dependencies = [
 [[package]]
 name = "three-edge-connected"
 version = "0.1.0"
-source = "git+https://github.com/chfi/rs-3-edge?rev=d34f1871557ef72cfb0b4b33e3f6c66df533437e#d34f1871557ef72cfb0b4b33e3f6c66df533437e"
+source = "git+https://github.com/chfi/rs-3-edge?rev=e1e78ae71f56c254bf95f3cc20351289ebd23c77#e1e78ae71f56c254bf95f3cc20351289ebd23c77"
 dependencies = [
  "bstr",
  "gfa",
