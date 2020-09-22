@@ -366,65 +366,28 @@ impl BiedgedGraph {
     }
 
     /// Create a biedged graph from a Handlegraph
-    pub fn from_handlegraph<T: HandleGraph>(graph: &T) -> BiedgedGraph {
-        let mut biedged: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
+    pub fn from_handlegraph<T: HandleGraph>(graph: &T) -> Self {
+        let mut be_graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
-        // Create queue
-        // NOTE: this is a Queue based implementation, this was done
-        // in order not to get a stack overflow
-        let mut q: VecDeque<NodeId> = VecDeque::new();
-
-        // Start from the node with the lowest id
-        // will probably always be 1, but this is safer
-        let node_id = graph.min_node_id();
-
-        // Store which nodes have already been visited
-        let mut visited_nodes: HashSet<NodeId> = HashSet::new();
-
-        // Insert first value
-        q.push_back(node_id);
-
-        while let Some(curr_node) = q.pop_front() {
-            if visited_nodes.contains(&curr_node) {
-                continue;
-            }
-
-            let current_handle = Handle::pack(curr_node, false);
-            let left_id: u64 = current_handle.as_integer();
-            let right_id: u64 = current_handle.flip().as_integer();
-
-            // For each node in the Handlegraph, there will be two nodes in the biedged graph
-            // each representing one of the two sides
-            let node_1 = biedged.add_node(left_id);
-            let node_2 = biedged.add_node(right_id);
-
-            // The two nodes are connected with a black edge
-            biedged.add_edge(node_1, node_2, BiedgedWeight::black(1));
-
-            // Look for neighbors in the Handlegraph, add edges in the biedged graph
-            for neighbor in
-                graph.handle_edges_iter(current_handle, Direction::Right)
-            {
-                // Add first node for neighbor
-                let neighbor_node_biedged =
-                    biedged.add_node(neighbor.as_integer());
-
-                // Add edge from neighbor to
-                // let id_edge = format!("G: {}->{}", curr_node, neighbor.id());
-                biedged.add_edge(
-                    node_2,
-                    neighbor_node_biedged,
-                    BiedgedWeight::gray(1),
-                );
-
-                // Add to queue
-                q.push_back(neighbor.id());
-            }
-
-            visited_nodes.insert(curr_node);
+        // Add the nodes
+        for handle in graph.handles_iter() {
+            let left_id = handle.unpack_number();
+            println!("adding node {}", left_id);
+            let right_id = std::u64::MAX - left_id;
+            be_graph.add_node(left_id);
+            be_graph.add_node(right_id);
+            be_graph.add_edge(left_id, right_id, BiedgedWeight::black(1));
         }
 
-        BiedgedGraph { graph: biedged }
+        // Add the edges
+        for Edge(from, to) in graph.edges_iter() {
+            let from_id = std::u64::MAX - from.unpack_number();
+            let to_id = to.unpack_number();
+            println!("adding gray edge {} {}", from_id, to_id);
+            be_graph.add_edge(from_id, to_id, BiedgedWeight::gray(1));
+        }
+
+        BiedgedGraph { graph: be_graph }
     }
 
     /// Convert a GFA to a biedged graph if file exists
