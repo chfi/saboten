@@ -13,54 +13,44 @@ pub fn contract_all_gray_edges(biedged: &mut BiedgedGraph) {
 }
 
 /// STEP 2: Find 3-edge connected components
-/// makes use of chfi's rs-3-edge, which can be found at:
-/// https://github.com/chfi/rs-3-edge
-fn merge_3_connected_components(
+pub fn find_3_edge_connected_components(
+    biedged: &BiedgedGraph,
+) -> Vec<Vec<usize>> {
+    let mut edges = biedged
+        .graph
+        .all_edges()
+        .flat_map(|(a, b, w)| {
+            std::iter::repeat((a as usize, b as usize)).take(w.black)
+        })
+        .collect::<Vec<_>>();
+
+    // edges.sort();
+
+    let graph = t_e_c::Graph::from_edges(edges.into_iter());
+
+    let (components, _) = t_e_c::find_components(&graph.graph);
+
+    let components: Vec<_> =
+        components.into_iter().filter(|c| c.len() > 1).collect();
+
+    let components = graph.invert_components(components);
+
+    components
+}
+
+// merge the detected components
+
+pub fn merge_components(
     biedged: &mut BiedgedGraph,
-    components: &[Vec<usize>],
+    components: Vec<Vec<usize>>,
 ) {
-    for component in components {
-        merge_nodes_in_component(biedged, component);
-    }
-}
-fn merge_nodes_in_component(biedged: &mut BiedgedGraph, component: &[usize]) {
-    let mut adj_vertices: HashSet<u64> = HashSet::new();
-
-    for node_id in component {
-        let node_id = *node_id as u64;
-        for node in biedged.get_adjacent_nodes(node_id) {
-            if !component.contains(&(node as usize)) {
-                adj_vertices.insert(node);
-            }
+    for comp in components {
+        let mut iter = comp.into_iter();
+        let head = iter.next().unwrap();
+        for other in iter {
+            biedged.merge_vertices(head as u64, other as u64);
         }
-        // Remove all edges incident to nodeId
-        biedged.remove_edges_incident_to_node(node_id);
-        // Remove node
-        biedged.remove_node(node_id);
     }
-
-    // TODO: Decide which nodeId to use
-    biedged.add_node(*component.get(0).unwrap() as u64);
-    for node in adj_vertices {
-        // TODO: keep track if edge was incoming or outcoming
-        biedged.add_edge(100, node, BiedgedEdgeType::Black);
-    }
-}
-
-pub fn find_3_edge_connected_components(biedged: &mut BiedgedGraph) {
-    let graph = t_e_c::Graph::from_edges(
-        biedged
-            .black_edges()
-            .map(|(from, to, _)| (from as usize, to as usize)),
-    );
-
-    let components: Vec<_> = t_e_c::find_components(&graph.graph)
-        .into_iter()
-        .filter(|c| c.len() > 1)
-        .collect();
-
-    merge_3_connected_components(biedged, &components);
-    // components
 }
 
 /// STEP 3: Find loops and contract edges inside them
