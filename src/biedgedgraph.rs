@@ -150,6 +150,44 @@ impl BiedgedGraph {
             .map(|(_, _, w)| w.black + w.gray)
             .sum()
     }
+
+    pub fn contract_edge(&mut self, left: u64, right: u64) -> Option<()> {
+        // We'll always remove the node with a higher ID, for consistency
+        let from = left.min(right);
+        let to = left.max(right);
+
+        let weight = self.graph.edge_weight(from, to).copied()?;
+
+        // Retrieve the edges of the node we're removing
+        let to_edges: Vec<(u64, u64, BiedgedWeight)> = self
+            .graph
+            .edges(to)
+            .filter(|(_, node, _)| node != &from)
+            .map(|(a, b, w)| (a, b, *w))
+            .collect();
+
+        self.graph.remove_node(to);
+
+        // add the edges that were removed with the deleted node
+        for (_, other, w) in to_edges {
+            if let Some(old_weight) = self.graph.edge_weight_mut(from, other) {
+                *old_weight += w;
+            } else {
+                self.graph.add_edge(from, other, w);
+            }
+        }
+
+        if weight.black > 0 {
+            let new_weight = BiedgedWeight::black(weight.black);
+            if let Some(self_weight) = self.graph.edge_weight_mut(from, from) {
+                *self_weight += new_weight;
+            } else {
+                self.graph.add_edge(from, from, new_weight);
+            }
+        }
+
+        Some(())
+    }
 }
 
 /// A node in the biedged graph
@@ -207,8 +245,6 @@ pub trait EdgeFunctions {
     fn remove_edge(&mut self, from: u64, to: u64) -> Option<BiedgedEdge>;
 
     fn remove_edges_incident_to_node(&mut self, id: u64) -> Vec<BiedgedEdge>;
-
-    fn contract_edge(&mut self, from: u64, to: u64);
 }
 
 impl NodeFunctions for BiedgedGraph {
@@ -315,48 +351,6 @@ impl EdgeFunctions for BiedgedGraph {
         }
         edges
     }
-
-    /// Contract a given edge. For more information on edge contraction go to:
-    /// https://en.wikipedia.org/wiki/Edge_contraction
-    fn contract_edge(&mut self, from: u64, to: u64) {
-        let mut adjacent_nodes_by_black_edge: Vec<u64> = Vec::new();
-        let mut adjacent_nodes_by_gray_edge: Vec<u64> = Vec::new();
-
-        let mut first_node_adjacent_nodes_black: Vec<u64> =
-            self.get_adjacent_nodes_by_color(from, BiedgedEdgeType::Black);
-        let mut first_node_adjacent_nodes_gray: Vec<u64> =
-            self.get_adjacent_nodes_by_color(from, BiedgedEdgeType::Gray);
-
-        let mut second_node_adjacent_nodes_black: Vec<u64> =
-            self.get_adjacent_nodes_by_color(to, BiedgedEdgeType::Black);
-        let mut second_node_adjacent_nodes_gray: Vec<u64> =
-            self.get_adjacent_nodes_by_color(to, BiedgedEdgeType::Gray);
-
-        adjacent_nodes_by_black_edge
-            .append(&mut first_node_adjacent_nodes_black);
-        adjacent_nodes_by_black_edge
-            .append(&mut second_node_adjacent_nodes_black);
-
-        adjacent_nodes_by_gray_edge.append(&mut first_node_adjacent_nodes_gray);
-        adjacent_nodes_by_gray_edge
-            .append(&mut second_node_adjacent_nodes_gray);
-
-        // All adjacent edges will also be removed
-        self.remove_node(from);
-        self.remove_node(to);
-
-        let added_node = self.add_node(from);
-
-        for adj_node in adjacent_nodes_by_black_edge {
-            self.add_edge(added_node, adj_node, BiedgedEdgeType::Black);
-        }
-
-        for adj_node in adjacent_nodes_by_gray_edge {
-            if adj_node != from && adj_node != to {
-                self.add_edge(added_node, adj_node, BiedgedEdgeType::Gray);
-            }
-        }
-    }
 }
 
 impl BiedgedGraph {
@@ -372,7 +366,6 @@ impl BiedgedGraph {
         // Add the nodes
         for handle in graph.handles_iter() {
             let left_id = handle.unpack_number();
-            println!("adding node {}", left_id);
             let right_id = std::u64::MAX - left_id;
             be_graph.add_node(left_id);
             be_graph.add_node(right_id);
@@ -383,7 +376,6 @@ impl BiedgedGraph {
         for Edge(from, to) in graph.edges_iter() {
             let from_id = std::u64::MAX - from.unpack_number();
             let to_id = to.unpack_number();
-            println!("adding gray edge {} {}", from_id, to_id);
             be_graph.add_edge(from_id, to_id, BiedgedWeight::gray(1));
         }
 
@@ -408,9 +400,7 @@ impl BiedgedGraph {
         let mut segments = Vec::new();
         let mut links = Vec::new();
 
-        let (black, gray): (Vec<_>, Vec<_>) =
-            self.graph.all_edges().partition(|(_f, _t, w)| w.black > 0);
-
+        let black = self.black_edges();
         for (f, _t, _w) in black {
             let id = f as usize;
             let seg = Segment {
@@ -421,6 +411,7 @@ impl BiedgedGraph {
             segments.push(seg);
         }
 
+        let gray = self.gray_edges();
         for (f, t, _w) in gray {
             let link = Link {
                 from_segment: f as usize,
