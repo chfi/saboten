@@ -404,7 +404,6 @@ dependencies = [
 [[package]]
 name = "three-edge-connected"
 version = "0.1.0"
-source = "git+https://github.com/chfi/rs-3-edge?rev=e1e78ae71f56c254bf95f3cc20351289ebd23c77#e1e78ae71f56c254bf95f3cc20351289ebd23c77"
 dependencies = [
  "bstr",
  "gfa",

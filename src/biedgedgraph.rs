@@ -438,18 +438,35 @@ impl BiedgedGraph {
         BiedgedGraph { graph: be_graph }
     }
 
+    pub fn from_gfa(gfa: &GFA<usize, ()>) -> BiedgedGraph {
+        let mut be_graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
+
+        for segment in gfa.segments.iter() {
+            let name = segment.name as u64;
+            let left_id = name;
+            let right_id = std::u64::MAX - left_id;
+            be_graph.add_node(left_id);
+            be_graph.add_node(right_id);
+            be_graph.add_edge(left_id, right_id, BiedgedWeight::black(1));
+        }
+
+        for link in gfa.links.iter() {
+            let from_id = std::u64::MAX - link.from_segment as u64;
+            let to_id = link.to_segment as u64;
+            be_graph.add_edge(from_id, to_id, BiedgedWeight::gray(1));
+        }
+
+        BiedgedGraph { graph: be_graph }
+    }
+
     /// Convert a GFA to a biedged graph if file exists
     /// otherwise return None
     pub fn from_gfa_file(path: &PathBuf) -> Option<BiedgedGraph> {
         let parser = GFAParser::new();
         let gfa: GFA<usize, ()> = parser.parse_file(path).ok()?;
-        let graph = HashGraph::from_gfa(&gfa);
-        Some(BiedgedGraph::from_handlegraph(&graph))
+        Some(BiedgedGraph::from_gfa(&gfa))
     }
 
-    pub fn from_gfa(gfa: &GFA<usize, ()>) -> BiedgedGraph {
-        let hash_graph = HashGraph::from_gfa(gfa);
-        BiedgedGraph::from_handlegraph(&hash_graph)
     pub fn to_gfa_usize(&self) -> GFA<usize, ()> {
         let mut segments = Vec::new();
         let mut links = Vec::new();
@@ -582,6 +599,7 @@ impl BiedgedGraph {
         segments.sort_by(|a, b| a.name.cmp(&b.name));
         segments.dedup_by(|a, b| a.name == b.name);
         links.sort_by(|f, t| f.from_segment.cmp(&t.from_segment));
+        */
 
         GFA {
             header: Header {

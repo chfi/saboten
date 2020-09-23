@@ -7,7 +7,7 @@ use three_edge_connected as t_e_c;
 /// STEP 1: Contract all gray edges
 pub fn contract_all_gray_edges(biedged: &mut BiedgedGraph) {
     while biedged.gray_edge_count() > 0 {
-        let (from, to, _) = biedged.gray_edges().next().unwrap();
+        let (from, to, w) = biedged.gray_edges().next().unwrap();
         biedged.contract_edge(from, to);
     }
 }
