@@ -151,6 +151,37 @@ impl BiedgedGraph {
             .sum()
     }
 
+    pub fn merge_vertices(&mut self, a: u64, b: u64) -> Option<()> {
+        // We'll always remove the node with a higher ID, for consistency
+        let from = a.min(b);
+        let to = a.max(b);
+
+        if self.graph.contains_edge(a, b) {
+            return self.contract_edge(a, b);
+        }
+
+        // Retrieve the edges of the node we're removing
+        let to_edges: Vec<(u64, u64, BiedgedWeight)> = self
+            .graph
+            .edges(to)
+            .filter(|(_, node, _)| node != &from)
+            .map(|(a, b, w)| (a, b, *w))
+            .collect();
+
+        self.graph.remove_node(to);
+
+        // add the edges that were removed with the deleted node
+        for (_, other, w) in to_edges {
+            if let Some(old_weight) = self.graph.edge_weight_mut(from, other) {
+                *old_weight += w;
+            } else {
+                self.graph.add_edge(from, other, w);
+            }
+        }
+
+        Some(())
+    }
+
     pub fn contract_edge(&mut self, left: u64, right: u64) -> Option<()> {
         // We'll always remove the node with a higher ID, for consistency
         let from = left.min(right);
@@ -490,35 +521,6 @@ impl BiedgedGraph {
                 optional: (),
             });
         }
-        /*
-        let black = self.black_edges();
-        for (f, _t, _w) in black {
-            let id = f as usize;
-            let seg = Segment {
-                name: id,
-                sequence: BString::from("*"),
-                optional: (),
-            };
-            segments.push(seg);
-        }
-
-        let gray = self.gray_edges();
-        for (f, t, _w) in gray {
-            let link = Link {
-                from_segment: f as usize,
-                from_orient: Orientation::Forward,
-                to_segment: t as usize,
-                to_orient: Orientation::Forward,
-                overlap: BString::from(""),
-                optional: (),
-            };
-            links.push(link);
-        }
-
-        segments.sort_by(|a, b| a.name.cmp(&b.name));
-        segments.dedup_by(|a, b| a.name == b.name);
-        links.sort_by(|f, t| f.from_segment.cmp(&t.from_segment));
-        */
 
         GFA {
             header: Header {
