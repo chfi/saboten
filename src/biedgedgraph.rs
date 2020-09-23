@@ -7,7 +7,7 @@ use handlegraph::{
 };
 
 use gfa::{
-    gfa::{Link, Orientation, Segment, GFA},
+    gfa::{Header, Link, Orientation, Segment, GFA},
     parser::GFAParser,
 };
 
@@ -144,7 +144,7 @@ impl BiedgedGraph {
     /// Produces the sum of all edges in the graph, counted using the
     /// edge weights. Note that black and gray edges are summed
     /// together.
-    pub fn edges_count(&self) -> usize {
+    pub fn edge_color_count(&self) -> usize {
         self.graph
             .all_edges()
             .map(|(_, _, w)| w.black + w.gray)
@@ -179,6 +179,15 @@ impl BiedgedGraph {
 
         if weight.black > 0 {
             let new_weight = BiedgedWeight::black(weight.black);
+            if let Some(self_weight) = self.graph.edge_weight_mut(from, from) {
+                *self_weight += new_weight;
+            } else {
+                self.graph.add_edge(from, from, new_weight);
+            }
+        }
+
+        if weight.gray > 1 {
+            let new_weight = BiedgedWeight::gray(weight.gray - 1);
             if let Some(self_weight) = self.graph.edge_weight_mut(from, from) {
                 *self_weight += new_weight;
             } else {
@@ -359,7 +368,54 @@ impl BiedgedGraph {
         Default::default()
     }
 
+    pub fn sorted_edges(&self) -> Vec<(u64, u64, usize, usize)> {
+        let mut black_edges = self
+            .black_edges()
+            .map(|x| (x.0, x.1, x.2.black, x.2.gray))
+            .collect::<Vec<_>>();
+        let mut gray_edges = self
+            .gray_edges()
+            .map(|x| (x.0, x.1, x.2.black, x.2.gray))
+            .collect::<Vec<_>>();
+
+        black_edges.sort();
+        gray_edges.sort();
+        black_edges.extend(gray_edges);
+        black_edges
+    }
+
+    pub fn example() -> BiedgedGraph {
+        let mut be_graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
+
+        // let black_edges =
+        //     vec![(1, 2), (3, 4), (5, 6), (7, 8), (9, 10), (11, 12)];
+
+        let black_edges =
+            vec![(0, 10), (1, 11), (2, 12), (3, 13), (4, 14), (5, 15)];
+
+        let gray_edges = vec![
+            (10, 1),
+            (10, 2),
+            (11, 3),
+            (12, 3),
+            (13, 4),
+            (13, 5),
+            (13, 0),
+        ];
+
+        for (a, b) in black_edges {
+            be_graph.add_edge(a, b, BiedgedWeight::black(1));
+        }
+
+        for (a, b) in gray_edges {
+            be_graph.add_edge(a, b, BiedgedWeight::gray(1));
+        }
+
+        BiedgedGraph { graph: be_graph }
+    }
+
     /// Create a biedged graph from a Handlegraph
+    /// apparently kinda broken!
     pub fn from_handlegraph<T: HandleGraph>(graph: &T) -> Self {
         let mut be_graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
@@ -394,12 +450,111 @@ impl BiedgedGraph {
     pub fn from_gfa(gfa: &GFA<usize, ()>) -> BiedgedGraph {
         let hash_graph = HashGraph::from_gfa(gfa);
         BiedgedGraph::from_handlegraph(&hash_graph)
-    }
-
-    pub fn to_gfa(&self) -> GFA<usize, ()> {
+    pub fn to_gfa_usize(&self) -> GFA<usize, ()> {
         let mut segments = Vec::new();
         let mut links = Vec::new();
 
+        for id in self.graph.nodes() {
+            let name = id as usize;
+            segments.push(Segment {
+                name,
+                sequence: BString::from("*"),
+                optional: (),
+            });
+        }
+
+        for (f, t, _) in self.black_edges() {
+            links.push(Link {
+                from_segment: f as usize,
+                from_orient: Orientation::Forward,
+                to_segment: t as usize,
+                to_orient: Orientation::Forward,
+                overlap: BString::from("0M"),
+                optional: (),
+            });
+        }
+        /*
+        let black = self.black_edges();
+        for (f, _t, _w) in black {
+            let id = f as usize;
+            let seg = Segment {
+                name: id,
+                sequence: BString::from("*"),
+                optional: (),
+            };
+            segments.push(seg);
+        }
+
+        let gray = self.gray_edges();
+        for (f, t, _w) in gray {
+            let link = Link {
+                from_segment: f as usize,
+                from_orient: Orientation::Forward,
+                to_segment: t as usize,
+                to_orient: Orientation::Forward,
+                overlap: BString::from(""),
+                optional: (),
+            };
+            links.push(link);
+        }
+
+        segments.sort_by(|a, b| a.name.cmp(&b.name));
+        segments.dedup_by(|a, b| a.name == b.name);
+        links.sort_by(|f, t| f.from_segment.cmp(&t.from_segment));
+        */
+
+        GFA {
+            header: Header {
+                version: Some("1.0".into()),
+                optional: (),
+            },
+            segments,
+            links,
+            containments: vec![],
+            paths: vec![],
+        }
+    }
+
+    pub fn to_gfa_bstring(&self) -> GFA<BString, ()> {
+        let mut segments = Vec::new();
+        let mut links = Vec::new();
+
+        for id in self.graph.nodes() {
+            let name = BString::from(id.to_string());
+            segments.push(Segment {
+                name,
+                sequence: BString::from("*"),
+                optional: (),
+            });
+        }
+
+        for (f, t, w) in self.black_edges() {
+            links.push(Link {
+                from_segment: BString::from(f.to_string()),
+                from_orient: Orientation::Forward,
+                to_segment: BString::from(t.to_string()),
+                to_orient: Orientation::Forward,
+                overlap: BString::from("0M"),
+                // overlap: BString::from(w.black.to_string()),
+                optional: (),
+            });
+        }
+
+        segments.sort_by(|a, b| a.name.cmp(&b.name));
+        segments.dedup_by(|a, b| a.name == b.name);
+        links.sort_by(|f, t| f.from_segment.cmp(&t.from_segment));
+
+        /*
+        for (f, t, _) in self.gray_edges() {
+            links.push(Link {
+                from_segment: BString::from(f.to_string()),
+                from_orient: Orientation::Forward,
+                to_segment: BString::from(t.to_string()),
+                to_orient: Orientation::Forward,
+                overlap: BString::from("0M"),
+                optional: (),
+            });
+        }
         let black = self.black_edges();
         for (f, _t, _w) in black {
             let id = f as usize;
@@ -429,7 +584,10 @@ impl BiedgedGraph {
         links.sort_by(|f, t| f.from_segment.cmp(&t.from_segment));
 
         GFA {
-            header: Default::default(),
+            header: Header {
+                version: Some("1.0".into()),
+                optional: (),
+            },
             segments,
             links,
             containments: vec![],
