@@ -64,12 +64,11 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
     let graph = &biedged.graph;
 
     let mut visited: BTreeSet<u64> = BTreeSet::new();
-
     let mut parents: BTreeMap<u64, u64> = BTreeMap::new();
+
     let mut stack: Vec<u64> = Vec::new();
 
     let mut cycles = Vec::new();
-
     let mut cycle_ends: Vec<(u64, u64)> = Vec::new();
 
     for node in graph.nodes() {
@@ -77,29 +76,16 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
             stack.push(node);
             while let Some(current) = stack.pop() {
                 if !visited.contains(&current) {
-                    println!("visiting\t\t{}", current);
                     visited.insert(current);
-
-                    let degree = graph.neighbors(current).count();
-                    println!("    degree\t{}", degree);
-
                     for (_, adj, weight) in graph.edges(current) {
                         if adj == current {
-                            println!(
-                                "adding self-cycles [{},{}]",
-                                current, adj
-                            );
                             for _ in 0..weight.black {
                                 cycles.push(vec![current, current]);
                             }
                         } else {
                             if !visited.contains(&adj) {
                                 if weight.black == 2 {
-                                    println!(
-                                        "adding pair cycle [{},{}]",
-                                        current, adj
-                                    );
-                                    cycles.push(vec![current, adj]);
+                                    cycles.push(vec![current, adj, current]);
                                 }
                                 stack.push(adj);
                                 parents.insert(adj, current);
@@ -111,11 +97,6 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
                         }
                     }
                 }
-                /*else {
-                    println!("-- already visited {} --", current);
-
-                    // if
-                }*/
             }
         }
     }
@@ -132,6 +113,8 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
             }
         }
 
+        cycle.push(end);
+
         cycles.push(cycle);
     }
 
@@ -139,157 +122,10 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
 }
 
 /// STEP 3: Find loops and contract edges inside them
-pub fn find_cycles_(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
-    let graph = &biedged.graph;
-
-    let mut parents: BTreeMap<u64, u64> = BTreeMap::new();
-    let mut visited_nodes: BTreeSet<u64> = BTreeSet::new();
-
-    let mut prev: Option<u64> = None;
-
-    let mut stack: Vec<u64> = Vec::new();
-
-    let mut cycles = Vec::new();
-    // let mut current_cycle: Vec<u64> = Vec::new();
-
-    // let mut current_cycle: Option<Vec<u64>> = Some(Vec::new());
-    let mut current_cycle: Option<Vec<u64>> = None;
-    let mut current_end: Option<u64> = None;
-
-    for node in graph.nodes() {
-        if !visited_nodes.contains(&node) {
-            stack.push(node);
-
-            while let Some(current) = stack.pop() {
-                if !visited_nodes.contains(&current) {
-                    println!("visiting\t{}", current);
-                    visited_nodes.insert(current);
-                    if let Some(prev) = prev {
-                        parents.insert(current, prev);
-                    }
-
-                    println!("  push ret\t{}", current);
-                    stack.push(current);
-
-                    let neighbors: Vec<_> = graph
-                        .neighbors(current)
-                        .filter(|n| !visited_nodes.contains(n))
-                        .collect();
-
-                    if !neighbors.is_empty() {
-                        prev = Some(current);
-                    }
-
-                    for adj in neighbors {
-                        println!("  pushing\t{}", adj);
-                        stack.push(adj);
-                    }
-                } else {
-                    println!("backtracking\t{}", current);
-                    println!("\tfrom\t{:?}", prev);
-                    // backtracking
-
-                    let neighbors: Vec<_> = graph
-                        .neighbors(current)
-                        .filter(|&n| Some(n) != prev)
-                        .collect();
-
-                    let degree = neighbors.len() + 1;
-                    println!("\tdegree\t{}", degree);
-
-                    if let Some(ref mut cycle) = current_cycle {
-                        if cycle.is_empty() {
-                            if current_end.is_none() {
-                                current_end = Some(current);
-                            }
-                            if degree > 2 {
-                                cycle.push(current);
-                            }
-                        } else {
-                            cycle.push(current);
-                        }
-                    } else {
-                        if degree > 1 {
-                            current_cycle = Some(vec![current]);
-                            current_end = Some(current);
-                        } else {
-                            current_cycle = Some(Vec::new());
-                        }
-                    }
-
-                    if neighbors
-                        .iter()
-                        .find(|&&n| Some(n) == current_end)
-                        .is_some()
-                    {
-                        if let Some(cycle) = current_cycle {
-                            cycles.push(cycle);
-                            current_cycle = None;
-                            current_end = None;
-                        }
-                    }
-
-                    prev = Some(current);
-                }
-            }
-        }
-    }
-
-    cycles
-}
-
-// Find loops using a DFS
-fn find_loops(biedged: &mut BiedgedGraph) -> Vec<Vec<(u64, u64)>> {
-    let mut loops: Vec<Vec<_>> = Vec::new();
-    let mut dfs_stack: Vec<u64> = Vec::new();
-    let mut visited_nodes_set: HashSet<u64> = HashSet::new();
-
-    let start_node = biedged.graph.nodes().min().unwrap();
-    dfs_stack.push(start_node);
-
-    let mut parent = start_node;
-    let mut current_loop: Vec<u64> = Vec::new();
-    let mut loops_: Vec<Vec<u64>> = Vec::new();
-    // let mut current_component: Vec<BiedgedEdge> = Vec::new();
-    while let Some(id) = dfs_stack.pop() {
-        current_loop.push(id);
-
-        for node in biedged.graph.neighbors(id) {
-            if !visited_nodes_set.contains(&node) {
-                dfs_stack.push(node);
-            }
-            // current_component.push(BiedgedEdge { from: id, to: node });
-            // else if node != parent
-            //     && current_loop.iter().find(|&n| n == &node).is_some()
-            else {
-                // else {
-                // Found loop
-                let mut current_component: Vec<_> = Vec::new();
-                current_component.push((id, node));
-                loops.push(current_component);
-                // current_component = Vec::new();
-
-                current_loop.push(node);
-                loops_.push(current_loop);
-                current_loop = Vec::new();
-            }
-        }
-        parent = id;
-        visited_nodes_set.insert(id);
-    }
-    for each_loop in loops_ {
-        // println!("loop length: {}", each_loop.len());
-        for node in each_loop {
-            print!(" {}", node);
-        }
-        println!();
-    }
-
-    loops
-}
 
 pub fn contract_loops(biedged: &mut BiedgedGraph) {
     // let loop_edges: Vec<Vec<BiedgedEdge>>;
+    /*
     let loop_edges = find_loops(biedged);
     println!("found {} loops", loop_edges.len());
     for each_loop in loop_edges {
@@ -300,6 +136,7 @@ pub fn contract_loops(biedged: &mut BiedgedGraph) {
         }
         // println!();
     }
+    */
 }
 
 // ----------------------------------- TESTS -------------------------------
@@ -578,46 +415,40 @@ mod tests {
     fn cycle_detection() {
         let mut graph: BiedgedGraph = BiedgedGraph::new();
 
-        /*
-        for i in 0..=4 {
+        for i in 0..=9 {
             graph.add_node(i);
         }
 
-        let edges = vec![(0, 1), (1, 2), (1, 3), (2, 3), (3, 4)];
-        */
+        /*               -i
+                 &     &/
+        a--b==c--d==f--h--j
+               \ |   \ |
+                -e    -g
+                 &     &
 
-        /*
-        for i in 0..=4 {
-            graph.add_node(i);
-        }
-
-        let edges =
-            vec![(0, 1), (1, 2), (1, 2), (1, 3), (1, 4), (2, 2), (2, 2)];
-        */
-
-        for i in 0..=11 {
-            graph.add_node(i);
-        }
+        & self cycles
+        - 1 black edge
+        = 2 black edges
+                */
 
         let edges = vec![
             (0, 1),
             (1, 2),
             (1, 2),
             (2, 3),
+            (2, 4),
+            (3, 3),
             (3, 4),
-            (3, 4),
+            (4, 4),
             (4, 5),
-            (4, 6),
-            (5, 5),
+            (4, 5),
             (5, 6),
+            (5, 7),
             (6, 6),
-            (6, 7),
+            (7, 6),
+            (7, 7),
             (7, 8),
             (7, 9),
-            (7, 10),
-            (7, 10),
-            (10, 10),
-            (10, 10),
         ];
 
         for (a, b) in edges {
@@ -625,13 +456,19 @@ mod tests {
         }
 
         let cycles = find_cycles(&graph);
-        println!("found {} cycles", cycles.len());
 
-        for cycle in cycles {
-            for c in cycle {
-                print!(" {}", c);
-            }
-            println!();
-        }
+        assert_eq!(
+            cycles,
+            vec![
+                vec![1, 2, 1],
+                vec![4, 4],
+                vec![4, 5, 4],
+                vec![7, 7],
+                vec![6, 6],
+                vec![3, 3],
+                vec![6, 7, 5, 6],
+                vec![3, 4, 2, 3],
+            ]
+        );
     }
 }
