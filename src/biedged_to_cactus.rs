@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use three_edge_connected as t_e_c;
 
-pub fn find_projection(proj_map: BTreeMap<u64, u64>, mut node: u64) -> u64 {
+pub fn find_projection(proj_map: &BTreeMap<u64, u64>, mut node: u64) -> u64 {
     while let Some(&next) = proj_map.get(&node) {
         if node == next {
             break;
@@ -18,10 +18,8 @@ pub fn find_projection(proj_map: BTreeMap<u64, u64>, mut node: u64) -> u64 {
 /// STEP 1: Contract all gray edges
 pub fn contract_all_gray_edges(
     biedged: &mut BiedgedGraph,
-    // ) -> Option<BTreeMap<u64, Vec<u64>>> {
 ) -> Option<BTreeMap<u64, u64>> {
     let mut projections: BTreeMap<u64, u64> = BTreeMap::new();
-
     while biedged.gray_edge_count() > 0 {
         let (from, to, _w) = biedged.gray_edges().next().unwrap();
         let kept = biedged.contract_edge(from, to)?;
@@ -36,15 +34,13 @@ pub fn contract_all_gray_edges(
 pub fn find_3_edge_connected_components(
     biedged: &BiedgedGraph,
 ) -> Vec<Vec<usize>> {
-    let mut edges = biedged
+    let edges = biedged
         .graph
         .all_edges()
         .flat_map(|(a, b, w)| {
             std::iter::repeat((a as usize, b as usize)).take(w.black)
         })
         .collect::<Vec<_>>();
-
-    // edges.sort();
 
     let graph = t_e_c::Graph::from_edges(edges.into_iter());
 
@@ -341,5 +337,69 @@ mod tests {
             "Expected 18 black edges, is actually {:#?}",
             graph.black_edge_count()
         );
+    }
+
+    #[test]
+    fn edge_contraction_projection_map() {
+        use crate::biedgedgraph::recover_node_name;
+        use bstr::BString;
+        use gfa::{
+            gfa::{name_conversion::NameMap, GFA},
+            parser::GFAParser,
+        };
+
+        let parser = GFAParser::new();
+        let bstr_gfa: GFA<bstr::BString, ()> =
+            parser.parse_file("./paper.gfa").unwrap();
+
+        let name_map = NameMap::build_from_gfa(&bstr_gfa);
+        let gfa = name_map.gfa_bstring_to_usize(&bstr_gfa, false).unwrap();
+
+        let mut graph = BiedgedGraph::from_gfa(&gfa);
+
+        let proj_map = contract_all_gray_edges(&mut graph).unwrap();
+
+        let proj_names = bstr_gfa
+            .segments
+            .iter()
+            .map(|s| {
+                let orig = name_map.map_name(&s.name).unwrap();
+                let orig_name = s.name.to_owned();
+                let (l, r) = crate::biedgedgraph::split_node_id(orig as u64);
+                let l_end = find_projection(&proj_map, l);
+                let r_end = find_projection(&proj_map, r);
+                let l_end = recover_node_name(&name_map, l_end).unwrap();
+                let r_end = recover_node_name(&name_map, r_end).unwrap();
+                (orig_name, (l_end, r_end))
+            })
+            .collect::<Vec<_>>();
+
+        let expected_names: Vec<_> = vec![
+            ("a", ("a", "b")),
+            ("b", ("b", "d")),
+            ("c", ("b", "d")),
+            ("d", ("d", "e")),
+            ("e", ("e", "g")),
+            ("f", ("e", "g")),
+            ("g", ("g", "k")),
+            ("h", ("g", "i")),
+            ("i", ("i", "i")),
+            ("j", ("i", "k")),
+            ("k", ("k", "k")),
+            ("l", ("k", "m")),
+            ("m", ("m", "n")),
+            ("n", ("n", "p")),
+            ("o", ("n", "p")),
+            ("p", ("p", "m")),
+            ("q", ("m", "q_")),
+            ("r", ("m", "r_")),
+        ]
+        .into_iter()
+        .map(|(a, (l, r))| {
+            (BString::from(a), (BString::from(l), BString::from(r)))
+        })
+        .collect();
+
+        assert_eq!(expected_names, proj_names);
     }
 }
