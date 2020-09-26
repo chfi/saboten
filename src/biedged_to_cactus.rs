@@ -4,17 +4,6 @@ use std::collections::{BTreeMap, HashSet};
 
 use three_edge_connected as t_e_c;
 
-pub fn find_projection(proj_map: &BTreeMap<u64, u64>, mut node: u64) -> u64 {
-    while let Some(&next) = proj_map.get(&node) {
-        if node == next {
-            break;
-        } else {
-            node = next;
-        }
-    }
-    node
-}
-
 /// STEP 1: Contract all gray edges
 pub fn contract_all_gray_edges(
     biedged: &mut BiedgedGraph,
@@ -347,7 +336,7 @@ mod tests {
 
     #[test]
     fn edge_contraction_projection_map() {
-        use crate::biedgedgraph::recover_node_name;
+        use crate::biedgedgraph::{find_projection, recover_node_name};
         use bstr::BString;
         use gfa::{
             gfa::{name_conversion::NameMap, GFA},

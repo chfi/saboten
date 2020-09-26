@@ -1,15 +1,14 @@
 use petgraph::prelude::*;
 
-use handlegraph::{handle::*, handlegraph::*};
-
 use gfa::{
     gfa::{name_conversion::NameMap, Header, Link, Orientation, Segment, GFA},
     parser::GFAParser,
 };
 
-use bstr::{BString, ByteSlice};
+use bstr::BString;
 
 use std::{
+    collections::BTreeMap,
     io::Write,
     ops::{Add, AddAssign, Sub, SubAssign},
     path::PathBuf,
@@ -27,6 +26,37 @@ pub fn recover_node_id(n: u64) -> u64 {
     } else {
         std::u64::MAX - n
     }
+}
+
+pub fn find_projection(proj_map: &BTreeMap<u64, u64>, mut node: u64) -> u64 {
+    while let Some(&next) = proj_map.get(&node) {
+        if node == next {
+            break;
+        } else {
+            node = next;
+        }
+    }
+    node
+}
+
+pub fn project_graph_id(
+    proj_map: &BTreeMap<u64, u64>,
+    seg_id: usize,
+) -> (usize, usize) {
+    let (left, right) = split_node_id(seg_id as u64);
+    let left = find_projection(proj_map, left);
+    let right = find_projection(proj_map, right);
+    (left as usize, right as usize)
+}
+
+pub fn projected_node_id(n: u64) -> String {
+    let not_orig = n > std::u64::MAX / 2;
+    let id = recover_node_id(n);
+    let mut name = id.to_string();
+    if not_orig {
+        name.push_str("_");
+    }
+    name
 }
 
 pub fn recover_node_name(name_map: &NameMap, n: u64) -> Option<BString> {
