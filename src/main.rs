@@ -70,9 +70,6 @@ fn main() {
         }
     };
 
-    // let mut contracted_proj_map = BTreeMap::new();
-    // let mut merged_proj_map = BTreeMap::new();
-
     let mut projection_map = BTreeMap::new();
 
     biedged_to_cactus::contract_all_gray_edges(
@@ -89,17 +86,30 @@ fn main() {
         &mut projection_map,
     );
 
+    let cycles = biedged_to_cactus::find_cycles(&be_graph);
+
+    /*
+    println!("nodes -- ");
+    for node in be_graph.graph.nodes() {
+        println!("{}", node);
+    }
+    println!("edges -- ");
+
+    for (from, to, w) in be_graph.graph.all_edges() {
+        println!("{}\t{}\t{}", from, to, w.black);
+    }
+
+    println!("      -- ");
+    */
+
+    biedged_to_cactus::contract_simple_cycles(
+        &mut be_graph,
+        &cycles,
+        &mut projection_map,
+    );
+
     for seg in gfa.segments.iter() {
         let (seg, left, right) = project_gfa_name(&projection_map, seg.name);
         println!("{}\t{}\t{}", seg, left, right);
     }
-
-    // for seg in gfa
-
-    /*
-    let mut un_gfa = be_graph.to_gfa_bstring();
-    let mut un_gfa_str = String::new();
-    write_gfa(&un_gfa, &mut un_gfa_str);
-    println!("{}", un_gfa_str);
-    */
 }

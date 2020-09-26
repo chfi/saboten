@@ -1,6 +1,6 @@
 use crate::biedgedgraph::*;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 use three_edge_connected as t_e_c;
 
@@ -133,13 +133,7 @@ pub fn contract_simple_cycles(
         if cycle.len() > 2 {
             let projected: Vec<_> = cycle
                 .iter()
-                .map(|v| {
-                    if biedged.graph.contains_node(*v) {
-                        *v
-                    } else {
-                        *proj_map.get(v).unwrap()
-                    }
-                })
+                .map(|v| find_projection(proj_map, *v))
                 .collect();
 
             let merged = biedged
