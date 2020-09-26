@@ -59,7 +59,7 @@ pub fn projected_node_id(n: u64) -> String {
     name
 }
 
-pub fn recover_node_name(name_map: &NameMap, n: u64) -> Option<BString> {
+pub fn projected_node_name(name_map: &NameMap, n: u64) -> Option<BString> {
     let not_orig = n > std::u64::MAX / 2;
     let id = recover_node_id(n);
     let mut name: BString = name_map.inverse_map_name(id as usize)?.to_owned();
@@ -442,7 +442,7 @@ impl BiedgedGraph {
             });
         }
 
-        for (f, t, w) in self.black_edges() {
+        for (f, t, _w) in self.black_edges() {
             links.push(Link {
                 from_segment: BString::from(f.to_string()),
                 from_orient: Orientation::Forward,

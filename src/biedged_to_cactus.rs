@@ -7,16 +7,14 @@ use three_edge_connected as t_e_c;
 /// STEP 1: Contract all gray edges
 pub fn contract_all_gray_edges(
     biedged: &mut BiedgedGraph,
-) -> Option<BTreeMap<u64, u64>> {
-    let mut projections: BTreeMap<u64, u64> = BTreeMap::new();
+    proj_map: &mut BTreeMap<u64, u64>,
+) {
     while biedged.gray_edge_count() > 0 {
         let (from, to, _w) = biedged.gray_edges().next().unwrap();
-        let kept = biedged.contract_edge(from, to)?;
-        projections.insert(from, kept);
-        projections.insert(to, kept);
+        let kept = biedged.contract_edge(from, to).unwrap();
+        proj_map.insert(from, kept);
+        proj_map.insert(to, kept);
     }
-
-    Some(projections)
 }
 
 /// STEP 2: Find 3-edge connected components
@@ -48,23 +46,27 @@ pub fn find_3_edge_connected_components(
 pub fn merge_components(
     biedged: &mut BiedgedGraph,
     components: Vec<Vec<usize>>,
-) -> Option<BTreeMap<u64, u64>> {
-    let mut projections: BTreeMap<u64, u64> = BTreeMap::new();
+    proj_map: &mut BTreeMap<u64, u64>,
+) {
     for comp in components {
         let mut iter = comp.into_iter();
         let head = iter.next().unwrap() as u64;
         for other in iter {
             let other = other as u64;
-            let prj = biedged.merge_vertices(head, other)?;
-            projections.insert(head, prj);
-            projections.insert(other, prj);
+            let prj = biedged.merge_vertices(head, other).unwrap();
+            proj_map.insert(head, prj);
+            proj_map.insert(other, prj);
         }
     }
-
-    Some(projections)
 }
 
 /// STEP 3: Find loops and contract edges inside them
+
+pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
+    let mut cycles = Vec::new();
+
+    cycles
+}
 
 // Find loops using a DFS
 fn find_loops(biedged: &mut BiedgedGraph) -> Vec<Vec<(u64, u64)>> {
@@ -299,7 +301,8 @@ mod tests {
         graph.add_edge(21, 40, BiedgedWeight::gray(1));
         graph.add_edge(31, 40, BiedgedWeight::gray(1));
 
-        contract_all_gray_edges(&mut graph);
+        let mut proj_map = BTreeMap::new();
+        contract_all_gray_edges(&mut graph, &mut proj_map);
 
         use petgraph::dot::{Config, Dot};
 
@@ -323,7 +326,9 @@ mod tests {
     #[test]
     fn paper_contract_all_gray_edges() {
         let mut graph: BiedgedGraph = graph_from_paper();
-        contract_all_gray_edges(&mut graph);
+
+        let mut proj_map = BTreeMap::new();
+        contract_all_gray_edges(&mut graph, &mut proj_map);
 
         assert_eq!(graph.gray_edge_count(), 0);
         assert_eq!(
@@ -352,7 +357,8 @@ mod tests {
 
         let mut graph = BiedgedGraph::from_gfa(&gfa);
 
-        let proj_map = contract_all_gray_edges(&mut graph).unwrap();
+        let mut proj_map = BTreeMap::new();
+        contract_all_gray_edges(&mut graph, &mut proj_map);
 
         let proj_names = bstr_gfa
             .segments
