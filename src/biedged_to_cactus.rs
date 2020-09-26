@@ -1,6 +1,6 @@
 use crate::biedgedgraph::*;
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use three_edge_connected as t_e_c;
 
@@ -61,9 +61,37 @@ pub fn merge_components(
 }
 
 /// STEP 3: Find loops and contract edges inside them
-
 pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
+    let graph = &biedged.graph;
+
+    let mut parents: BTreeMap<u64, u64> = BTreeMap::new();
+    let mut visited_nodes: BTreeSet<u64> = BTreeSet::new();
+
+    let mut prev: Option<u64> = None;
+
+    let mut stack: Vec<u64> = Vec::new();
+
     let mut cycles = Vec::new();
+    let mut current_cycle: Vec<u64> = Vec::new();
+
+    for node in graph.nodes() {
+        if !visited_nodes.contains(&node) {
+            stack.push(node);
+
+            while let Some(current) = stack.pop() {
+                for adj in graph.neighbors(current) {
+                    if !visited_nodes.contains(&adj) {
+                        stack.push(adj);
+                        parents.insert(adj, current);
+                    } else {
+                        if Some(adj) != prev {}
+                    }
+                }
+                visited_nodes.insert(current);
+                prev = Some(current);
+            }
+        }
+    }
 
     cycles
 }
