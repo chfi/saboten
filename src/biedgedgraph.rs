@@ -295,10 +295,12 @@ impl BiedgedGraph {
             if !self.graph.contains_node(v) {
                 return None;
             }
-            let v_edges =
-                self.graph.edges(v).map(|(_, other, w)| (other, w.clone()));
-            edges.extend(v_edges);
-            nodes.push(v);
+            if v != head {
+                let v_edges =
+                    self.graph.edges(v).map(|(_, other, w)| (other, w.clone()));
+                edges.extend(v_edges);
+                nodes.push(v);
+            }
         }
 
         for n in nodes {

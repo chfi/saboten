@@ -60,6 +60,9 @@ pub fn merge_components(
     }
 }
 
+/// Find the simple cycles in a cactus graph and return them. A cycle
+/// is represented as a vector of vertices, with the same start and
+/// end vertex.
 pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
     let graph = &biedged.graph;
 
@@ -102,7 +105,6 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
     }
 
     for (start, end) in cycle_ends {
-        // let mut cycle: Vec<u64> = Vec::new();
         let mut cycle: Vec<u64> = vec![end];
         let mut current = end;
 
@@ -114,7 +116,6 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
         }
 
         cycle.push(end);
-
         cycles.push(cycle);
     }
 
@@ -123,20 +124,33 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
 
 /// STEP 3: Find loops and contract edges inside them
 
-pub fn contract_loops(biedged: &mut BiedgedGraph) {
-    // let loop_edges: Vec<Vec<BiedgedEdge>>;
-    /*
-    let loop_edges = find_loops(biedged);
-    println!("found {} loops", loop_edges.len());
-    for each_loop in loop_edges {
-        for (from, to) in each_loop {
-            // print!(" {}, {}", edge.from, edge.to);
-            println!("contracting {}, {}", from, to);
-            biedged.contract_edge(from, to);
+pub fn contract_simple_cycles(
+    biedged: &mut BiedgedGraph,
+    cycles: &[Vec<u64>],
+    proj_map: &mut BTreeMap<u64, u64>,
+) {
+    for cycle in cycles {
+        if cycle.len() > 2 {
+            let projected: Vec<_> = cycle
+                .iter()
+                .map(|v| {
+                    if biedged.graph.contains_node(*v) {
+                        *v
+                    } else {
+                        *proj_map.get(v).unwrap()
+                    }
+                })
+                .collect();
+
+            let merged = biedged
+                .merge_many_vertices(projected.iter().copied())
+                .unwrap();
+
+            for vertex in projected.iter() {
+                proj_map.insert(*vertex, merged);
+            }
         }
-        // println!();
     }
-    */
 }
 
 // ----------------------------------- TESTS -------------------------------
