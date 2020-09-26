@@ -59,14 +59,20 @@ pub fn find_3_edge_connected_components(
 pub fn merge_components(
     biedged: &mut BiedgedGraph,
     components: Vec<Vec<usize>>,
-) {
+) -> Option<BTreeMap<u64, u64>> {
+    let mut projections: BTreeMap<u64, u64> = BTreeMap::new();
     for comp in components {
         let mut iter = comp.into_iter();
-        let head = iter.next().unwrap();
+        let head = iter.next().unwrap() as u64;
         for other in iter {
-            biedged.merge_vertices(head as u64, other as u64);
+            let other = other as u64;
+            let prj = biedged.merge_vertices(head, other)?;
+            projections.insert(head, prj);
+            projections.insert(other, prj);
         }
     }
+
+    Some(projections)
 }
 
 /// STEP 3: Find loops and contract edges inside them
