@@ -449,8 +449,7 @@ mod tests {
         assert_eq!(expected_names, proj_names);
     }
 
-    #[test]
-    fn cycle_detection() {
+    fn example_graph() -> BiedgedGraph {
         let mut graph: BiedgedGraph = BiedgedGraph::new();
 
         for i in 0..=9 {
@@ -493,6 +492,13 @@ mod tests {
             graph.add_edge(a, b, BiedgedWeight::black(1));
         }
 
+        graph
+    }
+
+    #[test]
+    fn cycle_detection() {
+        let graph = example_graph();
+
         let cycles = find_cycles(&graph);
 
         assert_eq!(
@@ -508,5 +514,23 @@ mod tests {
                 vec![3, 4, 2, 3],
             ]
         );
+    }
+
+    #[test]
+    fn test_build_cactus_tree() {
+        let mut graph = example_graph();
+
+        let cycles = find_cycles(&graph);
+
+        let chains = build_cactus_tree(&mut graph, &cycles);
+
+        assert_eq!(cycles.len(), chains.len());
+
+        for (cv, cycle) in chains.iter().zip(cycles.iter()) {
+            let chain_edges =
+                graph.graph.edges(*cv).map(|x| x.1).collect::<Vec<_>>();
+
+            assert_eq!(&cycle[1..], &chain_edges[..]);
+        }
     }
 }
