@@ -60,8 +60,86 @@ pub fn merge_components(
     }
 }
 
-/// STEP 3: Find loops and contract edges inside them
 pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
+    let graph = &biedged.graph;
+
+    let mut visited: BTreeSet<u64> = BTreeSet::new();
+
+    let mut parents: BTreeMap<u64, u64> = BTreeMap::new();
+    let mut stack: Vec<u64> = Vec::new();
+
+    let mut cycles = Vec::new();
+
+    let mut cycle_ends: Vec<(u64, u64)> = Vec::new();
+
+    for node in graph.nodes() {
+        if !visited.contains(&node) {
+            stack.push(node);
+            while let Some(current) = stack.pop() {
+                if !visited.contains(&current) {
+                    println!("visiting\t\t{}", current);
+                    visited.insert(current);
+
+                    let degree = graph.neighbors(current).count();
+                    println!("    degree\t{}", degree);
+
+                    for (_, adj, weight) in graph.edges(current) {
+                        if adj == current {
+                            println!(
+                                "adding self-cycles [{},{}]",
+                                current, adj
+                            );
+                            for _ in 0..weight.black {
+                                cycles.push(vec![current, current]);
+                            }
+                        } else {
+                            if !visited.contains(&adj) {
+                                if weight.black == 2 {
+                                    println!(
+                                        "adding pair cycle [{},{}]",
+                                        current, adj
+                                    );
+                                    cycles.push(vec![current, adj]);
+                                }
+                                stack.push(adj);
+                                parents.insert(adj, current);
+                            } else {
+                                if parents.get(&current) != Some(&adj) {
+                                    cycle_ends.push((adj, current));
+                                }
+                            }
+                        }
+                    }
+                }
+                /*else {
+                    println!("-- already visited {} --", current);
+
+                    // if
+                }*/
+            }
+        }
+    }
+
+    for (start, end) in cycle_ends {
+        // let mut cycle: Vec<u64> = Vec::new();
+        let mut cycle: Vec<u64> = vec![end];
+        let mut current = end;
+
+        while current != start {
+            if let Some(parent) = parents.get(&current) {
+                cycle.push(*parent);
+                current = *parent;
+            }
+        }
+
+        cycles.push(cycle);
+    }
+
+    cycles
+}
+
+/// STEP 3: Find loops and contract edges inside them
+pub fn find_cycles_(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
     let graph = &biedged.graph;
 
     let mut parents: BTreeMap<u64, u64> = BTreeMap::new();
@@ -72,23 +150,87 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
     let mut stack: Vec<u64> = Vec::new();
 
     let mut cycles = Vec::new();
-    let mut current_cycle: Vec<u64> = Vec::new();
+    // let mut current_cycle: Vec<u64> = Vec::new();
+
+    // let mut current_cycle: Option<Vec<u64>> = Some(Vec::new());
+    let mut current_cycle: Option<Vec<u64>> = None;
+    let mut current_end: Option<u64> = None;
 
     for node in graph.nodes() {
         if !visited_nodes.contains(&node) {
             stack.push(node);
 
             while let Some(current) = stack.pop() {
-                for adj in graph.neighbors(current) {
-                    if !visited_nodes.contains(&adj) {
-                        stack.push(adj);
-                        parents.insert(adj, current);
-                    } else {
-                        if Some(adj) != prev {}
+                if !visited_nodes.contains(&current) {
+                    println!("visiting\t{}", current);
+                    visited_nodes.insert(current);
+                    if let Some(prev) = prev {
+                        parents.insert(current, prev);
                     }
+
+                    println!("  push ret\t{}", current);
+                    stack.push(current);
+
+                    let neighbors: Vec<_> = graph
+                        .neighbors(current)
+                        .filter(|n| !visited_nodes.contains(n))
+                        .collect();
+
+                    if !neighbors.is_empty() {
+                        prev = Some(current);
+                    }
+
+                    for adj in neighbors {
+                        println!("  pushing\t{}", adj);
+                        stack.push(adj);
+                    }
+                } else {
+                    println!("backtracking\t{}", current);
+                    println!("\tfrom\t{:?}", prev);
+                    // backtracking
+
+                    let neighbors: Vec<_> = graph
+                        .neighbors(current)
+                        .filter(|&n| Some(n) != prev)
+                        .collect();
+
+                    let degree = neighbors.len() + 1;
+                    println!("\tdegree\t{}", degree);
+
+                    if let Some(ref mut cycle) = current_cycle {
+                        if cycle.is_empty() {
+                            if current_end.is_none() {
+                                current_end = Some(current);
+                            }
+                            if degree > 2 {
+                                cycle.push(current);
+                            }
+                        } else {
+                            cycle.push(current);
+                        }
+                    } else {
+                        if degree > 1 {
+                            current_cycle = Some(vec![current]);
+                            current_end = Some(current);
+                        } else {
+                            current_cycle = Some(Vec::new());
+                        }
+                    }
+
+                    if neighbors
+                        .iter()
+                        .find(|&&n| Some(n) == current_end)
+                        .is_some()
+                    {
+                        if let Some(cycle) = current_cycle {
+                            cycles.push(cycle);
+                            current_cycle = None;
+                            current_end = None;
+                        }
+                    }
+
+                    prev = Some(current);
                 }
-                visited_nodes.insert(current);
-                prev = Some(current);
             }
         }
     }
@@ -369,7 +511,7 @@ mod tests {
 
     #[test]
     fn edge_contraction_projection_map() {
-        use crate::biedgedgraph::{find_projection, recover_node_name};
+        use crate::biedgedgraph::{find_projection, projected_node_name};
         use bstr::BString;
         use gfa::{
             gfa::{name_conversion::NameMap, GFA},
@@ -397,8 +539,8 @@ mod tests {
                 let (l, r) = crate::biedgedgraph::split_node_id(orig as u64);
                 let l_end = find_projection(&proj_map, l);
                 let r_end = find_projection(&proj_map, r);
-                let l_end = recover_node_name(&name_map, l_end).unwrap();
-                let r_end = recover_node_name(&name_map, r_end).unwrap();
+                let l_end = projected_node_name(&name_map, l_end).unwrap();
+                let r_end = projected_node_name(&name_map, r_end).unwrap();
                 (orig_name, (l_end, r_end))
             })
             .collect::<Vec<_>>();
@@ -430,5 +572,66 @@ mod tests {
         .collect();
 
         assert_eq!(expected_names, proj_names);
+    }
+
+    #[test]
+    fn cycle_detection() {
+        let mut graph: BiedgedGraph = BiedgedGraph::new();
+
+        /*
+        for i in 0..=4 {
+            graph.add_node(i);
+        }
+
+        let edges = vec![(0, 1), (1, 2), (1, 3), (2, 3), (3, 4)];
+        */
+
+        /*
+        for i in 0..=4 {
+            graph.add_node(i);
+        }
+
+        let edges =
+            vec![(0, 1), (1, 2), (1, 2), (1, 3), (1, 4), (2, 2), (2, 2)];
+        */
+
+        for i in 0..=11 {
+            graph.add_node(i);
+        }
+
+        let edges = vec![
+            (0, 1),
+            (1, 2),
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (3, 4),
+            (4, 5),
+            (4, 6),
+            (5, 5),
+            (5, 6),
+            (6, 6),
+            (6, 7),
+            (7, 8),
+            (7, 9),
+            (7, 10),
+            (7, 10),
+            (10, 10),
+            (10, 10),
+        ];
+
+        for (a, b) in edges {
+            graph.add_edge(a, b, BiedgedWeight::black(1));
+        }
+
+        let cycles = find_cycles(&graph);
+        println!("found {} cycles", cycles.len());
+
+        for cycle in cycles {
+            for c in cycle {
+                print!(" {}", c);
+            }
+            println!();
+        }
     }
 }
