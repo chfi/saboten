@@ -1,15 +1,35 @@
 use crate::biedgedgraph::*;
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use three_edge_connected as t_e_c;
 
+pub fn find_projection(proj_map: BTreeMap<u64, u64>, mut node: u64) -> u64 {
+    while let Some(&next) = proj_map.get(&node) {
+        if node == next {
+            break;
+        } else {
+            node = next;
+        }
+    }
+    node
+}
+
 /// STEP 1: Contract all gray edges
-pub fn contract_all_gray_edges(biedged: &mut BiedgedGraph) {
+pub fn contract_all_gray_edges(
+    biedged: &mut BiedgedGraph,
+    // ) -> Option<BTreeMap<u64, Vec<u64>>> {
+) -> Option<BTreeMap<u64, u64>> {
+    let mut projections: BTreeMap<u64, u64> = BTreeMap::new();
+
     while biedged.gray_edge_count() > 0 {
         let (from, to, _w) = biedged.gray_edges().next().unwrap();
-        biedged.contract_edge(from, to);
+        let kept = biedged.contract_edge(from, to)?;
+        projections.insert(from, kept);
+        projections.insert(to, kept);
     }
+
+    Some(projections)
 }
 
 /// STEP 2: Find 3-edge connected components
