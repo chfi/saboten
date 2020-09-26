@@ -152,6 +152,15 @@ impl BiedgedGraph {
         Default::default()
     }
 
+    pub fn new_node(&mut self) -> u64 {
+        let mut id = self.graph.node_count() as u64;
+        while self.graph.contains_node(id) {
+            id += 1;
+        }
+        self.graph.add_node(id);
+        id
+    }
+
     pub fn from_gfa(gfa: &GFA<usize, ()>) -> BiedgedGraph {
         let mut be_graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
@@ -236,6 +245,20 @@ impl BiedgedGraph {
             .all_edges()
             .map(|(_, _, w)| w.black + w.gray)
             .sum()
+    }
+
+    pub fn remove_one_black_edge(&mut self, a: u64, b: u64) -> Option<usize> {
+        let weight = self.graph.edge_weight_mut(a, b)?;
+
+        if weight.black > 1 {
+            weight.black -= 1;
+            Some(weight.black)
+        } else if weight.black == 1 {
+            self.graph.remove_edge(a, b);
+            Some(0)
+        } else {
+            None
+        }
     }
 
     /// Merge two vertices into one, such that all the edges incident

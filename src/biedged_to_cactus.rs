@@ -124,6 +124,8 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
 
 /// STEP 3: Find loops and contract edges inside them
 
+/// Contracts each cycle into a single vertex, updating the projection
+/// map accordingly.
 pub fn contract_simple_cycles(
     biedged: &mut BiedgedGraph,
     cycles: &[Vec<u64>],
@@ -145,6 +147,34 @@ pub fn contract_simple_cycles(
             }
         }
     }
+}
+
+/// Adds a chain vertex for each cycle, with edges to each of the
+/// elements in the cycle, and removes the edges within the cycle.
+/// Returns the IDs of the new chain vertices as a vector.
+pub fn build_cactus_tree(
+    biedged: &mut BiedgedGraph,
+    cycles: &[Vec<u64>],
+) -> Vec<u64> {
+    let mut chain_vertices = Vec::with_capacity(cycles.len());
+
+    for cycle in cycles {
+        assert!(cycle.len() > 1);
+
+        let chain_vx = biedged.new_node();
+
+        let edges = cycle.windows(2).map(|vs| (vs[0], vs[1]));
+
+        for (from, to) in edges {
+            biedged.add_edge(to, chain_vx, BiedgedWeight::black(1));
+
+            biedged.remove_one_black_edge(from, to);
+        }
+
+        chain_vertices.push(chain_vx);
+    }
+
+    chain_vertices
 }
 
 // ----------------------------------- TESTS -------------------------------
