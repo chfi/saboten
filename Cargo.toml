@@ -8,8 +8,10 @@ edition = "2018"
 
 [dependencies]
 petgraph = "0.5.0"
-handlegraph = "0.4.0"
-gfa = "0.7"
+# handlegraph = "0.4.0"
+handlegraph = { path = "../rs-handlegraph"}
+# gfa = "0.7"
+gfa = { path = "../rs-gfa"}
 # three-edge-connected = { git = "https://github.com/chfi/rs-3-edge", rev = "e1e78ae71f56c254bf95f3cc20351289ebd23c77" }
 three-edge-connected = { path = "../rs-edge-connectivity" }
 bstr = "0.2"

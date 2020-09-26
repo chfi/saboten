@@ -3,17 +3,41 @@ use petgraph::prelude::*;
 use handlegraph::{handle::*, handlegraph::*};
 
 use gfa::{
-    gfa::{Header, Link, Orientation, Segment, GFA},
+    gfa::{name_conversion::NameMap, Header, Link, Orientation, Segment, GFA},
     parser::GFAParser,
 };
 
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 
 use std::{
     io::Write,
     ops::{Add, AddAssign, Sub, SubAssign},
     path::PathBuf,
 };
+
+pub fn split_node_id(n: u64) -> (u64, u64) {
+    let left = n;
+    let right = std::u64::MAX - left;
+    (left, right)
+}
+
+pub fn recover_node_id(n: u64) -> u64 {
+    if n < std::u64::MAX / 2 {
+        n
+    } else {
+        std::u64::MAX - n
+    }
+}
+
+pub fn recover_node_name(name_map: &NameMap, n: u64) -> Option<BString> {
+    let not_orig = n > std::u64::MAX / 2;
+    let id = recover_node_id(n);
+    let mut name: BString = name_map.inverse_map_name(id as usize)?.to_owned();
+    if not_orig {
+        name.push(b'_');
+    }
+    Some(name)
+}
 
 /// To make a petgraph Graph(Map) into a multigraph, we track the
 /// number of black and gray edges between two nodes by using this

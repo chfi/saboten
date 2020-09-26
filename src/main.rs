@@ -11,8 +11,7 @@ use structopt::StructOpt;
 use rs_cactusgraph::{biedged_to_cactus, biedgedgraph::*};
 
 use gfa::{
-    gfa::{Header, Link, Orientation, Segment, GFA},
-    gfa_name_conversion::NameMap,
+    gfa::{name_conversion::NameMap, Header, Link, Orientation, Segment, GFA},
     parser::GFAParser,
     writer::{gfa_string, write_gfa},
 };
