@@ -14,18 +14,19 @@ use std::{
     path::PathBuf,
 };
 
-pub fn split_node_id(n: u64) -> (u64, u64) {
-    let left = n;
-    let right = std::u64::MAX - left;
+pub fn id_to_black_edge(n: u64) -> (u64, u64) {
+    let left = n * 2;
+    let right = left + 1;
     (left, right)
 }
 
-pub fn recover_node_id(n: u64) -> u64 {
-    if n < std::u64::MAX / 2 {
-        n
-    } else {
-        std::u64::MAX - n
-    }
+pub fn distinct_vertices(a: u64, b: u64) -> bool {
+    id_from_black_edge(a) != id_from_black_edge(b)
+}
+
+#[inline]
+pub fn id_from_black_edge(n: u64) -> u64 {
+    n / 2
 }
 
 pub fn find_projection(proj_map: &BTreeMap<u64, u64>, mut node: u64) -> u64 {
@@ -39,19 +40,9 @@ pub fn find_projection(proj_map: &BTreeMap<u64, u64>, mut node: u64) -> u64 {
     node
 }
 
-pub fn project_graph_id(
-    proj_map: &BTreeMap<u64, u64>,
-    seg_id: usize,
-) -> (usize, usize) {
-    let (left, right) = split_node_id(seg_id as u64);
-    let left = find_projection(proj_map, left);
-    let right = find_projection(proj_map, right);
-    (left as usize, right as usize)
-}
-
 pub fn projected_node_id(n: u64) -> String {
-    let not_orig = n > std::u64::MAX / 2;
-    let id = recover_node_id(n);
+    let not_orig = n % 2 != 0;
+    let id = id_from_black_edge(n);
     let mut name = id.to_string();
     if not_orig {
         name.push_str("_");
@@ -60,8 +51,8 @@ pub fn projected_node_id(n: u64) -> String {
 }
 
 pub fn projected_node_name(name_map: &NameMap, n: u64) -> Option<BString> {
-    let not_orig = n > std::u64::MAX / 2;
-    let id = recover_node_id(n);
+    let not_orig = n % 2 != 0;
+    let id = id_from_black_edge(n);
     let mut name: BString = name_map.inverse_map_name(id as usize)?.to_owned();
     if not_orig {
         name.push(b'_');
@@ -165,18 +156,16 @@ impl BiedgedGraph {
         let mut be_graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
         for segment in gfa.segments.iter() {
-            let name = segment.name as u64;
-            let left_id = name;
-            let right_id = std::u64::MAX - left_id;
-            be_graph.add_node(left_id);
-            be_graph.add_node(right_id);
-            be_graph.add_edge(left_id, right_id, BiedgedWeight::black(1));
+            let (left, right) = id_to_black_edge(segment.name as u64);
+            be_graph.add_node(left);
+            be_graph.add_node(right);
+            be_graph.add_edge(left, right, BiedgedWeight::black(1));
         }
 
         for link in gfa.links.iter() {
-            let from_id = std::u64::MAX - link.from_segment as u64;
-            let to_id = link.to_segment as u64;
-            be_graph.add_edge(from_id, to_id, BiedgedWeight::gray(1));
+            let (_, from) = id_to_black_edge(link.from_segment as u64);
+            let (to, _) = id_to_black_edge(link.to_segment as u64);
+            be_graph.add_edge(from, to, BiedgedWeight::gray(1));
         }
 
         BiedgedGraph { graph: be_graph }
@@ -389,33 +378,6 @@ impl BiedgedGraph {
         gray_edges.sort();
         black_edges.extend(gray_edges);
         black_edges
-    }
-
-    pub fn example() -> BiedgedGraph {
-        let mut be_graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
-
-        let black_edges =
-            vec![(0, 10), (1, 11), (2, 12), (3, 13), (4, 14), (5, 15)];
-
-        let gray_edges = vec![
-            (10, 1),
-            (10, 2),
-            (11, 3),
-            (12, 3),
-            (13, 4),
-            (13, 5),
-            (13, 0),
-        ];
-
-        for (a, b) in black_edges {
-            be_graph.add_edge(a, b, BiedgedWeight::black(1));
-        }
-
-        for (a, b) in gray_edges {
-            be_graph.add_edge(a, b, BiedgedWeight::gray(1));
-        }
-
-        BiedgedGraph { graph: be_graph }
     }
 
     pub fn to_gfa_usize(&self) -> GFA<usize, ()> {
