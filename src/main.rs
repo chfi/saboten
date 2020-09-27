@@ -40,6 +40,8 @@ fn main() {
 
     let mut be_graph = BiedgedGraph::from_gfa(&gfa);
 
+    let orig_graph = be_graph.clone();
+
     let mut union_find: UnionFind<usize> =
         UnionFind::new(be_graph.graph.node_count());
 
@@ -69,6 +71,16 @@ fn main() {
     println!(" --- Finding cycles --- ");
     let cycles = biedged_to_cactus::find_cycles(&be_graph);
 
+    let mut cycle_map: HashMap<u64, Vec<usize>> = HashMap::new();
+
+    for (i, cycle) in cycles.iter().enumerate() {
+        let mut iter = cycle.iter().skip(1);
+        for vx in iter {
+            cycle_map.entry(*vx).or_default().push(i);
+        }
+        println!("{}\t{:?}", i, cycle);
+    }
+
     let mut bridge_forest = be_graph.clone();
 
     let mut bridge_forest_projections = union_find.clone();
@@ -81,15 +93,19 @@ fn main() {
     );
 
     println!(" --- Constructing cactus tree --- ");
-    biedged_to_cactus::build_cactus_tree(&mut be_graph, &cycles);
+
+    let mut cactus_tree = be_graph.clone();
+
+    biedged_to_cactus::build_cactus_tree(&mut cactus_tree, &cycles);
 
     let mut cactus_graph_inverse: HashMap<usize, Vec<usize>> = HashMap::new();
 
-    let cactus_reps = cactus_graph_projections.into_labeling();
+    let cactus_reps = cactus_graph_projections.clone().into_labeling();
     for (i, k) in cactus_reps.iter().enumerate() {
         cactus_graph_inverse.entry(*k).or_default().push(i);
     }
 
+    println!();
     println!("Cactus graph vertex projections");
     for (k, v) in cactus_graph_inverse.iter() {
         println!("{} mapped from {:?}", k, v);
@@ -102,8 +118,51 @@ fn main() {
         bridge_forest_inverse.entry(*k).or_default().push(i);
     }
 
+    println!();
     println!("Bridge forest vertex projections");
     for (k, v) in bridge_forest_inverse.iter() {
         println!("{} mapped from {:?}", k, v);
     }
+
+    let name_map = gfa_name_map.unwrap();
+    for seg in gfa.segments.iter() {
+        let id = seg.name as u64;
+        let name = name_map.inverse_map_name(seg.name).unwrap();
+        let name = name.to_str().unwrap();
+        let (a, b) = id_to_black_edge(id);
+        let (x, y) = projected_edge(&cactus_graph_projections, a, b);
+        let cyc_x = cycle_map.get(&x);
+        let cyc_y = cycle_map.get(&y);
+        println!(
+            "{} projects to edge ({}, {}) = {},\tcycles {:?}, {:?}",
+            name,
+            x,
+            y,
+            be_graph.graph.contains_edge(x, y),
+            cyc_x,
+            cyc_y
+        );
+    }
+
+    /*
+    let nodes: Vec<_> = gfa
+        .segments
+        .iter()
+        .map(|seg| id_to_black_edge(segment.name as u64))
+        .collect();
+
+    */
+    /*
+        let mut cycle_inverse: HashMap<usize, Vec<usize>> = HashMap::new();
+
+        let cycle_reps = cycle_projections.into_labeling();
+        for (i, k) in bridge_reps.iter().enumerate() {
+            cycle_inverse.entry(*k).or_default().push(i);
+        }
+
+        println!("Cactus graph cycle projections");
+        for (k, v) in cycle_inverse.iter() {
+            println!("{}
+        }
+    */
 }

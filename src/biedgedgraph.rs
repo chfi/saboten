@@ -60,6 +60,12 @@ pub fn projected_node_name(name_map: &NameMap, n: u64) -> Option<BString> {
     Some(name)
 }
 
+pub fn projected_edge(union: &UnionFind<usize>, a: u64, b: u64) -> (u64, u64) {
+    let x = union.find(a as usize);
+    let y = union.find(b as usize);
+    (x as u64, y as u64)
+}
+
 /// To make a petgraph Graph(Map) into a multigraph, we track the
 /// number of black and gray edges between two nodes by using this
 /// struct as the edge weight type
