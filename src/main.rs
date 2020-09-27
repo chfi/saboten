@@ -144,6 +144,35 @@ fn main() {
         );
     }
 
+    let chain_pairs = vec![
+        (24, 30),
+        (25, 30),
+        (24, 25),
+        (24, 31),
+        (25, 31),
+        (30, 31),
+        (14, 15),
+        (14, 18),
+        (14, 19),
+        (15, 18),
+        (15, 19),
+        (18, 19),
+    ];
+
+    for (a, b) in chain_pairs.iter() {
+        println!(
+            "{}, {} is chain pair:\t{}",
+            a,
+            b,
+            biedged_to_cactus::is_chain_pair(
+                &cactus_graph_projections,
+                &cycle_map,
+                *a,
+                *b
+            )
+        );
+    }
+
     /*
     let nodes: Vec<_> = gfa
         .segments

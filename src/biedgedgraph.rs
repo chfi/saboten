@@ -20,6 +20,14 @@ pub fn id_to_black_edge(n: u64) -> (u64, u64) {
     (left, right)
 }
 
+pub fn end_to_black_edge(n: u64) -> (u64, u64) {
+    if n % 2 == 0 {
+        (n, n + 1)
+    } else {
+        (n - 1, n)
+    }
+}
+
 pub fn distinct_vertices(a: u64, b: u64) -> bool {
     id_from_black_edge(a) != id_from_black_edge(b)
 }

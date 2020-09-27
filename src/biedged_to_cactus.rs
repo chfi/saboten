@@ -2,7 +2,7 @@ use crate::biedgedgraph::*;
 
 use petgraph::unionfind::UnionFind;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use three_edge_connected as t_e_c;
 
@@ -162,6 +162,51 @@ pub fn build_cactus_tree(
     }
 
     chain_vertices
+}
+
+pub fn black_edge_cycle(
+    vx_proj: &UnionFind<usize>,
+    cycle_map: &HashMap<u64, Vec<usize>>,
+    x: u64,
+) -> Option<Vec<usize>> {
+    let (l, r) = end_to_black_edge(x);
+    let p_l = vx_proj.find(l as usize) as u64;
+    let p_r = vx_proj.find(r as usize) as u64;
+    let cyc_l = cycle_map.get(&p_l)?;
+    let cyc_r = cycle_map.get(&p_r)?;
+    let intersection = cyc_l
+        .iter()
+        .copied()
+        .filter(|c| cyc_r.contains(c))
+        .collect();
+    Some(intersection)
+}
+
+pub fn is_chain_pair(
+    vx_proj: &UnionFind<usize>,
+    cycle_map: &HashMap<u64, Vec<usize>>,
+    x: u64,
+    y: u64,
+) -> bool {
+    if !distinct_vertices(x, y) {
+        return false;
+    }
+
+    let p_x = vx_proj.find(x as usize);
+    let p_y = vx_proj.find(y as usize);
+
+    if p_x != p_y {
+        return false;
+    }
+
+    let x_cycles = black_edge_cycle(vx_proj, cycle_map, x);
+    let y_cycles = black_edge_cycle(vx_proj, cycle_map, y);
+
+    if x_cycles.is_none() || y_cycles.is_none() {
+        return false;
+    }
+
+    x_cycles == y_cycles
 }
 
 // ----------------------------------- TESTS -------------------------------
