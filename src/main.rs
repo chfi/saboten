@@ -1,10 +1,12 @@
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
 use bstr::{BString, ByteSlice};
 
 use structopt::StructOpt;
 
 use rs_cactusgraph::{biedged_to_cactus, biedgedgraph::*};
+
+use petgraph::unionfind::UnionFind;
 
 use gfa::{
     gfa::{name_conversion::NameMap, GFA},
@@ -31,15 +33,6 @@ fn main() {
         let usize_gfa =
             name_map.gfa_bstring_to_usize(&bstr_gfa, false).unwrap();
 
-        for seg in bstr_gfa.segments.iter() {
-            let name = seg.name.to_str().unwrap();
-            let id = name_map.map_name(name).unwrap();
-
-            let (l, r) = id_to_black_edge(id as u64);
-
-            println!("{} -> ({},{})", name, l, r);
-        }
-
         gfa_name_map = Some(name_map);
 
         usize_gfa
@@ -47,72 +40,70 @@ fn main() {
 
     let mut be_graph = BiedgedGraph::from_gfa(&gfa);
 
-    let inv_map = |name_map: &NameMap, s: usize| {
-        projected_node_name(name_map, s as u64)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_owned()
-    };
+    let mut union_find: UnionFind<usize> =
+        UnionFind::new(be_graph.graph.node_count());
 
-    let project_gfa_name = move |proj_map: &BTreeMap<u64, u64>,
-                                 seg_id: usize| {
-        let (left, right) = project_graph_id(proj_map, seg_id);
-        if let Some(ref name_map) = gfa_name_map {
-            (
-                inv_map(name_map, seg_id),
-                inv_map(name_map, left),
-                inv_map(name_map, right),
-            )
-        } else {
-            (
-                projected_node_id(seg_id as u64),
-                projected_node_id(left as u64),
-                projected_node_id(right as u64),
-            )
-        }
-    };
+    println!(" --- Contracting gray edges --- ");
+    biedged_to_cactus::contract_all_gray_edges(&mut be_graph, &mut union_find);
 
-    let mut projection_map = BTreeMap::new();
-
-    biedged_to_cactus::contract_all_gray_edges(
-        &mut be_graph,
-        &mut projection_map,
-    );
-
+    println!(" --- Finding 3EC-components --- ");
     let components =
         biedged_to_cactus::find_3_edge_connected_components(&be_graph);
 
+    /*
+    println!("found {} components", components.len());
+    for c in components.iter() {
+        println!("{:?}", c);
+    }
+    */
+
+    println!(" --- Merging 3EC-components --- ");
     biedged_to_cactus::merge_components(
         &mut be_graph,
         components,
-        &mut projection_map,
+        &mut union_find,
     );
 
+    let cactus_graph_projections = union_find.clone();
+
+    println!(" --- Finding cycles --- ");
     let cycles = biedged_to_cactus::find_cycles(&be_graph);
 
-    /*
-    println!("nodes -- ");
-    for node in be_graph.graph.nodes() {
-        println!("{}", node);
-    }
-    println!("edges -- ");
+    let mut bridge_forest = be_graph.clone();
 
-    for (from, to, w) in be_graph.graph.all_edges() {
-        println!("{}\t{}\t{}", from, to, w.black);
-    }
+    let mut bridge_forest_projections = union_find.clone();
 
-    println!("      -- ");
-    */
-
+    println!(" --- Constructing bridge forest --- ");
     biedged_to_cactus::contract_simple_cycles(
-        &mut be_graph,
+        &mut bridge_forest,
         &cycles,
-        &mut projection_map,
+        &mut bridge_forest_projections,
     );
 
-    for seg in gfa.segments.iter() {
-        let (seg, left, right) = project_gfa_name(&projection_map, seg.name);
-        println!("{}\t{}\t{}", seg, left, right);
+    println!(" --- Constructing cactus tree --- ");
+    biedged_to_cactus::build_cactus_tree(&mut be_graph, &cycles);
+
+    let mut cactus_graph_inverse: HashMap<usize, Vec<usize>> = HashMap::new();
+
+    let cactus_reps = cactus_graph_projections.into_labeling();
+    for (i, k) in cactus_reps.iter().enumerate() {
+        cactus_graph_inverse.entry(*k).or_default().push(i);
+    }
+
+    println!("Cactus graph vertex projections");
+    for (k, v) in cactus_graph_inverse.iter() {
+        println!("{} mapped from {:?}", k, v);
+    }
+
+    let mut bridge_forest_inverse: HashMap<usize, Vec<usize>> = HashMap::new();
+
+    let bridge_reps = bridge_forest_projections.into_labeling();
+    for (i, k) in bridge_reps.iter().enumerate() {
+        bridge_forest_inverse.entry(*k).or_default().push(i);
+    }
+
+    println!("Bridge forest vertex projections");
+    for (k, v) in bridge_forest_inverse.iter() {
+        println!("{} mapped from {:?}", k, v);
     }
 }

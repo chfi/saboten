@@ -132,7 +132,7 @@ impl SubAssign for BiedgedWeight {
 /// A biedged graph is a graph with two types of edges: black edges and gray edges, such that each vertex is
 /// incident with at most one black edge. More information can be found in:
 /// Superbubbles, Ultrabubbles, and Cacti by BENEDICT PATEN et al.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct BiedgedGraph {
     pub graph: UnGraphMap<u64, BiedgedWeight>,
 }
