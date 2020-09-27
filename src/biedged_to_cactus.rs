@@ -1,5 +1,7 @@
 use crate::biedgedgraph::*;
 
+use petgraph::unionfind::UnionFind;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use three_edge_connected as t_e_c;
@@ -7,13 +9,11 @@ use three_edge_connected as t_e_c;
 /// STEP 1: Contract all gray edges
 pub fn contract_all_gray_edges(
     biedged: &mut BiedgedGraph,
-    proj_map: &mut BTreeMap<u64, u64>,
+    union_find: &mut UnionFind<usize>,
 ) {
     while biedged.gray_edge_count() > 0 {
         let (from, to, _w) = biedged.gray_edges().next().unwrap();
-        let kept = biedged.contract_edge(from, to).unwrap();
-        proj_map.insert(from, kept);
-        proj_map.insert(to, kept);
+        let kept = biedged.contract_edge(from, to, union_find).unwrap();
     }
 }
 
@@ -46,16 +46,13 @@ pub fn find_3_edge_connected_components(
 pub fn merge_components(
     biedged: &mut BiedgedGraph,
     components: Vec<Vec<usize>>,
-    proj_map: &mut BTreeMap<u64, u64>,
+    union_find: &mut UnionFind<usize>,
 ) {
     for comp in components {
         let mut iter = comp.into_iter();
         let head = iter.next().unwrap() as u64;
         for other in iter {
-            let other = other as u64;
-            let prj = biedged.merge_vertices(head, other).unwrap();
-            proj_map.insert(head, prj);
-            proj_map.insert(other, prj);
+            biedged.merge_vertices(head, other as u64, union_find);
         }
     }
 }
@@ -129,23 +126,14 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
 pub fn contract_simple_cycles(
     biedged: &mut BiedgedGraph,
     cycles: &[Vec<u64>],
-    proj_map: &mut BTreeMap<u64, u64>,
+    union_find: &mut UnionFind<usize>,
 ) {
     for cycle in cycles {
-        if cycle.len() > 2 {
-            let projected: Vec<_> = cycle
-                .iter()
-                .map(|v| find_projection(proj_map, *v))
-                .collect();
-
-            let merged = biedged
-                .merge_many_vertices(projected.iter().copied())
-                .unwrap();
-
-            for vertex in projected.iter() {
-                proj_map.insert(*vertex, merged);
-            }
-        }
+        cycle.windows(2).for_each(|vs| {
+            assert!(vs.len() == 2);
+            let (from, to) = (vs[0], vs[1]);
+            biedged.contract_edge(from, to, union_find);
+        });
     }
 }
 
@@ -163,13 +151,12 @@ pub fn build_cactus_tree(
 
         let chain_vx = biedged.new_node();
 
-        let edges = cycle.windows(2).map(|vs| (vs[0], vs[1]));
-
-        for (from, to) in edges {
+        cycle.windows(2).for_each(|vs| {
+            assert!(vs.len() == 2);
+            let (from, to) = (vs[0], vs[1]);
             biedged.add_edge(to, chain_vx, BiedgedWeight::black(1));
-
             biedged.remove_one_black_edge(from, to);
-        }
+        });
 
         chain_vertices.push(chain_vx);
     }

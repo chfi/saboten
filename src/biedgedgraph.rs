@@ -1,4 +1,4 @@
-use petgraph::prelude::*;
+use petgraph::{prelude::*, unionfind::UnionFind};
 
 use gfa::{
     gfa::{name_conversion::NameMap, Header, Link, Orientation, Segment, GFA},
@@ -155,12 +155,24 @@ impl BiedgedGraph {
     pub fn from_gfa(gfa: &GFA<usize, ()>) -> BiedgedGraph {
         let mut be_graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
+        let mut max_seg_id = 0;
+        let mut min_seg_id = std::usize::MAX;
+        let mut max_node_id = 0;
+
         for segment in gfa.segments.iter() {
+            max_seg_id = segment.name.max(max_seg_id);
+            min_seg_id = segment.name.min(min_seg_id);
             let (left, right) = id_to_black_edge(segment.name as u64);
             be_graph.add_node(left);
             be_graph.add_node(right);
+            max_node_id = right.max(max_node_id);
             be_graph.add_edge(left, right, BiedgedWeight::black(1));
         }
+
+        // Ensure the GFA segment IDs are compact in 0..len
+        assert_eq!(min_seg_id as usize, 0);
+        assert_eq!(max_seg_id as usize, gfa.segments.len() - 1);
+        assert_eq!(max_node_id as usize, (2 * gfa.segments.len()) - 1);
 
         for link in gfa.links.iter() {
             let (_, from) = id_to_black_edge(link.from_segment as u64);
@@ -256,18 +268,28 @@ impl BiedgedGraph {
     ///
     /// Returns the index of the resulting vertex, or None if either
     /// of the provided vertices were not present in the graph.
-    pub fn merge_vertices(&mut self, a: u64, b: u64) -> Option<u64> {
-        // We'll always remove the node with a higher ID, for consistency
-        let from = a.min(b);
-        let to = a.max(b);
-
-        if !self.graph.contains_node(a) || !self.graph.contains_node(b) {
+    pub fn merge_vertices(
+        &mut self,
+        left: u64,
+        right: u64,
+        union_find: &mut UnionFind<usize>,
+    ) -> Option<u64> {
+        if !self.graph.contains_node(left) || !self.graph.contains_node(right) {
             return None;
         }
 
-        if self.graph.contains_edge(a, b) {
-            return self.contract_edge(a, b);
+        if self.graph.contains_edge(left, right) {
+            return self.contract_edge(left, right, union_find);
         }
+
+        let (from, to) = {
+            let union = union_find.find_mut(left as usize) as u64;
+            if union == left {
+                (union, right)
+            } else {
+                (union, left)
+            }
+        };
 
         // Retrieve the edges of the node we're removing
         let to_edges: Vec<(u64, u64, BiedgedWeight)> = self
@@ -287,50 +309,22 @@ impl BiedgedGraph {
         Some(from)
     }
 
-    /// Merge any number of vertices, provided as an iterator of node
-    /// IDs, into one. Returns the index of the resulting vertex, or
-    /// None if the iterator was empty or any of the vertices were not
-    /// present in the graph.
-    pub fn merge_many_vertices<I>(&mut self, vertices: I) -> Option<u64>
-    where
-        I: IntoIterator<Item = u64>,
-    {
-        let mut vertices = vertices.into_iter();
-        let head = vertices.next()?;
+    pub fn contract_edge(
+        &mut self,
+        left: u64,
+        right: u64,
+        union_find: &mut UnionFind<usize>,
+    ) -> Option<u64> {
+        union_find.union(left as usize, right as usize);
 
-        // Collect all the nodes to be deleted, along with their
-        // corresponding edges
-        let mut edges = Vec::new();
-        let mut nodes = Vec::new();
-
-        for v in vertices {
-            if !self.graph.contains_node(v) {
-                return None;
+        let (from, to) = {
+            let union = union_find.find_mut(left as usize) as u64;
+            if union == left {
+                (union, right)
+            } else {
+                (union, left)
             }
-            if v != head {
-                let v_edges =
-                    self.graph.edges(v).map(|(_, other, w)| (other, w.clone()));
-                edges.extend(v_edges);
-                nodes.push(v);
-            }
-        }
-
-        for n in nodes {
-            self.graph.remove_node(n);
-        }
-
-        // Insert the
-        for (other, w) in edges {
-            self.add_edge(head, other, w);
-        }
-
-        Some(head)
-    }
-
-    pub fn contract_edge(&mut self, left: u64, right: u64) -> Option<u64> {
-        // We'll always remove the node with a higher ID, for consistency
-        let from = left.min(right);
-        let to = left.max(right);
+        };
 
         let weight = self.graph.edge_weight(from, to).copied()?;
 
