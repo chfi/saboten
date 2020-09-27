@@ -321,51 +321,47 @@ mod tests {
         let mut graph: BiedgedGraph = BiedgedGraph::new();
 
         //First Handlegraph node
-        graph.add_node(10);
-        graph.add_node(11);
-        graph.add_edge(10, 11, BiedgedWeight::black(1));
+        let mut add_node = |n: u64| {
+            let (l, r) = id_to_black_edge(n);
+            graph.add_node(l);
+            graph.add_node(r);
+            graph.add_edge(l, r, BiedgedWeight::black(1));
+        };
 
-        //Second Handlegraph node
-        graph.add_node(20);
-        graph.add_node(21);
-        graph.add_edge(20, 21, BiedgedWeight::black(1));
+        add_node(0);
+        add_node(1);
+        add_node(2);
+        add_node(3);
 
-        //Third Handlegraph node
-        graph.add_node(30);
-        graph.add_node(31);
-        graph.add_edge(30, 31, BiedgedWeight::black(1));
+        let mut add_edge = |l: u64, r: u64| {
+            graph.add_edge(l, r, BiedgedWeight::gray(1));
+        };
 
-        //Forth Handlegraph node
-        graph.add_node(40);
-        graph.add_node(41);
-        graph.add_edge(40, 41, BiedgedWeight::black(1));
-
-        //Add Handlegraph edges
-        graph.add_edge(11, 20, BiedgedWeight::gray(1));
-        graph.add_edge(11, 30, BiedgedWeight::gray(1));
-        graph.add_edge(21, 40, BiedgedWeight::gray(1));
-        graph.add_edge(31, 40, BiedgedWeight::gray(1));
+        add_edge(1, 2);
+        add_edge(1, 4);
+        add_edge(3, 6);
+        add_edge(5, 6);
 
         let mut proj_map = BTreeMap::new();
         contract_all_gray_edges(&mut graph, &mut proj_map);
 
-        use petgraph::dot::{Config, Dot};
-
-        println!(
-            "{:#?}",
-            Dot::with_config(&graph.graph, &[Config::NodeNoLabel])
+        assert_eq!(
+            graph.graph.edge_weight(0, 1),
+            Some(&BiedgedWeight::black(1))
         );
-        // println!("Nodes: {:#?}", graph.get_nodes());
-        println!("Gray_edges {:#?}", graph.gray_edges().collect::<Vec<_>>());
-        println!("Black_edges {:#?}", graph.black_edges().collect::<Vec<_>>());
+        assert_eq!(
+            graph.graph.edge_weight(1, 3),
+            Some(&BiedgedWeight::black(2))
+        );
+        assert_eq!(
+            graph.graph.edge_weight(3, 7),
+            Some(&BiedgedWeight::black(1))
+        );
 
-        assert!(graph.graph.node_count() == 4);
+        assert_eq!(graph.graph.node_count(), 4);
         assert_eq!(graph.black_edge_count(), 4);
-
-        // NOTE: petgraph does not actually support multiple edges between two given nodes
-        // however, they are allowed in Biedged Graphs. For this reason it is better to use
-        // the count_edges function provided by the EdgeFunctions trait.
-        assert!(graph.graph.edge_count() == 3);
+        assert_eq!(graph.gray_edge_count(), 0);
+        assert_eq!(graph.graph.edge_count(), 3);
     }
 
     #[test]
@@ -411,7 +407,7 @@ mod tests {
             .map(|s| {
                 let orig = name_map.map_name(&s.name).unwrap();
                 let orig_name = s.name.to_owned();
-                let (l, r) = crate::biedgedgraph::split_node_id(orig as u64);
+                let (l, r) = crate::biedgedgraph::id_to_black_edge(orig as u64);
                 let l_end = find_projection(&proj_map, l);
                 let r_end = find_projection(&proj_map, r);
                 let l_end = projected_node_name(&name_map, l_end).unwrap();
@@ -421,24 +417,24 @@ mod tests {
             .collect::<Vec<_>>();
 
         let expected_names: Vec<_> = vec![
-            ("a", ("a", "b")),
-            ("b", ("b", "d")),
-            ("c", ("b", "d")),
-            ("d", ("d", "e")),
-            ("e", ("e", "g")),
-            ("f", ("e", "g")),
-            ("g", ("g", "k")),
-            ("h", ("g", "i")),
-            ("i", ("i", "i")),
-            ("j", ("i", "k")),
-            ("k", ("k", "k")),
-            ("l", ("k", "m")),
-            ("m", ("m", "n")),
-            ("n", ("n", "p")),
-            ("o", ("n", "p")),
-            ("p", ("p", "m")),
-            ("q", ("m", "q_")),
-            ("r", ("m", "r_")),
+            ("a", ("a", "a_")),
+            ("b", ("a_", "b_")),
+            ("c", ("a_", "b_")),
+            ("d", ("b_", "d_")),
+            ("e", ("d_", "e_")),
+            ("f", ("d_", "e_")),
+            ("g", ("e_", "g_")),
+            ("h", ("e_", "h_")),
+            ("i", ("h_", "h_")),
+            ("j", ("h_", "g_")),
+            ("k", ("g_", "g_")),
+            ("l", ("g_", "l_")),
+            ("m", ("l_", "m_")),
+            ("n", ("m_", "n_")),
+            ("o", ("m_", "n_")),
+            ("p", ("n_", "l_")),
+            ("q", ("l_", "q_")),
+            ("r", ("l_", "r_")),
         ]
         .into_iter()
         .map(|(a, (l, r))| {
