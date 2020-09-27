@@ -22,24 +22,27 @@ fn main() {
     let mut gfa_name_map = None;
 
     let gfa = {
-        let usize_parser = GFAParser::new();
-        let usize_gfa = usize_parser.parse_file(&opt.in_gfa);
-        if let Ok(gfa) = usize_gfa {
-            gfa
-        } else {
-            let parser = GFAParser::new();
-            let bstr_gfa: GFA<BString, ()> =
-                parser.parse_file(&opt.in_gfa).unwrap();
+        let parser = GFAParser::new();
+        let bstr_gfa: GFA<BString, ()> =
+            parser.parse_file(&opt.in_gfa).unwrap();
 
-            let name_map = NameMap::build_from_gfa(&bstr_gfa);
+        let name_map = NameMap::build_from_gfa(&bstr_gfa);
 
-            let usize_gfa =
-                name_map.gfa_bstring_to_usize(&bstr_gfa, false).unwrap();
+        let usize_gfa =
+            name_map.gfa_bstring_to_usize(&bstr_gfa, false).unwrap();
 
-            gfa_name_map = Some(name_map);
+        for seg in bstr_gfa.segments.iter() {
+            let name = seg.name.to_str().unwrap();
+            let id = name_map.map_name(name).unwrap();
 
-            usize_gfa
+            let (l, r) = id_to_black_edge(id as u64);
+
+            println!("{} -> ({},{})", name, l, r);
         }
+
+        gfa_name_map = Some(name_map);
+
+        usize_gfa
     };
 
     let mut be_graph = BiedgedGraph::from_gfa(&gfa);
