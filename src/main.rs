@@ -96,7 +96,8 @@ fn main() {
 
     let mut cactus_tree = be_graph.clone();
 
-    biedged_to_cactus::build_cactus_tree(&mut cactus_tree, &cycles);
+    let chain_vertices =
+        biedged_to_cactus::build_cactus_tree(&mut cactus_tree, &cycles);
 
     let mut cactus_graph_inverse: HashMap<usize, Vec<usize>> = HashMap::new();
 

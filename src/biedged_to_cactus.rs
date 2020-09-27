@@ -139,17 +139,19 @@ pub fn contract_simple_cycles(
 
 /// Adds a chain vertex for each cycle, with edges to each of the
 /// elements in the cycle, and removes the edges within the cycle.
-/// Returns the IDs of the new chain vertices as a vector.
+/// Returns a vector of tuples, where the first element is the chain
+/// vertex ID in the graph, and the second element is the index of the
+/// corresponding cycle in the provided cycles vector.
 pub fn build_cactus_tree(
     biedged: &mut BiedgedGraph,
     cycles: &[Vec<u64>],
-) -> Vec<u64> {
+) -> Vec<(u64, usize)> {
     let mut chain_vertices = Vec::with_capacity(cycles.len());
 
-    for cycle in cycles {
+    for (i, cycle) in cycles.iter().enumerate() {
         assert!(cycle.len() > 1);
 
-        let chain_vx = biedged.new_node();
+        let chain_vx = biedged.add_chain_vertex();
 
         cycle.windows(2).for_each(|vs| {
             assert!(vs.len() == 2);
@@ -158,10 +160,44 @@ pub fn build_cactus_tree(
             biedged.remove_one_black_edge(from, to);
         });
 
-        chain_vertices.push(chain_vx);
+        chain_vertices.push((chain_vx, i));
     }
 
     chain_vertices
+}
+
+pub fn is_chain_edge(
+    cactus_tree: &BiedgedGraph,
+    cycles: &[Vec<u64>],
+    chains: &[(u64, usize)],
+    union_find: &UnionFind<usize>,
+    a: u64,
+    b: u64,
+) -> bool {
+    let a = cactus_tree.projected_node(union_find, a);
+    let b = cactus_tree.projected_node(union_find, b);
+    if cactus_tree.graph.contains_edge(a, b) {
+        let n = a.min(b);
+        let c = a.max(b);
+        cactus_tree.is_net_vertex(n) && cactus_tree.is_chain_vertex(c)
+    } else {
+        false
+    }
+}
+
+pub fn is_bridge_edge(
+    cactus_tree: &BiedgedGraph,
+    union_find: &UnionFind<usize>,
+    a: u64,
+    b: u64,
+) -> bool {
+    let a = cactus_tree.projected_node(union_find, a);
+    let b = cactus_tree.projected_node(union_find, b);
+    if cactus_tree.graph.contains_edge(a, b) {
+        cactus_tree.is_net_vertex(a) && cactus_tree.is_net_vertex(b)
+    } else {
+        false
+    }
 }
 
 pub fn black_edge_cycle(

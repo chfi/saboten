@@ -149,6 +149,8 @@ impl SubAssign for BiedgedWeight {
 #[derive(Default, Clone)]
 pub struct BiedgedGraph {
     pub graph: UnGraphMap<u64, BiedgedWeight>,
+    pub max_net_vertex: u64,
+    pub max_chain_vertex: u64,
 }
 
 impl BiedgedGraph {
@@ -164,6 +166,29 @@ impl BiedgedGraph {
         }
         self.graph.add_node(id);
         id
+    }
+
+    pub fn add_chain_vertex(&mut self) -> u64 {
+        self.max_chain_vertex += 1;
+        let id = self.max_chain_vertex;
+        self.graph.add_node(id);
+        id
+    }
+
+    pub fn is_chain_vertex(&self, n: u64) -> bool {
+        self.graph.contains_node(n) && n > self.max_net_vertex
+    }
+
+    pub fn is_net_vertex(&self, n: u64) -> bool {
+        self.graph.contains_node(n) && n <= self.max_net_vertex
+    }
+
+    pub fn projected_node(&self, union: &UnionFind<usize>, n: u64) -> u64 {
+        if n <= self.max_net_vertex {
+            union.find(n as usize) as u64
+        } else {
+            n
+        }
     }
 
     pub fn from_gfa(gfa: &GFA<usize, ()>) -> BiedgedGraph {
@@ -194,7 +219,14 @@ impl BiedgedGraph {
             be_graph.add_edge(from, to, BiedgedWeight::gray(1));
         }
 
-        BiedgedGraph { graph: be_graph }
+        let max_net_vertex = max_seg_id as u64;
+        let max_chain_vertex = max_seg_id as u64;
+
+        BiedgedGraph {
+            graph: be_graph,
+            max_net_vertex,
+            max_chain_vertex,
+        }
     }
 
     /// Convert a GFA to a biedged graph if file exists
