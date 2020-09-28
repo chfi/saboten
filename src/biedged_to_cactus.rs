@@ -167,7 +167,6 @@ pub fn build_cactus_tree(
 
 pub fn is_chain_edge(
     cactus_tree: &BiedgedGraph,
-    chains: &[(u64, usize)],
     union_find: &UnionFind<usize>,
     a: u64,
     b: u64,
@@ -220,8 +219,6 @@ pub fn snarl_cactus_tree_path(
         let mut stack: Vec<u64> = Vec::new();
 
         stack.push(p_x);
-
-        // let mut prev = current;
 
         while let Some(current) = stack.pop() {
             if !current != p_y && !visited.contains(&current) {
@@ -319,7 +316,6 @@ pub fn build_net_graph(
     cactus_tree_proj: &UnionFind<usize>,
     cactus_graph_inverse: &FnvHashMap<u64, Vec<u64>>,
     cycle_map: &FnvHashMap<(u64, u64), Vec<usize>>,
-    cycles: &[Vec<(u64, u64)>],
     x: u64,
     y: u64,
 ) -> Option<BiedgedGraph> {
@@ -382,24 +378,78 @@ pub fn build_net_graph(
         }
     }
 
-    println!("  ---   Net graph vertices  ---  ");
-
+    let mut net_graph = BiedgedGraph::new();
     for v in vertices.iter() {
-        println!("  -  {}", v);
+        net_graph.add_node(*v);
     }
 
-    println!("  ---  Net graph gray edges ---  ");
     for (a, b) in gray_edges.iter() {
-        println!("  -  {}, {}", a, b);
+        net_graph.add_edge(*a, *b, BiedgedWeight::gray(1));
     }
 
-    println!("  ---  Net graph black edges ---  ");
     for (a, b) in black_edges.iter() {
-        println!("  -  {}, {}", a, b);
+        net_graph.add_edge(*a, *b, BiedgedWeight::black(1));
     }
-    // for v in vertices.
 
-    None
+    Some(net_graph)
+}
+
+pub fn snarl_is_acyclic(biedged: &BiedgedGraph, x: u64) -> bool {
+    let graph = &biedged.graph;
+    let mut visited: BTreeSet<u64> = BTreeSet::new();
+    let mut in_path: FnvHashSet<u64> = FnvHashSet::default();
+
+    enum Color {
+        Black,
+        Gray,
+    };
+
+    let other_color = |col: &Color| match col {
+        Color::Black => Color::Gray,
+        Color::Gray => Color::Black,
+    };
+
+    let disp_color = |col: &Color| match col {
+        Color::Black => "black",
+        Color::Gray => "gray",
+    };
+
+    let mut stack: Vec<(Color, u64)> = Vec::new();
+
+    if graph.edges(x).find(|(_, _, w)| w.black > 0).is_some() {
+        stack.push((Color::Gray, x));
+    } else {
+        stack.push((Color::Black, x));
+    }
+    let mut acyclic = true;
+
+    while let Some((last_color, current)) = stack.pop() {
+        if !visited.contains(&current) {
+            visited.insert(current);
+            in_path.insert(current);
+
+            let edges: Vec<_> = graph
+                .edges(current)
+                .filter(|(_, _, w)| match last_color {
+                    Color::Black => w.gray > 0,
+                    Color::Gray => w.black > 0,
+                })
+                .collect();
+
+            stack.push((other_color(&last_color), current));
+            for (_, adj, _) in edges {
+                if in_path.contains(&adj) {
+                    acyclic = false;
+                } else {
+                    stack.push((other_color(&last_color), adj));
+                }
+            }
+        } else if in_path.contains(&current) {
+            in_path.remove(&current);
+        }
+    }
+
+    acyclic
 }
 
 pub fn black_edge_cycle(

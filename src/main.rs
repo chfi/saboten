@@ -103,7 +103,6 @@ fn main() {
     cactus_tree.graph.all_edges().for_each(|(a, b, _)| {
         if biedged_to_cactus::is_chain_edge(
             &cactus_tree,
-            &chain_vertices,
             &cactus_graph_projections,
             a,
             b,
@@ -136,12 +135,14 @@ fn main() {
         });
     */
 
-    let mut cactus_graph_inverse: FnvHashMap<usize, Vec<usize>> =
+    let mut cactus_graph_inverse: FnvHashMap<u64, Vec<u64>> =
         FnvHashMap::default();
 
     let cactus_reps = cactus_graph_projections.clone().into_labeling();
     for (i, k) in cactus_reps.iter().enumerate() {
-        cactus_graph_inverse.entry(*k).or_default().push(i);
+        let i = i as u64;
+        let k = *k as u64;
+        cactus_graph_inverse.entry(k).or_default().push(i);
     }
 
     println!();
@@ -226,13 +227,13 @@ fn main() {
         println!("  {:?}", cycle);
 
         for (x, y) in cycle.iter() {
-            let x = *x as usize;
-            let y = *y as usize;
+            // let x = *x as usize;
+            // let y = *y as usize;
             // let y = *y as usize;
             let orig_xs = cactus_graph_inverse.get(&x).unwrap();
             // let orig_ys = cactus_graph_inverse.get(&y).unwrap();
 
-            if let Some(w) = be_graph.graph.edge_weight(x as u64, y as u64) {
+            if let Some(w) = be_graph.graph.edge_weight(*x, *y) {
                 println!("  -- {}", w.black);
             }
 
@@ -241,8 +242,8 @@ fn main() {
                 .iter()
                 .filter(|&&u| {
                     let (w, v) = end_to_black_edge(u as u64);
-                    let w = w as usize;
-                    let v = v as usize;
+                    // let w = w as usize;
+                    // let v = v as usize;
                     println!("  {} - {}, {}", u, w, v);
                     if orig_xs.contains(&w) && orig_xs.contains(&v) {
                         false
@@ -372,6 +373,68 @@ fn main() {
         println!(" -- {:?}", path);
     }
 
+    let bridge_1_net = biedged_to_cactus::build_net_graph(
+        &orig_graph,
+        &cactus_tree,
+        &cactus_graph_projections,
+        &cactus_graph_inverse,
+        &cycle_map,
+        1,
+        6,
+    );
+
+    println!("\n--------------\n");
+
+    let bridge_2_net = biedged_to_cactus::build_net_graph(
+        &orig_graph,
+        &cactus_tree,
+        &cactus_graph_projections,
+        &cactus_graph_inverse,
+        &cycle_map,
+        7,
+        22,
+    );
+
+    let fake_net = biedged_to_cactus::build_net_graph(
+        &orig_graph,
+        &cactus_tree,
+        &cactus_graph_projections,
+        &cactus_graph_inverse,
+        &cycle_map,
+        9,
+        11,
+    );
+
+    let fake_net_2 = biedged_to_cactus::build_net_graph(
+        &orig_graph,
+        &cactus_tree,
+        &cactus_graph_projections,
+        &cactus_graph_inverse,
+        &cycle_map,
+        23,
+        31,
+    );
+
+    println!("cycles");
+    for (k, v) in cycle_map.iter() {
+        println!("{:?} - {:?}", k, v);
+    }
+
+    if biedged_to_cactus::snarl_is_acyclic(&bridge_1_net.unwrap(), 1) {
+        println!("1, 6 is acyclic");
+    }
+
+    if biedged_to_cactus::snarl_is_acyclic(&bridge_2_net.unwrap(), 7) {
+        println!("7, 22 is acyclic");
+    }
+
+    // if biedged_to_cactus::snarl_is_acyclic(&fake_net.unwrap(), 9) {
+    //     println!("9, 11 is acyclic");
+    // }
+
+    if biedged_to_cactus::snarl_is_acyclic(&fake_net_2.unwrap(), 23) {
+        println!("23, 31 is acyclic");
+    }
     /*
     let nodes: Vec<_> = gfa
         .segments
