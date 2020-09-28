@@ -28,6 +28,14 @@ pub fn end_to_black_edge(n: u64) -> (u64, u64) {
     }
 }
 
+pub fn opposite_vertex(n: u64) -> u64 {
+    if n % 2 == 0 {
+        n + 1
+    } else {
+        n - 1
+    }
+}
+
 #[inline]
 pub fn id_from_black_edge(n: u64) -> u64 {
     n / 2

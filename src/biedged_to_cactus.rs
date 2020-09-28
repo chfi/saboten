@@ -266,6 +266,142 @@ pub fn snarl_cactus_tree_path(
     Some(path)
 }
 
+pub fn net_graph_black_edge_walk(
+    biedged: &BiedgedGraph,
+    x: u64,
+    y: u64,
+) -> bool {
+    let start = x;
+    let end = y;
+    let adj_start = opposite_vertex(x);
+    let adj_end = opposite_vertex(y);
+
+    let mut visited: FnvHashSet<u64> = FnvHashSet::default();
+    let mut stack: Vec<u64> = Vec::new();
+
+    stack.push(start);
+
+    while let Some(current) = stack.pop() {
+        if current == end {
+            return true;
+        }
+
+        if !visited.contains(&current) {
+            visited.insert(current);
+
+            let edges = biedged.graph.edges(current);
+            // .filter(|(_, n, _)| vertices.contains(n));
+
+            if current == start || current == adj_end {
+                for (_, n, w) in edges {
+                    if w.black > 0 {
+                        if !visited.contains(&n) {
+                            stack.push(n);
+                        }
+                    }
+                }
+            } else {
+                for (_, n, _) in edges {
+                    if !visited.contains(&n) && n != end {
+                        stack.push(n);
+                    }
+                }
+            }
+        }
+    }
+
+    false
+}
+
+pub fn build_net_graph(
+    biedged: &BiedgedGraph,
+    cactus_tree: &BiedgedGraph,
+    cactus_tree_proj: &UnionFind<usize>,
+    cactus_graph_inverse: &FnvHashMap<u64, Vec<u64>>,
+    cycle_map: &FnvHashMap<(u64, u64), Vec<usize>>,
+    cycles: &[Vec<(u64, u64)>],
+    x: u64,
+    y: u64,
+) -> Option<BiedgedGraph> {
+    // Find the path in the cactus tree connecting the snarl
+    let path = snarl_cactus_tree_path(cactus_tree, cactus_tree_proj, x, y)?;
+
+    // Get the vertices in the original biedged graph that map to the
+    // net vertices in the path
+    let mut vertices: FnvHashSet<u64> = FnvHashSet::default();
+    for net in path.iter().filter(|&n| cactus_tree.is_net_vertex(*n)) {
+        let projected = cactus_graph_inverse.get(net)?;
+        vertices.extend(projected);
+    }
+
+    let mut gray_edges: FnvHashSet<(u64, u64)> = FnvHashSet::default();
+
+    for v in vertices.iter() {
+        let edges = biedged.graph.edges(*v);
+        // let neighbors = biedged.graph.neighbors(*v);
+        for (_, n, w) in edges {
+            if vertices.contains(&n) && w.gray > 0 {
+                let a = v.min(&n);
+                let b = v.max(&n);
+                gray_edges.insert((*a, *b));
+            }
+        }
+    }
+
+    let mut black_edges: FnvHashSet<(u64, u64)> = FnvHashSet::default();
+    let mut black_vertices: FnvHashSet<u64> = FnvHashSet::default();
+
+    for v in vertices.iter() {
+        for u in vertices.iter() {
+            if opposite_vertex(*v) == *u {
+                let a = v.min(u);
+                let b = v.max(u);
+                black_edges.insert((*a, *b));
+                black_vertices.insert(*a);
+                black_vertices.insert(*b);
+            } else if v != u {
+                let b_v = black_edge_cycle(cactus_tree_proj, cycle_map, *v);
+                let b_u = black_edge_cycle(cactus_tree_proj, cycle_map, *u);
+
+                if b_v.is_some() && b_v == b_u {
+                    if !black_vertices.contains(v)
+                        && !black_vertices.contains(u)
+                    {
+                        let connected =
+                            net_graph_black_edge_walk(biedged, *v, *u);
+                        if connected {
+                            let a = v.min(u);
+                            let b = v.max(u);
+                            black_edges.insert((*a, *b));
+                            black_vertices.insert(*a);
+                            black_vertices.insert(*b);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    println!("  ---   Net graph vertices  ---  ");
+
+    for v in vertices.iter() {
+        println!("  -  {}", v);
+    }
+
+    println!("  ---  Net graph gray edges ---  ");
+    for (a, b) in gray_edges.iter() {
+        println!("  -  {}, {}", a, b);
+    }
+
+    println!("  ---  Net graph black edges ---  ");
+    for (a, b) in black_edges.iter() {
+        println!("  -  {}, {}", a, b);
+    }
+    // for v in vertices.
+
+    None
+}
+
 pub fn black_edge_cycle(
     vx_proj: &UnionFind<usize>,
     cycle_map: &FnvHashMap<(u64, u64), Vec<usize>>,
