@@ -71,12 +71,11 @@ fn main() {
     println!(" --- Finding cycles --- ");
     let cycles = biedged_to_cactus::find_cycles(&be_graph);
 
-    let mut cycle_map: HashMap<u64, Vec<usize>> = HashMap::new();
+    let mut cycle_map: HashMap<(u64, u64), Vec<usize>> = HashMap::new();
 
     for (i, cycle) in cycles.iter().enumerate() {
-        let mut iter = cycle.iter().skip(1);
-        for vx in iter {
-            cycle_map.entry(*vx).or_default().push(i);
+        for (a, b) in cycle.iter() {
+            cycle_map.entry((*a, *b)).or_default().push(i);
         }
         println!("{}\t{:?}", i, cycle);
     }
@@ -132,16 +131,14 @@ fn main() {
         let name = name.to_str().unwrap();
         let (a, b) = id_to_black_edge(id);
         let (x, y) = projected_edge(&cactus_graph_projections, a, b);
-        let cyc_x = cycle_map.get(&x);
-        let cyc_y = cycle_map.get(&y);
+        let cyc = cycle_map.get(&(x, y));
         println!(
-            "{} projects to edge ({}, {}) = {},\tcycles {:?}, {:?}",
+            "{} projects to edge ({}, {}) = {},\tcycles {:?}",
             name,
             x,
             y,
             be_graph.graph.contains_edge(x, y),
-            cyc_x,
-            cyc_y
+            cyc,
         );
     }
 

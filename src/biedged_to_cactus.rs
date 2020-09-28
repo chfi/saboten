@@ -60,7 +60,7 @@ pub fn merge_components(
 /// Find the simple cycles in a cactus graph and return them. A cycle
 /// is represented as a vector of vertices, with the same start and
 /// end vertex.
-pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
+pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<(u64, u64)>> {
     let graph = &biedged.graph;
 
     let mut visited: BTreeSet<u64> = BTreeSet::new();
@@ -80,12 +80,15 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
                     for (_, adj, weight) in graph.edges(current) {
                         if adj == current {
                             for _ in 0..weight.black {
-                                cycles.push(vec![current, current]);
+                                cycles.push(vec![(current, current)]);
                             }
                         } else {
                             if !visited.contains(&adj) {
                                 if weight.black == 2 {
-                                    cycles.push(vec![current, adj, current]);
+                                    cycles.push(vec![
+                                        (current, adj),
+                                        (adj, current),
+                                    ]);
                                 }
                                 stack.push(adj);
                                 parents.insert(adj, current);
@@ -102,17 +105,17 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
     }
 
     for (start, end) in cycle_ends {
-        let mut cycle: Vec<u64> = vec![end];
+        let mut cycle: Vec<(u64, u64)> = vec![];
         let mut current = end;
 
         while current != start {
             if let Some(parent) = parents.get(&current) {
-                cycle.push(*parent);
+                cycle.push((*parent, current));
                 current = *parent;
             }
         }
 
-        cycle.push(end);
+        cycle.push((end, start));
         cycles.push(cycle);
     }
 
@@ -125,15 +128,13 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<u64>> {
 /// map accordingly.
 pub fn contract_simple_cycles(
     biedged: &mut BiedgedGraph,
-    cycles: &[Vec<u64>],
+    cycles: &[Vec<(u64, u64)>],
     union_find: &mut UnionFind<usize>,
 ) {
     for cycle in cycles {
-        cycle.windows(2).for_each(|vs| {
-            assert!(vs.len() == 2);
-            let (from, to) = (vs[0], vs[1]);
-            biedged.contract_edge(from, to, union_find);
-        });
+        for (from, to) in cycle {
+            biedged.contract_edge(*from, *to, union_find);
+        }
     }
 }
 
@@ -144,21 +145,17 @@ pub fn contract_simple_cycles(
 /// corresponding cycle in the provided cycles vector.
 pub fn build_cactus_tree(
     biedged: &mut BiedgedGraph,
-    cycles: &[Vec<u64>],
+    cycles: &[Vec<(u64, u64)>],
 ) -> Vec<(u64, usize)> {
     let mut chain_vertices = Vec::with_capacity(cycles.len());
 
     for (i, cycle) in cycles.iter().enumerate() {
-        assert!(cycle.len() > 1);
-
         let chain_vx = biedged.add_chain_vertex();
 
-        cycle.windows(2).for_each(|vs| {
-            assert!(vs.len() == 2);
-            let (from, to) = (vs[0], vs[1]);
-            biedged.add_edge(to, chain_vx, BiedgedWeight::black(1));
-            biedged.remove_one_black_edge(from, to);
-        });
+        for (from, to) in cycle {
+            biedged.add_edge(*to, chain_vx, BiedgedWeight::black(1));
+            biedged.remove_one_black_edge(*from, *to);
+        }
 
         chain_vertices.push((chain_vx, i));
     }
@@ -202,25 +199,19 @@ pub fn is_bridge_edge(
 
 pub fn black_edge_cycle(
     vx_proj: &UnionFind<usize>,
-    cycle_map: &HashMap<u64, Vec<usize>>,
+    cycle_map: &HashMap<(u64, u64), Vec<usize>>,
     x: u64,
 ) -> Option<Vec<usize>> {
     let (l, r) = end_to_black_edge(x);
     let p_l = vx_proj.find(l as usize) as u64;
     let p_r = vx_proj.find(r as usize) as u64;
-    let cyc_l = cycle_map.get(&p_l)?;
-    let cyc_r = cycle_map.get(&p_r)?;
-    let intersection = cyc_l
-        .iter()
-        .copied()
-        .filter(|c| cyc_r.contains(c))
-        .collect();
-    Some(intersection)
+    let intersection = cycle_map.get(&(p_l, p_r))?;
+    Some(intersection.to_vec())
 }
 
 pub fn is_chain_pair(
     vx_proj: &UnionFind<usize>,
-    cycle_map: &HashMap<u64, Vec<usize>>,
+    cycle_map: &HashMap<(u64, u64), Vec<usize>>,
     x: u64,
     y: u64,
 ) -> bool {
