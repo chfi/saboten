@@ -452,6 +452,22 @@ pub fn snarl_is_acyclic(biedged: &BiedgedGraph, x: u64) -> bool {
     acyclic
 }
 
+pub fn snarl_is_bridgeless(snarl: &BiedgedGraph, x: u64, y: u64) -> bool {
+    for node in snarl.graph.nodes() {
+        if node != x && node != y {
+            if snarl
+                .graph
+                .edges(node)
+                .find(|(_, _, w)| w.black == 1)
+                .is_none()
+            {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 pub fn black_edge_cycle(
     vx_proj: &UnionFind<usize>,
     cycle_map: &FnvHashMap<(u64, u64), Vec<usize>>,

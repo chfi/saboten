@@ -19,6 +19,15 @@ struct Opt {
     in_gfa: PathBuf,
 }
 
+fn print_snarl_acyclic_bridgeless(snarl: &BiedgedGraph, x: u64, y: u64) {
+    println!("snarl {}, {}", x, y);
+    let acyclic = biedged_to_cactus::snarl_is_acyclic(&snarl, x);
+    let bridgeless = biedged_to_cactus::snarl_is_bridgeless(&snarl, x, y);
+    println!("acyclic: {}", acyclic);
+    println!("bridgeless: {}", bridgeless);
+    println!();
+}
+
 fn main() {
     let opt = Opt::from_args();
 
@@ -381,7 +390,8 @@ fn main() {
         &cycle_map,
         1,
         6,
-    );
+    )
+    .unwrap();
 
     println!("\n--------------\n");
 
@@ -393,7 +403,8 @@ fn main() {
         &cycle_map,
         7,
         22,
-    );
+    )
+    .unwrap();
 
     let fake_net = biedged_to_cactus::build_net_graph(
         &orig_graph,
@@ -403,7 +414,8 @@ fn main() {
         &cycle_map,
         9,
         11,
-    );
+    )
+    .unwrap();
 
     let fake_net_2 = biedged_to_cactus::build_net_graph(
         &orig_graph,
@@ -413,28 +425,24 @@ fn main() {
         &cycle_map,
         23,
         31,
-    );
+    )
+    .unwrap();
 
     println!("cycles");
     for (k, v) in cycle_map.iter() {
         println!("{:?} - {:?}", k, v);
     }
 
-    if biedged_to_cactus::snarl_is_acyclic(&bridge_1_net.unwrap(), 1) {
-        println!("1, 6 is acyclic");
-    }
+    print_snarl_acyclic_bridgeless(&bridge_1_net, 1, 6);
 
-    if biedged_to_cactus::snarl_is_acyclic(&bridge_2_net.unwrap(), 7) {
-        println!("7, 22 is acyclic");
-    }
+    print_snarl_acyclic_bridgeless(&bridge_2_net, 7, 22);
 
-    // if biedged_to_cactus::snarl_is_acyclic(&fake_net.unwrap(), 9) {
-    //     println!("9, 11 is acyclic");
-    // }
+    print_snarl_acyclic_bridgeless(&fake_net, 9, 11);
 
-    if biedged_to_cactus::snarl_is_acyclic(&fake_net_2.unwrap(), 23) {
-        println!("23, 31 is acyclic");
-    }
+    print_snarl_acyclic_bridgeless(&fake_net_2, 23, 31);
+
+    // fo
+
     /*
     let nodes: Vec<_> = gfa
         .segments
