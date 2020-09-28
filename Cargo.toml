@@ -16,3 +16,4 @@ gfa = { path = "../rs-gfa"}
 three-edge-connected = { path = "../rs-edge-connectivity" }
 bstr = "0.2"
 structopt = "0.3"
+fnv = "1.0"

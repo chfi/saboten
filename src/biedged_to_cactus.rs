@@ -2,6 +2,8 @@ use crate::biedgedgraph::*;
 
 use petgraph::unionfind::UnionFind;
 
+use fnv::FnvHashMap;
+
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use three_edge_connected as t_e_c;
@@ -165,7 +167,6 @@ pub fn build_cactus_tree(
 
 pub fn is_chain_edge(
     cactus_tree: &BiedgedGraph,
-    cycles: &[Vec<u64>],
     chains: &[(u64, usize)],
     union_find: &UnionFind<usize>,
     a: u64,
@@ -199,7 +200,7 @@ pub fn is_bridge_edge(
 
 pub fn black_edge_cycle(
     vx_proj: &UnionFind<usize>,
-    cycle_map: &HashMap<(u64, u64), Vec<usize>>,
+    cycle_map: &FnvHashMap<(u64, u64), Vec<usize>>,
     x: u64,
 ) -> Option<Vec<usize>> {
     let (l, r) = end_to_black_edge(x);
@@ -211,7 +212,7 @@ pub fn black_edge_cycle(
 
 pub fn is_chain_pair(
     vx_proj: &UnionFind<usize>,
-    cycle_map: &HashMap<(u64, u64), Vec<usize>>,
+    cycle_map: &FnvHashMap<(u64, u64), Vec<usize>>,
     x: u64,
     y: u64,
 ) -> bool {

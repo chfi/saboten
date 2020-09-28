@@ -219,8 +219,8 @@ impl BiedgedGraph {
             be_graph.add_edge(from, to, BiedgedWeight::gray(1));
         }
 
-        let max_net_vertex = max_seg_id as u64;
-        let max_chain_vertex = max_seg_id as u64;
+        let max_net_vertex = max_node_id as u64;
+        let max_chain_vertex = max_node_id as u64;
 
         BiedgedGraph {
             graph: be_graph,
