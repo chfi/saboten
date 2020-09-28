@@ -2,7 +2,7 @@ use crate::biedgedgraph::*;
 
 use petgraph::unionfind::UnionFind;
 
-use fnv::FnvHashMap;
+use fnv::{FnvHashMap, FnvHashSet};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -198,6 +198,74 @@ pub fn is_bridge_edge(
     }
 }
 
+pub fn snarl_cactus_tree_path(
+    cactus_tree: &BiedgedGraph,
+    cactus_tree_proj: &UnionFind<usize>,
+    x: u64,
+    y: u64,
+) -> Option<Vec<u64>> {
+    let p_x = cactus_tree_proj.find(x as usize) as u64;
+    let p_y = cactus_tree_proj.find(y as usize) as u64;
+
+    let mut path = Vec::new();
+
+    if p_x == p_y {
+        // If {x, y} is a chain pair
+        path.push(p_x);
+    } else {
+        // If {x, y} is not a chain pair
+        let mut visited: FnvHashSet<u64> = FnvHashSet::default();
+        let mut parents: FnvHashMap<u64, u64> = FnvHashMap::default();
+
+        let mut stack: Vec<u64> = Vec::new();
+
+        stack.push(p_x);
+
+        // let mut prev = current;
+
+        while let Some(current) = stack.pop() {
+            if !current != p_y && !visited.contains(&current) {
+                visited.insert(current);
+
+                let current_net_vertex = cactus_tree.is_net_vertex(current);
+                let neighbors = cactus_tree.graph.neighbors(current);
+
+                let neighbors = neighbors.filter(|&n| {
+                    if current_net_vertex {
+                        cactus_tree.is_chain_vertex(n)
+                            // && n != prev
+                            && n != current
+                    } else {
+                        cactus_tree.is_net_vertex(n)
+                            // && n != prev
+                            && n != current
+                    }
+                });
+
+                for n in neighbors {
+                    if !visited.contains(&n) {
+                        stack.push(n);
+                        parents.insert(n, current);
+                    }
+                }
+            }
+        }
+
+        let mut current = p_y;
+        let mut path_ = vec![p_y];
+        while current != p_x {
+            let parent = parents.get(&current)?;
+            path_.push(*parent);
+            current = *parent;
+        }
+
+        path_.reverse();
+        path.append(&mut path_);
+    }
+
+    Some(path)
+}
+
 pub fn black_edge_cycle(
     vx_proj: &UnionFind<usize>,
     cycle_map: &FnvHashMap<(u64, u64), Vec<usize>>,
@@ -216,7 +284,7 @@ pub fn is_chain_pair(
     x: u64,
     y: u64,
 ) -> bool {
-    if !distinct_vertices(x, y) {
+    if x == y {
         return false;
     }
 

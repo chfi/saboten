@@ -358,6 +358,20 @@ fn main() {
     }
     */
 
+    let pairs = vec![(1, 6), (7, 22), (25, 30), (24, 31), (16, 17)];
+
+    for (a, b) in pairs {
+        let path = biedged_to_cactus::snarl_cactus_tree_path(
+            &cactus_tree,
+            &cactus_graph_projections,
+            a,
+            b,
+        );
+        // paths.push(path);
+        println!(" pair {}, {}", a, b);
+        println!(" -- {:?}", path);
+    }
+
     /*
     let nodes: Vec<_> = gfa
         .segments
