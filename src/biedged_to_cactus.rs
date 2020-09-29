@@ -347,6 +347,11 @@ pub fn build_net_graph(
     let mut black_edges: FnvHashSet<(u64, u64)> = FnvHashSet::default();
     let mut black_vertices: FnvHashSet<u64> = FnvHashSet::default();
 
+    // Treat the edges of the snarl as if they already have black
+    // edges, since they shouldn't have any in the net graph
+    black_vertices.insert(x);
+    black_vertices.insert(y);
+
     for v in vertices.iter() {
         for u in vertices.iter() {
             if opposite_vertex(*v) == *u {
