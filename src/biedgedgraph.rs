@@ -201,6 +201,63 @@ impl BiedgedGraph {
         }
     }
 
+    /// Consume an iterator of directed edges to produce a biedged
+    /// graph. The edges should be tuples of the form (from, to),
+    /// where the elements are node IDs, and each node ID must be in
+    /// the range 0..N, where N is the number of nodes.
+    ///
+    pub fn from_bidirected_edges<'a, I>(i: I) -> Option<BiedgedGraph>
+    where
+        I: 'a + IntoIterator<Item = &'a (u64, Orientation, u64, Orientation)>,
+    {
+        use Orientation::*;
+
+        let mut min_node_id = std::u64::MAX;
+        let mut max_node_id = std::u64::MIN;
+
+        let mut graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
+
+        for &(a, a_o, b, b_o) in i {
+            // println!("Adding edge\t({}, {})\t->\t({}, {})", a, a_o, b, b_o);
+            min_node_id = min_node_id.min(a.min(b));
+            max_node_id = max_node_id.max(a.max(b));
+
+            let (a_l, a_r) = id_to_black_edge(a);
+            let (b_l, b_r) = id_to_black_edge(b);
+
+            if !graph.contains_edge(a_l, a_r) {
+                graph.add_edge(a_l, a_r, BiedgedWeight::black(1));
+                // println!("adding black edge\t{}, {}", a_l, a_r);
+            }
+
+            if !graph.contains_edge(b_l, b_r) {
+                graph.add_edge(b_l, b_r, BiedgedWeight::black(1));
+                // println!("adding black edge\t{}, {}", b_l, b_r);
+            }
+
+            let (left, right) = match (a_o, b_o) {
+                (Forward, Forward) => (a_r, b_l),
+                (Backward, Backward) => (b_r, a_l),
+                (Forward, Backward) => (a_r, b_r),
+                (Backward, Forward) => (a_l, b_l),
+            };
+
+            graph.add_edge(left, right, BiedgedWeight::gray(1));
+        }
+
+        let max_net_vertex = (max_node_id + 1) * 2;
+        let max_chain_vertex = max_node_id;
+
+        assert_eq!(min_node_id, 0);
+        assert_eq!(max_net_vertex, graph.node_count() as u64);
+
+        Some(BiedgedGraph {
+            graph,
+            max_net_vertex,
+            max_chain_vertex,
+        })
+    }
+
     pub fn from_gfa(gfa: &GFA<usize, ()>) -> BiedgedGraph {
         let mut be_graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
@@ -330,7 +387,6 @@ impl BiedgedGraph {
         &mut self,
         left: u64,
         right: u64,
-        union_find: &mut UnionFind<usize>,
         projection: &mut Projection,
     ) -> Option<u64> {
         if !self.graph.contains_node(left) || !self.graph.contains_node(right) {
@@ -341,7 +397,8 @@ impl BiedgedGraph {
             return self.contract_edge(left, right, projection);
         }
 
-
+        // is this necessary? I think so?
+        projection.union(left, right);
         let (from, to) = projection.kept_pair(left, right);
 
         // Retrieve the edges of the node we're removing
@@ -529,80 +586,214 @@ mod tests {
     #[test]
     fn test_add_edge() {
         let mut graph: BiedgedGraph = BiedgedGraph::new();
-        graph.add_node(10);
-        graph.add_node(20);
-        graph.add_node(30);
+        graph.add_node(0);
+        graph.add_node(1);
+        graph.add_node(2);
 
-        graph.add_edge(10, 20, BiedgedWeight::black(1));
-        assert!(graph.graph.contains_edge(10, 20));
+        graph.add_edge(0, 1, BiedgedWeight::black(1));
+        assert!(graph.graph.contains_edge(0, 1));
 
         assert_eq!(graph.black_edge_count(), 1);
         assert_eq!(
             Some(&BiedgedWeight { black: 1, gray: 0 }),
-            graph.graph.edge_weight(10, 20)
+            graph.graph.edge_weight(0, 1)
         );
 
-        graph.add_edge(20, 30, BiedgedWeight::gray(1));
-        assert!(graph.graph.contains_edge(20, 30));
+        graph.add_edge(1, 2, BiedgedWeight::gray(1));
+        assert!(graph.graph.contains_edge(1, 2));
         assert_eq!(graph.gray_edge_count(), 1);
 
         assert_eq!(
             Some(&BiedgedWeight { black: 0, gray: 1 }),
-            graph.graph.edge_weight(20, 30)
+            graph.graph.edge_weight(1, 2)
         );
 
         graph.add_edge(20, 30, BiedgedWeight::black(1));
 
         assert_eq!(
             Some(&BiedgedWeight { black: 1, gray: 1 }),
-            graph.graph.edge_weight(20, 30)
+            graph.graph.edge_weight(1, 2)
         );
     }
 
     #[test]
-    fn test_contract_edge() {
+    fn contract_one_edge() {
         let mut graph: BiedgedGraph = BiedgedGraph::new();
-        graph.add_node(10);
-        graph.add_node(20);
-        graph.add_node(30);
-        graph.add_edge(10, 20, BiedgedWeight::black(1));
-        graph.add_edge(10, 30, BiedgedWeight::gray(1));
-        graph.add_edge(20, 30, BiedgedWeight::black(1));
+        graph.add_node(0);
+        graph.add_node(1);
+        graph.add_node(2);
+        graph.add_edge(0, 1, BiedgedWeight::black(1));
+        graph.add_edge(0, 2, BiedgedWeight::gray(1));
+        graph.add_edge(1, 2, BiedgedWeight::black(1));
 
-        assert_eq!(None, graph.graph.edge_weight(10, 10));
+        graph.max_net_vertex = graph.graph.node_count() as u64;
+
+        let mut proj = Projection::new_for_biedged_graph(&graph);
+
+        assert_eq!(None, graph.graph.edge_weight(0, 0));
         assert_eq!(
             Some(&BiedgedWeight { black: 0, gray: 1 }),
-            graph.graph.edge_weight(10, 30)
+            graph.graph.edge_weight(0, 2)
         );
         assert_eq!(
             Some(&BiedgedWeight { black: 1, gray: 0 }),
-            graph.graph.edge_weight(10, 20)
+            graph.graph.edge_weight(0, 1)
         );
         assert_eq!(
             Some(&BiedgedWeight { black: 1, gray: 0 }),
-            graph.graph.edge_weight(20, 30)
+            graph.graph.edge_weight(1, 2)
         );
 
-        graph.contract_edge(10, 20);
+        graph.contract_edge(0, 1, &mut proj);
 
         assert_eq!(
             Some(&BiedgedWeight { black: 1, gray: 0 }),
-            graph.graph.edge_weight(10, 10)
+            graph.graph.edge_weight(0, 0)
         );
         assert_eq!(
             Some(&BiedgedWeight { black: 1, gray: 1 }),
-            graph.graph.edge_weight(10, 30)
+            graph.graph.edge_weight(0, 2)
         );
-        assert_eq!(None, graph.graph.edge_weight(10, 20));
-        assert_eq!(None, graph.graph.edge_weight(20, 30));
+        assert_eq!(None, graph.graph.edge_weight(0, 1));
+        assert_eq!(None, graph.graph.edge_weight(1, 2));
 
-        assert!(graph.graph.contains_node(10));
-        assert!(graph.graph.contains_node(30));
-        assert!(!graph.graph.contains_node(20));
+        assert!(graph.graph.contains_node(0));
+        assert!(graph.graph.contains_node(2));
+        assert!(!graph.graph.contains_node(1));
 
         assert!(graph.graph.edge_count() == 2);
 
         assert_eq!(graph.black_edge_count(), 2);
         assert_eq!(graph.gray_edge_count(), 1);
+
+        assert!(proj.equiv(0, 1));
+
+        for i in 2..=3 {
+            assert!(!proj.equiv(0, i as u64));
+        }
+    }
+
+    #[test]
+    fn contract_multiple_edges() {
+        use Orientation::Forward as F;
+
+        let edges =
+            vec![(0, 1), (0, 2), (1, 3), (2, 3), (3, 4), (3, 5), (3, 0)]
+                .into_iter()
+                .map(|(a, b)| (a, F, b, F))
+                .collect::<Vec<_>>();
+
+        let mut graph = BiedgedGraph::from_bidirected_edges(&edges).unwrap();
+        let mut proj = Projection::new_for_biedged_graph(&graph);
+
+        graph.contract_edge(1, 2, &mut proj);
+        let (x, y) = proj.kept_pair(1, 2);
+
+        // One of the two nodes were deleted
+        assert!(graph.graph.contains_node(x));
+        assert!(!graph.graph.contains_node(y));
+
+        graph.contract_edge(4, 1, &mut proj);
+
+        let (x_, y_) = proj.kept_pair(4, 1);
+
+        // The kept node must be the same in both cases, as one node
+        // was included in both contractions
+        assert_eq!(x, x_);
+
+        assert!(graph.graph.contains_node(x_));
+        assert!(!graph.graph.contains_node(y_));
+        assert!(!graph.graph.contains_node(y));
+
+        let first_union: Vec<u64> = vec![1, 2, 4];
+
+        // All combinations of contracted edges have the same projection
+        assert!(proj.equiv(1, 2));
+        assert!(proj.equiv(1, 4));
+        assert!(proj.equiv(2, 4));
+
+        let edges_vec = |g: &BiedgedGraph, x: u64| {
+            g.graph
+                .edges(x)
+                .map(|(a, b, w)| (a, b, w.black, w.gray))
+                .collect::<Vec<_>>()
+        };
+
+        let x = proj.projected(4);
+        let edges = edges_vec(&graph, x);
+
+        assert_eq!(edges, vec![(1, 0, 1, 0), (1, 3, 1, 0), (1, 5, 1, 0)]);
+
+        graph.contract_edge(7, 8, &mut proj);
+        graph.contract_edge(0, 7, &mut proj);
+
+        let second_union: Vec<u64> = vec![0, 7, 8];
+
+        assert!(proj.equiv(0, 7));
+        assert!(proj.equiv(7, 8));
+        assert!(proj.equiv(0, 8));
+
+        let x = proj.projected(7);
+        let edges = edges_vec(&graph, x);
+
+        assert_eq!(
+            edges,
+            vec![(7, 6, 1, 0), (7, 9, 1, 0), (7, 10, 0, 1), (7, 1, 1, 0)]
+        );
+
+        graph.contract_edge(0, 1, &mut proj);
+
+        let (x_2, y_2) = proj.kept_pair(8, 4);
+
+        assert_eq!(x, x_2);
+
+        assert!(graph.graph.contains_node(x_2));
+        assert!(!graph.graph.contains_node(y));
+        assert!(!graph.graph.contains_node(y_));
+        assert!(!graph.graph.contains_node(y_2));
+
+        // Now all nodes in the contracted edges have been unified
+        for (a, b) in first_union.iter().zip(second_union.iter()) {
+            let x = proj.projected(*a);
+            let y = proj.projected(*b);
+            assert_eq!(x, y);
+        }
+    }
+
+    #[test]
+    fn merge_two_vertices() {
+        use Orientation::Forward as F;
+
+        let edges =
+            vec![(0, 1), (0, 2), (1, 3), (2, 3), (3, 4), (3, 5), (3, 0)]
+                .into_iter()
+                .map(|(a, b)| (a, F, b, F))
+                .collect::<Vec<_>>();
+
+        let mut graph = BiedgedGraph::from_bidirected_edges(&edges).unwrap();
+        let mut proj = Projection::new_for_biedged_graph(&graph);
+
+        graph.merge_vertices(7, 8, &mut proj);
+        graph.merge_vertices(7, 9, &mut proj);
+
+        println!("  ---     Nodes     ---  ");
+
+        for n in graph.graph.nodes() {
+            println!("  {}", n);
+        }
+
+        println!("  ---  Black edges  ---  ");
+        println!("  from\tto\tblack\tgray");
+
+        for (a, b, w) in graph.black_edges() {
+            println!("  {}\t{}\t{}\t{}", a, b, w.black, w.gray);
+        }
+
+        println!("  ---  Gray edges   ---  ");
+        println!("  from\tto\tblack\tgray");
+
+        for (a, b, w) in graph.gray_edges() {
+            println!("  {}\t{}\t{}\t{}", a, b, w.black, w.gray);
+        }
     }
 }

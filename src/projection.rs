@@ -69,8 +69,14 @@ impl Projection {
         self.union_find.union(x as usize, y as usize)
     }
 
+    pub fn equiv(&self, x: u64, y: u64) -> bool {
+        self.union_find.equiv(x as usize, y as usize)
+    }
+
     /// Given a pair of vertices, return a corresponding pair with one
-    /// of them replaced with their projection.
+    /// of them replaced with their projection. The first one is
+    /// guaranteed to be the representative of the union, so it's safe
+    /// to use as an ID in the graph.
     pub fn kept_pair(&mut self, x: u64, y: u64) -> (u64, u64) {
         let union = self.union_find.find_mut(x as usize) as u64;
         if union == x {
