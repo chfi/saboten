@@ -796,24 +796,40 @@ mod tests {
         graph.merge_vertices(7, 8, &mut proj);
         graph.merge_vertices(7, 9, &mut proj);
 
-        println!("  ---     Nodes     ---  ");
+        let (x, y) = proj.kept_pair(7, 9);
 
-        for n in graph.graph.nodes() {
-            println!("  {}", n);
-        }
+        let edges_vec = |g: &BiedgedGraph, x: u64| {
+            g.graph
+                .edges(x)
+                .map(|(a, b, w)| (a, b, w.black, w.gray))
+                .collect::<Vec<_>>()
+        };
 
-        println!("  ---  Black edges  ---  ");
-        println!("  from\tto\tblack\tgray");
+        graph.merge_vertices(0, 7, &mut proj);
+        graph.merge_vertices(1, 7, &mut proj);
 
-        for (a, b, w) in graph.black_edges() {
-            println!("  {}\t{}\t{}\t{}", a, b, w.black, w.gray);
-        }
+        let edges = edges_vec(&graph, x);
 
-        println!("  ---  Gray edges   ---  ");
-        println!("  from\tto\tblack\tgray");
+        assert_eq!(
+            edges,
+            vec![
+                (7, 6, 1, 0),
+                (7, 7, 2, 0),
+                (7, 10, 0, 1),
+                (7, 4, 0, 1),
+                (7, 2, 0, 1)
+            ]
+        );
 
-        for (a, b, w) in graph.gray_edges() {
-            println!("  {}\t{}\t{}\t{}", a, b, w.black, w.gray);
+        let merged: Vec<u64> = vec![0, 1, 7, 8, 9];
+
+        for i in merged {
+            let x = proj.projected(i);
+            if i == x {
+                assert!(graph.graph.contains_node(i));
+            } else {
+                assert!(!graph.graph.contains_node(i));
+            }
         }
     }
 }
