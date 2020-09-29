@@ -64,7 +64,7 @@ pub fn projected_node_id(n: u64) -> String {
     name
 }
 
-pub fn projected_node_name(name_map: &NameMap, n: u64) -> Option<BString> {
+pub fn segment_split_name(name_map: &NameMap, n: u64) -> Option<BString> {
     let not_orig = n % 2 != 0;
     let id = id_from_black_edge(n);
     let mut name: BString = name_map.inverse_map_name(id as usize)?.to_owned();
@@ -201,14 +201,23 @@ impl BiedgedGraph {
         }
     }
 
+    pub fn from_directed_edges<I>(i: I) -> Option<BiedgedGraph>
+    where
+        I: IntoIterator<Item = (u64, u64)>,
+    {
+        use Orientation::Forward as F;
+        let iter = i.into_iter().map(|(a, b)| (a, F, b, F));
+        Self::from_bidirected_edges(iter)
+    }
+
     /// Consume an iterator of directed edges to produce a biedged
     /// graph. The edges should be tuples of the form (from, to),
     /// where the elements are node IDs, and each node ID must be in
     /// the range 0..N, where N is the number of nodes.
     ///
-    pub fn from_bidirected_edges<'a, I>(i: I) -> Option<BiedgedGraph>
+    pub fn from_bidirected_edges<I>(i: I) -> Option<BiedgedGraph>
     where
-        I: 'a + IntoIterator<Item = &'a (u64, Orientation, u64, Orientation)>,
+        I: IntoIterator<Item = (u64, Orientation, u64, Orientation)>,
     {
         use Orientation::*;
 
@@ -217,7 +226,7 @@ impl BiedgedGraph {
 
         let mut graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
-        for &(a, a_o, b, b_o) in i {
+        for (a, a_o, b, b_o) in i {
             // println!("Adding edge\t({}, {})\t->\t({}, {})", a, a_o, b, b_o);
             min_node_id = min_node_id.min(a.min(b));
             max_node_id = max_node_id.max(a.max(b));
@@ -446,7 +455,6 @@ impl BiedgedGraph {
         projection: &mut Projection,
     ) -> Option<u64> {
         projection.union(left, right);
-
         let (from, to) = projection.kept_pair(left, right);
 
         let weight = self.graph.edge_weight(from, to).copied()?;
@@ -471,10 +479,12 @@ impl BiedgedGraph {
             self.add_edge(from, from, new_weight);
         }
 
+        /*
         if weight.gray > 1 {
             let new_weight = BiedgedWeight::gray(weight.gray - 1);
             self.add_edge(from, from, new_weight);
         }
+        */
 
         Some(from)
     }
@@ -698,12 +708,9 @@ mod tests {
         use Orientation::Forward as F;
 
         let edges =
-            vec![(0, 1), (0, 2), (1, 3), (2, 3), (3, 4), (3, 5), (3, 0)]
-                .into_iter()
-                .map(|(a, b)| (a, F, b, F))
-                .collect::<Vec<_>>();
+            vec![(0, 1), (0, 2), (1, 3), (2, 3), (3, 4), (3, 5), (3, 0)];
 
-        let mut graph = BiedgedGraph::from_bidirected_edges(&edges).unwrap();
+        let mut graph = BiedgedGraph::from_directed_edges(edges).unwrap();
         let mut proj = Projection::new_for_biedged_graph(&graph);
 
         graph.contract_edge(1, 2, &mut proj);
@@ -785,12 +792,9 @@ mod tests {
         use Orientation::Forward as F;
 
         let edges =
-            vec![(0, 1), (0, 2), (1, 3), (2, 3), (3, 4), (3, 5), (3, 0)]
-                .into_iter()
-                .map(|(a, b)| (a, F, b, F))
-                .collect::<Vec<_>>();
+            vec![(0, 1), (0, 2), (1, 3), (2, 3), (3, 4), (3, 5), (3, 0)];
 
-        let mut graph = BiedgedGraph::from_bidirected_edges(&edges).unwrap();
+        let mut graph = BiedgedGraph::from_directed_edges(edges).unwrap();
         let mut proj = Projection::new_for_biedged_graph(&graph);
 
         graph.merge_vertices(7, 8, &mut proj);

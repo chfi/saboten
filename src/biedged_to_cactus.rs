@@ -110,12 +110,12 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<(u64, u64)>> {
 
         while current != start {
             if let Some(parent) = parents.get(&current) {
-                cycle.push((*parent, current));
+                cycle.push((current, *parent));
                 current = *parent;
             }
         }
 
-        cycle.push((end, start));
+        cycle.push((start, end));
         cycles.push(cycle);
     }
 
@@ -510,179 +510,64 @@ mod tests {
     use super::*;
 
     fn graph_from_paper() -> BiedgedGraph {
-        let mut graph = BiedgedGraph::new();
+        let edges = vec![
+            (0, 1),
+            (0, 2),
+            (1, 3),
+            (2, 3),
+            (3, 4),
+            (3, 5),
+            (4, 6),
+            (5, 6),
+            (5, 7),
+            (6, 10),
+            (6, 11),
+            (7, 8),
+            (7, 9),
+            (8, 9),
+            (9, 11),
+            (10, 11),
+            (11, 12),
+            (12, 13),
+            (12, 14),
+            (13, 15),
+            (14, 15),
+            (15, 16),
+            (15, 17),
+            (15, 12),
+        ];
 
-        // Add nodes
-        for i in 1..=18 {
-            let n = 10 * i;
-            graph.add_node(n);
-            graph.add_node(n + 1);
-        }
-
-        // Add edges
-
-        // Node a
-        graph.add_edge(10, 11, BiedgedWeight::black(1));
-
-        // Node b
-        graph.add_edge(20, 21, BiedgedWeight::black(1));
-
-        // Node c
-        graph.add_edge(30, 31, BiedgedWeight::black(1));
-
-        // Node d
-        graph.add_edge(40, 41, BiedgedWeight::black(1));
-
-        // Node e
-        graph.add_edge(50, 51, BiedgedWeight::black(1));
-
-        // Node f
-        graph.add_edge(60, 61, BiedgedWeight::black(1));
-
-        // Node g
-        graph.add_edge(70, 71, BiedgedWeight::black(1));
-
-        // Node h
-        graph.add_edge(80, 81, BiedgedWeight::black(1));
-
-        // Node i
-        graph.add_edge(90, 91, BiedgedWeight::black(1));
-
-        // Node j
-        graph.add_edge(100, 101, BiedgedWeight::black(1));
-
-        // Node k
-        graph.add_edge(110, 111, BiedgedWeight::black(1));
-
-        // Node l
-        graph.add_edge(120, 121, BiedgedWeight::black(1));
-
-        // Node m
-        graph.add_edge(130, 131, BiedgedWeight::black(1));
-
-        // Node n
-        graph.add_edge(140, 141, BiedgedWeight::black(1));
-
-        // Node o
-        graph.add_edge(150, 151, BiedgedWeight::black(1));
-
-        // Node p
-        graph.add_edge(160, 161, BiedgedWeight::black(1));
-
-        // Node q
-        graph.add_edge(170, 171, BiedgedWeight::black(1));
-
-        // Node r
-        graph.add_edge(180, 181, BiedgedWeight::black(1));
-
-        // a-b
-        graph.add_edge(11, 20, BiedgedWeight::gray(1));
-        // a-c
-        graph.add_edge(11, 30, BiedgedWeight::gray(1));
-
-        // b-d
-        graph.add_edge(21, 40, BiedgedWeight::gray(1));
-        // c-d
-        graph.add_edge(31, 40, BiedgedWeight::gray(1));
-
-        // d-e
-        graph.add_edge(41, 50, BiedgedWeight::gray(1));
-        // d-f
-        graph.add_edge(41, 60, BiedgedWeight::gray(1));
-
-        // e-g
-        graph.add_edge(51, 70, BiedgedWeight::gray(1));
-
-        // f-g
-        graph.add_edge(61, 70, BiedgedWeight::gray(1));
-
-        // f-h
-        graph.add_edge(61, 80, BiedgedWeight::gray(1));
-
-        // g-k
-        graph.add_edge(71, 110, BiedgedWeight::gray(1));
-        // g-l
-        graph.add_edge(71, 120, BiedgedWeight::gray(1));
-
-        // h-i
-        graph.add_edge(81, 90, BiedgedWeight::gray(1));
-        // h-j
-        graph.add_edge(81, 100, BiedgedWeight::gray(1));
-
-        // i-j
-        graph.add_edge(91, 100, BiedgedWeight::gray(1));
-
-        // j-l
-        graph.add_edge(101, 120, BiedgedWeight::gray(1));
-
-        // k-l
-        graph.add_edge(110, 120, BiedgedWeight::gray(1));
-
-        // l-m
-        graph.add_edge(121, 130, BiedgedWeight::gray(1));
-
-        // m-n
-        graph.add_edge(131, 140, BiedgedWeight::gray(1));
-        // m-o
-        graph.add_edge(131, 150, BiedgedWeight::gray(1));
-
-        // n-p
-        graph.add_edge(141, 160, BiedgedWeight::gray(1));
-
-        // o-p
-        graph.add_edge(151, 160, BiedgedWeight::gray(1));
-
-        // p-m
-        graph.add_edge(161, 130, BiedgedWeight::gray(1));
-
-        // p-q
-        graph.add_edge(161, 170, BiedgedWeight::gray(1));
-        // p-r
-        graph.add_edge(161, 180, BiedgedWeight::gray(1));
-
-        graph
+        BiedgedGraph::from_directed_edges(edges).unwrap()
     }
 
     #[test]
     fn simple_contract_all_gray_edges() {
         let mut graph: BiedgedGraph = BiedgedGraph::new();
 
-        //First Handlegraph node
-        let mut add_node = |n: u64| {
-            let (l, r) = id_to_black_edge(n);
-            graph.add_node(l);
-            graph.add_node(r);
-            graph.add_edge(l, r, BiedgedWeight::black(1));
-        };
+        let edges = vec![(0, 1), (0, 2), (1, 3), (2, 3)];
 
-        add_node(0);
-        add_node(1);
-        add_node(2);
-        add_node(3);
+        let mut graph = BiedgedGraph::from_directed_edges(edges).unwrap();
 
-        let mut add_edge = |l: u64, r: u64| {
-            graph.add_edge(l, r, BiedgedWeight::gray(1));
-        };
+        let mut proj = Projection::new_for_biedged_graph(&graph);
 
-        add_edge(1, 2);
-        add_edge(1, 4);
-        add_edge(3, 6);
-        add_edge(5, 6);
+        contract_all_gray_edges(&mut graph, &mut proj);
 
-        let mut proj_map = BTreeMap::new();
-        contract_all_gray_edges(&mut graph, &mut proj_map);
+        let a = proj.projected(0);
+        let b = proj.projected(1);
+        let c = proj.projected(3);
+        let d = proj.projected(7);
 
         assert_eq!(
-            graph.graph.edge_weight(0, 1),
+            graph.graph.edge_weight(a, b),
             Some(&BiedgedWeight::black(1))
         );
         assert_eq!(
-            graph.graph.edge_weight(1, 3),
+            graph.graph.edge_weight(c, d),
+            Some(&BiedgedWeight::black(1))
+        );
+        assert_eq!(
+            graph.graph.edge_weight(b, c),
             Some(&BiedgedWeight::black(2))
-        );
-        assert_eq!(
-            graph.graph.edge_weight(3, 7),
-            Some(&BiedgedWeight::black(1))
         );
 
         assert_eq!(graph.graph.node_count(), 4);
@@ -695,8 +580,8 @@ mod tests {
     fn paper_contract_all_gray_edges() {
         let mut graph: BiedgedGraph = graph_from_paper();
 
-        let mut proj_map = BTreeMap::new();
-        contract_all_gray_edges(&mut graph, &mut proj_map);
+        let mut proj = Projection::new_for_biedged_graph(&graph);
+        contract_all_gray_edges(&mut graph, &mut proj);
 
         assert_eq!(graph.gray_edge_count(), 0);
         assert_eq!(
@@ -705,11 +590,14 @@ mod tests {
             "Expected 18 black edges, is actually {:#?}",
             graph.black_edge_count()
         );
+        assert_eq!(graph.graph.node_count(), 12);
+
+        let inv_map = proj.mut_get_inverse();
     }
 
     #[test]
-    fn edge_contraction_projection_map() {
-        use crate::biedgedgraph::{find_projection, projected_node_name};
+    fn edge_contraction_projection() {
+        use crate::biedgedgraph::{id_to_black_edge, segment_split_name};
         use bstr::BString;
         use gfa::{
             gfa::{name_conversion::NameMap, GFA},
@@ -725,8 +613,9 @@ mod tests {
 
         let mut graph = BiedgedGraph::from_gfa(&gfa);
 
-        let mut proj_map = BTreeMap::new();
-        contract_all_gray_edges(&mut graph, &mut proj_map);
+        let mut proj = Projection::new_for_biedged_graph(&graph);
+
+        contract_all_gray_edges(&mut graph, &mut proj);
 
         let proj_names = bstr_gfa
             .segments
@@ -734,11 +623,11 @@ mod tests {
             .map(|s| {
                 let orig = name_map.map_name(&s.name).unwrap();
                 let orig_name = s.name.to_owned();
-                let (l, r) = crate::biedgedgraph::id_to_black_edge(orig as u64);
-                let l_end = find_projection(&proj_map, l);
-                let r_end = find_projection(&proj_map, r);
-                let l_end = projected_node_name(&name_map, l_end).unwrap();
-                let r_end = projected_node_name(&name_map, r_end).unwrap();
+                let (l, r) = id_to_black_edge(orig as u64);
+                let l_end = proj.projected(l);
+                let r_end = proj.projected(r);
+                let l_end = segment_split_name(&name_map, l_end).unwrap();
+                let r_end = segment_split_name(&name_map, r_end).unwrap();
                 (orig_name, (l_end, r_end))
             })
             .collect::<Vec<_>>();
@@ -750,18 +639,18 @@ mod tests {
             ("d", ("b_", "d_")),
             ("e", ("d_", "e_")),
             ("f", ("d_", "e_")),
-            ("g", ("e_", "g_")),
+            ("g", ("e_", "k_")),
             ("h", ("e_", "h_")),
             ("i", ("h_", "h_")),
-            ("j", ("h_", "g_")),
-            ("k", ("g_", "g_")),
-            ("l", ("g_", "l_")),
-            ("m", ("l_", "m_")),
+            ("j", ("h_", "k_")),
+            ("k", ("k_", "k_")),
+            ("l", ("k_", "p_")),
+            ("m", ("p_", "m_")),
             ("n", ("m_", "n_")),
             ("o", ("m_", "n_")),
-            ("p", ("n_", "l_")),
-            ("q", ("l_", "q_")),
-            ("r", ("l_", "r_")),
+            ("p", ("n_", "p_")),
+            ("q", ("p_", "q_")),
+            ("r", ("p_", "r_")),
         ]
         .into_iter()
         .map(|(a, (l, r))| {
@@ -773,23 +662,23 @@ mod tests {
     }
 
     fn example_graph() -> BiedgedGraph {
-        let mut graph: BiedgedGraph = BiedgedGraph::new();
-
-        for i in 0..=9 {
-            graph.add_node(i);
-        }
-
         /*               -i
                  &     &/
-        a--b==c--d==f--h--j
+        a--b==c--e==f--h--j
                \ |   \ |
-                -e    -g
+                -d    -g
                  &     &
 
         & self cycles
         - 1 black edge
         = 2 black edges
                 */
+
+        let mut graph: BiedgedGraph = BiedgedGraph::new();
+
+        for i in 0..=9 {
+            graph.add_node(i);
+        }
 
         let edges = vec![
             (0, 1),
@@ -815,6 +704,9 @@ mod tests {
             graph.add_edge(a, b, BiedgedWeight::black(1));
         }
 
+        graph.max_net_vertex = (graph.graph.node_count() - 1) as u64;
+        graph.max_chain_vertex = graph.max_net_vertex;
+
         graph
     }
 
@@ -827,14 +719,14 @@ mod tests {
         assert_eq!(
             cycles,
             vec![
-                vec![1, 2, 1],
-                vec![4, 4],
-                vec![4, 5, 4],
-                vec![7, 7],
-                vec![6, 6],
-                vec![3, 3],
-                vec![6, 7, 5, 6],
-                vec![3, 4, 2, 3],
+                vec![(1, 2), (2, 1)],
+                vec![(4, 4)],
+                vec![(4, 5), (5, 4)],
+                vec![(7, 7)],
+                vec![(6, 6)],
+                vec![(3, 3)],
+                vec![(6, 7), (7, 5), (5, 6)],
+                vec![(3, 4), (4, 2), (2, 3)],
             ]
         );
     }
@@ -849,11 +741,24 @@ mod tests {
 
         assert_eq!(cycles.len(), chains.len());
 
-        for (cv, cycle) in chains.iter().zip(cycles.iter()) {
-            let chain_edges =
-                graph.graph.edges(*cv).map(|x| x.1).collect::<Vec<_>>();
+        for (chain_vx, cycle_ix) in chains.iter() {
+            let chain_edges = graph
+                .graph
+                .edges(*chain_vx)
+                .map(|x| x.1)
+                .collect::<Vec<_>>();
 
-            assert_eq!(&cycle[1..], &chain_edges[..]);
+            let cycle =
+                cycles[*cycle_ix].iter().map(|x| x.1).collect::<Vec<_>>();
+
+            // The neighbors of the chain vertex are the same as the
+            // vertices in the cycle
+            assert_eq!(chain_edges, cycle);
+
+            // None of the edges in the cycle remain in the graph
+            for edge in cycles[*cycle_ix].iter() {
+                assert!(graph.graph.edge_weight(edge.0, edge.1).is_none());
+            }
         }
     }
 }
