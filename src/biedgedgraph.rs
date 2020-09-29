@@ -282,10 +282,30 @@ impl BiedgedGraph {
         assert_eq!(max_seg_id as usize, gfa.segments.len() - 1);
         assert_eq!(max_node_id as usize, (2 * gfa.segments.len()) - 1);
 
+        use Orientation::*;
+
         for link in gfa.links.iter() {
+            let from_o = link.from_orient;
+            let to_o = link.to_orient;
+
+            let from = id_to_black_edge(link.from_segment as u64);
+            let to = id_to_black_edge(link.to_segment as u64);
+
+            let (left, right) = match (from_o, to_o) {
+                (Forward, Forward) => (from.1, to.0),
+                (Backward, Backward) => (to.1, from.0),
+                (Forward, Backward) => (from.1, to.1),
+                (Backward, Forward) => (from.0, to.0),
+            };
+
+            be_graph.add_edge(left, right, BiedgedWeight::gray(1));
+
+            /*
             let (_, from) = id_to_black_edge(link.from_segment as u64);
             let (to, _) = id_to_black_edge(link.to_segment as u64);
+
             be_graph.add_edge(from, to, BiedgedWeight::gray(1));
+            */
         }
 
         let max_net_vertex = max_node_id as u64;
