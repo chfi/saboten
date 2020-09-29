@@ -19,15 +19,6 @@ struct Opt {
     in_gfa: PathBuf,
 }
 
-fn print_snarl_acyclic_bridgeless(snarl: &BiedgedGraph, x: u64, y: u64) {
-    println!("snarl {}, {}", x, y);
-    let acyclic = biedged_to_cactus::snarl_is_acyclic(&snarl, x);
-    let bridgeless = biedged_to_cactus::snarl_is_bridgeless(&snarl, x, y);
-    println!("acyclic: {}", acyclic);
-    println!("bridgeless: {}", bridgeless);
-    println!();
-}
-
 fn main() {
     let opt = Opt::from_args();
 
@@ -132,17 +123,6 @@ fn main() {
             bridge_edges.push((a, b))
         }
     });
-    /*
-    let (bridge_edges, chain_edges): (Vec<_>, Vec<_>) =
-        cactus_tree.graph.all_edges().partition(|(a, b, _)| {
-            biedged_to_cactus::is_bridge_edge(
-                &cactus_tree,
-                &cactus_graph_projections,
-                *a,
-                *b,
-            )
-        });
-    */
 
     let mut cactus_graph_inverse: FnvHashMap<u64, Vec<u64>> =
         FnvHashMap::default();
@@ -192,68 +172,21 @@ fn main() {
         );
     }
 
-    /*
-    let chain_pairs = vec![
-        (24, 30),
-        (25, 30),
-        (24, 25),
-        (24, 31),
-        (25, 31),
-        (30, 31),
-        (14, 15),
-        (14, 18),
-        (14, 19),
-        (15, 18),
-        (15, 19),
-        (18, 19),
-    ];
-
-    for (a, b) in chain_pairs.iter() {
-        println!(
-            "{}, {} is chain pair:\t{}",
-            a,
-            b,
-            biedged_to_cactus::is_chain_pair(
-                &cactus_graph_projections,
-                &cycle_map,
-                *a,
-                *b
-            )
-        );
-    }
-    */
-
-    // let mut chain_pairs = Vec::new();
-    let mut chain_pairs = FnvHashSet::default();
+    let mut chain_pairs = FnvHashMap::default();
 
     println!("----- chain edges -----\n");
-    for (a, b) in chain_edges.iter() {
-        // println!("  {}, {}", a, b);
-        let ix = b - cactus_tree.max_net_vertex - 1;
+    for (a, chain_ix) in chain_edges.iter() {
+        let ix = chain_ix - cactus_tree.max_net_vertex - 1;
         let chain_vx = chain_vertices[ix as usize];
         let cycle = &cycles[chain_vx.1];
-        println!("chain edge {} {}", a, b);
-        println!("  {:?}", cycle);
 
         for (x, y) in cycle.iter() {
-            // let x = *x as usize;
-            // let y = *y as usize;
-            // let y = *y as usize;
             let orig_xs = cactus_graph_inverse.get(&x).unwrap();
-            // let orig_ys = cactus_graph_inverse.get(&y).unwrap();
 
-            if let Some(w) = be_graph.graph.edge_weight(*x, *y) {
-                println!("  -- {}", w.black);
-            }
-
-            println!("  orig {:?}", orig_xs);
             let filtered: Vec<_> = orig_xs
                 .iter()
                 .filter(|&&u| {
                     let (w, v) = end_to_black_edge(u as u64);
-                    // let w = w as usize;
-                    // let v = v as usize;
-                    println!("  {} - {}, {}", u, w, v);
                     if orig_xs.contains(&w) && orig_xs.contains(&v) {
                         false
                     } else {
@@ -263,17 +196,13 @@ fn main() {
                 .copied()
                 .collect();
 
-            // println!("  from {:?}", filtered);
-            // println!("   and {:?}", orig_ys);
-
-            // for x_a in orig_xs.iter() {
-            // for x_b in orig_xs.iter() {
-
             for x_a in filtered.iter() {
                 for x_b in filtered.iter() {
                     if x_a != x_b {
-                        let x_a = *x_a as u64;
-                        let x_b = *x_b as u64;
+                        let a = x_a.min(x_b);
+                        let b = x_a.max(x_b);
+                        let x_a = *a as u64;
+                        let x_b = *b as u64;
                         let is_chain_pair = biedged_to_cactus::is_chain_pair(
                             &cactus_graph_projections,
                             &cycle_map,
@@ -281,50 +210,12 @@ fn main() {
                             x_b,
                         );
                         if is_chain_pair {
-                            let a = x_a.min(x_b);
-                            let b = x_a.max(x_b);
-                            chain_pairs.insert((a, b));
-                            println!("   {} {} -> {}", x_a, x_b, is_chain_pair);
+                            chain_pairs.insert((x_a, x_b), chain_ix);
                         }
                     }
                 }
             }
-            /*
-            println!(
-                "   {} {} -> {}",
-                x,
-                y,
-                biedged_to_cactus::is_chain_pair(
-                    &cactus_graph_projections,
-                    &cycle_map,
-                    *x,
-                    *y
-                )
-            );
-            */
         }
-        // println!("  {}, {:?}", a, cycle);
-
-        // let  = cycle.iter().map(|(x, _)| x).collect::<Vec<_>>();
-
-        /*
-        println!(
-            "{}, {} is chain pair:\t{}",
-            a,
-            b,
-            biedged_to_cactus::is_chain_pair(
-                &cactus_graph_projections,
-                &cycle_map,
-                *a,
-                *b
-            )
-        );
-        */
-    }
-
-    println!(" --- (possible) chain pairs ---");
-    for (a, b) in chain_pairs.iter() {
-        println!("  {}, {}", a, b);
     }
 
     println!("bridge edges");
@@ -332,116 +223,32 @@ fn main() {
         println!("  {}, {}", a, b);
     }
 
-    println!("max_net_vertex: {}", orig_graph.max_net_vertex);
-    println!("max_chain_vertex: {}", orig_graph.max_chain_vertex);
+    let mut chain_labels: FnvHashMap<u64, bool> = FnvHashMap::default();
 
-    println!("max_net_vertex: {}", cactus_tree.max_net_vertex);
-    println!("max_chain_vertex: {}", cactus_tree.max_chain_vertex);
-
-    /*
-    let bridge_edges =
-
-    let bridge_edges = vec![
-        (0, 1),
-        (1, 6),
-        (6, 7),
-        (7, 22),
-        (22, 23),
-        (2, 3),
-        (4, 5),
-        (32, 33),
-        (34, 35),
-    ];
-
-    for (a, b) in bridge_edges.iter() {
-        println!(
-            "{}, {} is bridge edge:\t{}",
-            a,
-            b,
-            biedged_to_cactus::is_bridge_edge(
+    println!(" --- chain pairs --- ");
+    for ((a, b), chain_ix) in chain_pairs.iter() {
+        if !chain_labels.contains_key(chain_ix) {
+            let net_graph = biedged_to_cactus::build_net_graph(
+                &orig_graph,
                 &cactus_tree,
                 &cactus_graph_projections,
+                &cactus_graph_inverse,
+                &cycle_map,
                 *a,
-                *b
+                *b,
             )
-        );
+            .unwrap();
+
+            let acyclic = biedged_to_cactus::snarl_is_acyclic(&net_graph, *a);
+            let bridgeless =
+                biedged_to_cactus::snarl_is_bridgeless(&net_graph, *a, *b);
+
+            chain_labels.insert(**chain_ix, acyclic && bridgeless);
+
+            println!("{}, {} -    acyclic\t{}", a, b, acyclic);
+            println!("{}, {} - bridgeless\t{}", a, b, bridgeless);
+        }
     }
-    */
-
-    let pairs = vec![(1, 6), (7, 22), (25, 30), (24, 31), (16, 17)];
-
-    for (a, b) in pairs {
-        let path = biedged_to_cactus::snarl_cactus_tree_path(
-            &cactus_tree,
-            &cactus_graph_projections,
-            a,
-            b,
-        );
-        // paths.push(path);
-        println!(" pair {}, {}", a, b);
-        println!(" -- {:?}", path);
-    }
-
-    let bridge_1_net = biedged_to_cactus::build_net_graph(
-        &orig_graph,
-        &cactus_tree,
-        &cactus_graph_projections,
-        &cactus_graph_inverse,
-        &cycle_map,
-        1,
-        6,
-    )
-    .unwrap();
-
-    println!("\n--------------\n");
-
-    let bridge_2_net = biedged_to_cactus::build_net_graph(
-        &orig_graph,
-        &cactus_tree,
-        &cactus_graph_projections,
-        &cactus_graph_inverse,
-        &cycle_map,
-        7,
-        22,
-    )
-    .unwrap();
-
-    let fake_net = biedged_to_cactus::build_net_graph(
-        &orig_graph,
-        &cactus_tree,
-        &cactus_graph_projections,
-        &cactus_graph_inverse,
-        &cycle_map,
-        9,
-        11,
-    )
-    .unwrap();
-
-    let fake_net_2 = biedged_to_cactus::build_net_graph(
-        &orig_graph,
-        &cactus_tree,
-        &cactus_graph_projections,
-        &cactus_graph_inverse,
-        &cycle_map,
-        23,
-        31,
-    )
-    .unwrap();
-
-    println!("cycles");
-    for (k, v) in cycle_map.iter() {
-        println!("{:?} - {:?}", k, v);
-    }
-
-    print_snarl_acyclic_bridgeless(&bridge_1_net, 1, 6);
-
-    print_snarl_acyclic_bridgeless(&bridge_2_net, 7, 22);
-
-    print_snarl_acyclic_bridgeless(&fake_net, 9, 11);
-
-    print_snarl_acyclic_bridgeless(&fake_net_2, 23, 31);
-
-    // fo
 
     /*
     let nodes: Vec<_> = gfa

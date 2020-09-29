@@ -334,7 +334,6 @@ pub fn build_net_graph(
 
     for v in vertices.iter() {
         let edges = biedged.graph.edges(*v);
-        // let neighbors = biedged.graph.neighbors(*v);
         for (_, n, w) in edges {
             if vertices.contains(&n) && w.gray > 0 {
                 let a = v.min(&n);
@@ -412,11 +411,6 @@ pub fn snarl_is_acyclic(biedged: &BiedgedGraph, x: u64) -> bool {
     let other_color = |col: &Color| match col {
         Color::Black => Color::Gray,
         Color::Gray => Color::Black,
-    };
-
-    let disp_color = |col: &Color| match col {
-        Color::Black => "black",
-        Color::Gray => "gray",
     };
 
     let mut stack: Vec<(Color, u64)> = Vec::new();
