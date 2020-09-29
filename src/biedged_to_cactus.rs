@@ -1,6 +1,4 @@
-use crate::biedgedgraph::*;
-
-use petgraph::unionfind::UnionFind;
+use crate::{biedgedgraph::*, projection::Projection};
 
 use fnv::{FnvHashMap, FnvHashSet};
 
@@ -11,11 +9,11 @@ use three_edge_connected as t_e_c;
 /// STEP 1: Contract all gray edges
 pub fn contract_all_gray_edges(
     biedged: &mut BiedgedGraph,
-    union_find: &mut UnionFind<usize>,
+    projection: &mut Projection,
 ) {
     while biedged.gray_edge_count() > 0 {
         let (from, to, _w) = biedged.gray_edges().next().unwrap();
-        let kept = biedged.contract_edge(from, to, union_find).unwrap();
+        let kept = biedged.contract_edge(from, to, projection).unwrap();
     }
 }
 
@@ -48,13 +46,13 @@ pub fn find_3_edge_connected_components(
 pub fn merge_components(
     biedged: &mut BiedgedGraph,
     components: Vec<Vec<usize>>,
-    union_find: &mut UnionFind<usize>,
+    projection: &mut Projection,
 ) {
     for comp in components {
         let mut iter = comp.into_iter();
         let head = iter.next().unwrap() as u64;
         for other in iter {
-            biedged.merge_vertices(head, other as u64, union_find);
+            biedged.merge_vertices(head, other as u64, projection);
         }
     }
 }
@@ -131,11 +129,11 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<(u64, u64)>> {
 pub fn contract_simple_cycles(
     biedged: &mut BiedgedGraph,
     cycles: &[Vec<(u64, u64)>],
-    union_find: &mut UnionFind<usize>,
+    projection: &mut Projection,
 ) {
     for cycle in cycles {
         for (from, to) in cycle {
-            biedged.contract_edge(*from, *to, union_find);
+            biedged.contract_edge(*from, *to, projection);
         }
     }
 }
@@ -167,12 +165,12 @@ pub fn build_cactus_tree(
 
 pub fn is_chain_edge(
     cactus_tree: &BiedgedGraph,
-    union_find: &UnionFind<usize>,
+    projection: &Projection,
     a: u64,
     b: u64,
 ) -> bool {
-    let a = cactus_tree.projected_node(union_find, a);
-    let b = cactus_tree.projected_node(union_find, b);
+    let a = cactus_tree.projected_node(projection, a);
+    let b = cactus_tree.projected_node(projection, b);
     if cactus_tree.graph.contains_edge(a, b) {
         let n = a.min(b);
         let c = a.max(b);
@@ -184,12 +182,12 @@ pub fn is_chain_edge(
 
 pub fn is_bridge_edge(
     cactus_tree: &BiedgedGraph,
-    union_find: &UnionFind<usize>,
+    projection: &Projection,
     a: u64,
     b: u64,
 ) -> bool {
-    let a = cactus_tree.projected_node(union_find, a);
-    let b = cactus_tree.projected_node(union_find, b);
+    let a = cactus_tree.projected_node(projection, a);
+    let b = cactus_tree.projected_node(projection, b);
     if cactus_tree.graph.contains_edge(a, b) {
         cactus_tree.is_net_vertex(a) && cactus_tree.is_net_vertex(b)
     } else {
@@ -199,12 +197,12 @@ pub fn is_bridge_edge(
 
 pub fn snarl_cactus_tree_path(
     cactus_tree: &BiedgedGraph,
-    cactus_tree_proj: &UnionFind<usize>,
+    projection: &Projection,
     x: u64,
     y: u64,
 ) -> Option<Vec<u64>> {
-    let p_x = cactus_tree_proj.find(x as usize) as u64;
-    let p_y = cactus_tree_proj.find(y as usize) as u64;
+    let p_x = projection.find(x);
+    let p_y = projection.find(y);
 
     let mut path = Vec::new();
 
@@ -313,20 +311,20 @@ pub fn net_graph_black_edge_walk(
 pub fn build_net_graph(
     biedged: &BiedgedGraph,
     cactus_tree: &BiedgedGraph,
-    cactus_tree_proj: &UnionFind<usize>,
-    cactus_graph_inverse: &FnvHashMap<u64, Vec<u64>>,
+    projection: &Projection,
     cycle_map: &FnvHashMap<(u64, u64), Vec<usize>>,
     x: u64,
     y: u64,
 ) -> Option<BiedgedGraph> {
     // Find the path in the cactus tree connecting the snarl
-    let path = snarl_cactus_tree_path(cactus_tree, cactus_tree_proj, x, y)?;
+    let path = snarl_cactus_tree_path(cactus_tree, projection, x, y)?;
 
+    let proj_inverse = projection.get_inverse()?;
     // Get the vertices in the original biedged graph that map to the
     // net vertices in the path
     let mut vertices: FnvHashSet<u64> = FnvHashSet::default();
     for net in path.iter().filter(|&n| cactus_tree.is_net_vertex(*n)) {
-        let projected = cactus_graph_inverse.get(net)?;
+        let projected = proj_inverse.get(net)?;
         vertices.extend(projected);
     }
 
@@ -360,8 +358,8 @@ pub fn build_net_graph(
                 black_vertices.insert(*a);
                 black_vertices.insert(*b);
             } else if v != u {
-                let b_v = black_edge_cycle(cactus_tree_proj, cycle_map, *v);
-                let b_u = black_edge_cycle(cactus_tree_proj, cycle_map, *u);
+                let b_v = black_edge_cycle(projection, cycle_map, *v);
+                let b_u = black_edge_cycle(projection, cycle_map, *u);
 
                 if b_v.is_some() && b_v == b_u {
                     if !black_vertices.contains(v)
@@ -468,19 +466,19 @@ pub fn snarl_is_bridgeless(snarl: &BiedgedGraph, x: u64, y: u64) -> bool {
 }
 
 pub fn black_edge_cycle(
-    vx_proj: &UnionFind<usize>,
+    projection: &Projection,
     cycle_map: &FnvHashMap<(u64, u64), Vec<usize>>,
     x: u64,
 ) -> Option<Vec<usize>> {
     let (l, r) = end_to_black_edge(x);
-    let p_l = vx_proj.find(l as usize) as u64;
-    let p_r = vx_proj.find(r as usize) as u64;
+    let p_l = projection.find(l);
+    let p_r = projection.find(r);
     let intersection = cycle_map.get(&(p_l, p_r))?;
     Some(intersection.to_vec())
 }
 
 pub fn is_chain_pair(
-    vx_proj: &UnionFind<usize>,
+    projection: &Projection,
     cycle_map: &FnvHashMap<(u64, u64), Vec<usize>>,
     x: u64,
     y: u64,
@@ -489,15 +487,15 @@ pub fn is_chain_pair(
         return false;
     }
 
-    let p_x = vx_proj.find(x as usize);
-    let p_y = vx_proj.find(y as usize);
+    let p_x = projection.find(x);
+    let p_y = projection.find(y);
 
     if p_x != p_y {
         return false;
     }
 
-    let x_cycles = black_edge_cycle(vx_proj, cycle_map, x);
-    let y_cycles = black_edge_cycle(vx_proj, cycle_map, y);
+    let x_cycles = black_edge_cycle(projection, cycle_map, x);
+    let y_cycles = black_edge_cycle(projection, cycle_map, y);
 
     if x_cycles.is_none() || y_cycles.is_none() {
         return false;

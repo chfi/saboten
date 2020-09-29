@@ -1,5 +1,7 @@
 use petgraph::{prelude::*, unionfind::UnionFind};
 
+use crate::projection::Projection;
+
 use gfa::{
     gfa::{name_conversion::NameMap, Header, Link, Orientation, Segment, GFA},
     parser::GFAParser,
@@ -187,9 +189,13 @@ impl BiedgedGraph {
         self.graph.contains_node(n) && n <= self.max_net_vertex
     }
 
-    pub fn projected_node(&self, union: &UnionFind<usize>, n: u64) -> u64 {
+    pub fn projected_node(&self, projection: &Projection, n: u64) -> u64 {
         if n <= self.max_net_vertex {
-            union.find(n as usize) as u64
+            println!(
+                "projecting {}\tmax net vertex {}\tproj size {}",
+                n, self.max_net_vertex, projection.size
+            );
+            projection.find(n)
         } else {
             n
         }
@@ -203,12 +209,14 @@ impl BiedgedGraph {
         let mut max_node_id = 0;
 
         for segment in gfa.segments.iter() {
+            let (left, right) = id_to_black_edge(segment.name as u64);
+
             max_seg_id = segment.name.max(max_seg_id);
             min_seg_id = segment.name.min(min_seg_id);
-            let (left, right) = id_to_black_edge(segment.name as u64);
+            max_node_id = right.max(max_node_id);
+
             be_graph.add_node(left);
             be_graph.add_node(right);
-            max_node_id = right.max(max_node_id);
             be_graph.add_edge(left, right, BiedgedWeight::black(1));
         }
 
@@ -323,23 +331,18 @@ impl BiedgedGraph {
         left: u64,
         right: u64,
         union_find: &mut UnionFind<usize>,
+        projection: &mut Projection,
     ) -> Option<u64> {
         if !self.graph.contains_node(left) || !self.graph.contains_node(right) {
             return None;
         }
 
         if self.graph.contains_edge(left, right) {
-            return self.contract_edge(left, right, union_find);
+            return self.contract_edge(left, right, projection);
         }
 
-        let (from, to) = {
-            let union = union_find.find_mut(left as usize) as u64;
-            if union == left {
-                (union, right)
-            } else {
-                (union, left)
-            }
-        };
+
+        let (from, to) = projection.kept_pair(left, right);
 
         // Retrieve the edges of the node we're removing
         let to_edges: Vec<(u64, u64, BiedgedWeight)> = self
@@ -363,18 +366,11 @@ impl BiedgedGraph {
         &mut self,
         left: u64,
         right: u64,
-        union_find: &mut UnionFind<usize>,
+        projection: &mut Projection,
     ) -> Option<u64> {
-        union_find.union(left as usize, right as usize);
+        projection.union(left, right);
 
-        let (from, to) = {
-            let union = union_find.find_mut(left as usize) as u64;
-            if union == left {
-                (union, right)
-            } else {
-                (union, left)
-            }
-        };
+        let (from, to) = projection.kept_pair(left, right);
 
         let weight = self.graph.edge_weight(from, to).copied()?;
 
