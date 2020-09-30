@@ -514,49 +514,38 @@ impl<'a> BridgeForest<'a> {
     }
 
     pub fn find_bridge_pairs(&self) -> FnvHashSet<(u64, u64)> {
-        // let mut bridge_pairs = Vec::new();
         let mut bridge_pairs: FnvHashSet<(u64, u64)> = FnvHashSet::default();
-
         let proj_inv = self.projection.get_inverse().unwrap();
-
-        let mut partials = Vec::new();
 
         for p_x in self.base_graph().nodes() {
             let neighbors =
                 self.base_graph().neighbors(p_x).collect::<Vec<_>>();
 
             if neighbors.len() == 2 {
-                partials.push((p_x, neighbors));
-            }
-        }
-
-        for (p_x, others) in partials {
-            let mut stuff = Vec::new();
-            for o in others {
-                let b_os = proj_inv.get(&o).unwrap();
-                let b_os = b_os
-                    .iter()
-                    .filter(|&b_o| {
-                        let bo_o_ = opposite_vertex(*b_o);
-                        let po_o_ = self.projected_node(bo_o_);
-                        po_o_ == p_x
-                    })
-                    .collect::<Vec<_>>();
-
-                println!("{:?}", b_os);
-
-                for &b_0 in b_os.iter() {
-                    stuff.push(*b_0);
+                let mut all_neighbors: Vec<u64> = Vec::new();
+                for n in neighbors {
+                    let filtered = proj_inv
+                        .get(&n)
+                        .unwrap()
+                        .iter()
+                        .filter(|&b_n| {
+                            let bn_n_ = opposite_vertex(*b_n);
+                            let pn_n_ = self.projected_node(bn_n_);
+                            pn_n_ == p_x
+                        })
+                        .copied();
+                    all_neighbors.extend(filtered);
                 }
-            }
-            for &a in stuff.iter() {
-                for &b in stuff.iter() {
-                    let x = a.min(b);
-                    let y = a.max(b);
-                    if x != y {
-                        let x_ = opposite_vertex(x);
-                        let y_ = opposite_vertex(y);
-                        bridge_pairs.insert((x_, y_));
+
+                for &a in all_neighbors.iter() {
+                    for &b in all_neighbors.iter() {
+                        let x = a.min(b);
+                        let y = a.max(b);
+                        if x != y {
+                            let x_ = opposite_vertex(x);
+                            let y_ = opposite_vertex(y);
+                            bridge_pairs.insert((x_, y_));
+                        }
                     }
                 }
             }
