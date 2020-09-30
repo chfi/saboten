@@ -251,7 +251,7 @@ impl BiedgedGraph {
         }
 
         let max_net_vertex = (max_node_id + 1) * 2;
-        let max_chain_vertex = max_node_id;
+        let max_chain_vertex = max_net_vertex;
 
         assert_eq!(min_node_id, 0);
         assert_eq!(max_net_vertex, graph.node_count() as u64);

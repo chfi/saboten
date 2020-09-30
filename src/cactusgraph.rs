@@ -6,6 +6,7 @@ use crate::{
     biedgedgraph::{
         end_to_black_edge, opposite_vertex, BiedgedGraph, BiedgedWeight,
     },
+    netgraph::NetGraph,
     projection::Projection,
 };
 
@@ -99,7 +100,7 @@ impl<'a> CactusGraph<'a> {
         let (l, r) = end_to_black_edge(x);
         let p_l = self.projection.find(l);
         let p_r = self.projection.find(r);
-        let intersection = self.cycle_map.get(&(p_l, p_r))?;
+        let intersection = self.cycle_map.get(&(p_r, p_l))?;
         Some(&intersection)
     }
 
@@ -241,16 +242,19 @@ impl<'a> CactusTree<'a> {
         let cactus_graph_inverse =
             self.cactus_graph.projection.get_inverse().unwrap();
 
-        for (chain_ix, _) in chain_edges.iter() {
+        for (chain_ix, b) in chain_edges.iter() {
             let cycle = self.get_chain_vertex_cycle(*chain_ix).unwrap();
 
-            for (x, _y) in cycle.iter() {
+            println!("\ncycle {:?}", cycle);
+            for (x, y) in cycle.iter() {
+                println!("in cycle edge ({}, {})", x, y);
                 let orig_xs = cactus_graph_inverse.get(&x).unwrap();
+                println!("\t{:?}", orig_xs);
 
                 let filtered: Vec<_> = orig_xs
                     .iter()
                     .filter(|&&u| {
-                        let (w, v) = end_to_black_edge(u as u64);
+                        let (v, w) = end_to_black_edge(u as u64);
                         if orig_xs.contains(&w) && orig_xs.contains(&v) {
                             false
                         } else {
@@ -280,7 +284,7 @@ impl<'a> CactusTree<'a> {
         chain_pairs
     }
 
-    pub fn build_net_graph(&self, x: u64, y: u64) -> Option<BiedgedGraph> {
+    pub fn build_net_graph(&self, x: u64, y: u64) -> Option<NetGraph> {
         use biedged_to_cactus::{
             net_graph_black_edge_walk, snarl_cactus_tree_path,
         };
@@ -377,7 +381,11 @@ impl<'a> CactusTree<'a> {
             net_graph.add_edge(*a, *b, BiedgedWeight::black(1));
         }
 
-        Some(net_graph)
+        Some(NetGraph {
+            graph: net_graph,
+            x,
+            y,
+        })
     }
 }
 

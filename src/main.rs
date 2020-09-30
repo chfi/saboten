@@ -9,6 +9,7 @@ use rs_cactusgraph::{
     biedged_to_cactus,
     biedgedgraph::*,
     cactusgraph::{BiedgedWrapper, BridgeForest, CactusGraph, CactusTree},
+    netgraph::NetGraph,
     projection::Projection,
 };
 
@@ -22,7 +23,36 @@ struct Opt {
     in_gfa: PathBuf,
 }
 
+
+fn example_graph_2() -> BiedgedGraph {
+    let edges = vec![
+        (0, 1),
+        (0, 13),
+        (1, 2),
+        (1, 3),
+        (2, 4),
+        (3, 4),
+        (4, 5),
+        (4, 6),
+        (5, 7),
+        (6, 7),
+        (7, 8),
+        (7, 12),
+        (8, 9),
+        (8, 10),
+        (9, 11),
+        (10, 11),
+        (11, 12),
+        (12, 13),
+    ];
+
+    let graph = BiedgedGraph::from_directed_edges(edges).unwrap();
+
+    graph
+}
+
 fn main() {
+    /*
     let opt = Opt::from_args();
 
     let mut gfa_name_map = None;
@@ -43,6 +73,8 @@ fn main() {
     };
 
     let mut be_graph = BiedgedGraph::from_gfa(&gfa);
+    */
+    let mut be_graph = example_graph_2();
     let mut projection = Projection::new_for_biedged_graph(&be_graph);
 
     let orig_graph = be_graph.clone();
@@ -51,43 +83,14 @@ fn main() {
     cactus_graph.projection.build_inverse();
 
     let cactus_tree = CactusTree::from_cactus_graph(&cactus_graph);
-    // cactus_tree.projection.build_inverse();
 
     let mut bridge_forest = BridgeForest::from_cactus_graph(&cactus_graph);
     bridge_forest.projection.build_inverse();
 
-    // let orig_graph_2 = cactus_tree
-
-    /*
-    println!(" --- Finding cycles --- ");
-    let cycles = biedged_to_cactus::find_cycles(&be_graph);
-
-    let mut cycle_map: FnvHashMap<(u64, u64), Vec<usize>> =
-        FnvHashMap::default();
-
-    for (i, cycle) in cycles.iter().enumerate() {
-        for (a, b) in cycle.iter() {
-            cycle_map.entry((*a, *b)).or_default().push(i);
-        }
-        println!("{}\t{:?}", i, cycle);
-    }
-    */
-
-    // let mut bridge_edges = Vec::new();
-
     let chain_edges = cactus_tree.chain_edges();
-    /*
-    cactus_tree.base_graph().all_edges().for_each(|(a, b, _)| {
-        if cactus_tree.is_chain_edge(a, b) {
-            println!(" chain edge {} {}", a, b);
-            chain_edges.push((a, b));
-        }
-    });
-    */
 
     /*
-    println!("----------");
-
+    let mut bridge_edges = Vec::new();
     orig_graph.graph.all_edges().for_each(|(a, b, w)| {
         if w.black > 0 && cactus_tree.is_bridge_edge(a, b) {
             println!(" bridge edge {} {}", a, b);
@@ -96,10 +99,30 @@ fn main() {
     });
     */
 
+    println!("{:?}", cactus_tree.chain_vertices);
+
+    let mut chain_edge_labels: FnvHashMap<(u64, u64), bool> =
+        FnvHashMap::default();
+
     let chain_pairs = cactus_tree.find_chain_pairs();
+
+    println!("found {} chain pairs", chain_pairs.len());
 
     for ((a, b), c) in chain_pairs.iter() {
         println!(" -- {}, {} - - {}", a, b, c);
+    }
+
+    let chain_net_graphs: FnvHashMap<(u64, u64), NetGraph> = chain_pairs
+        .iter()
+        .map(|(&(a, b), _)| {
+            let net_graph = cactus_tree.build_net_graph(a, b).unwrap();
+            ((a, b), net_graph)
+        })
+        .collect();
+
+    for (chain_pair, net_graph) in chain_net_graphs.iter() {
+        let result = net_graph.is_ultrabubble();
+        chain_edge_labels.insert(*chain_pair, result);
     }
 
     /*
