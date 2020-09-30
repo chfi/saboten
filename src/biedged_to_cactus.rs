@@ -396,8 +396,8 @@ pub fn build_net_graph(
     Some(net_graph)
 }
 
-pub fn snarl_is_acyclic(biedged: &BiedgedGraph, x: u64) -> bool {
-    let graph = &biedged.graph;
+fn net_graph_is_acyclic(net_graph: &BiedgedGraph, x: u64) -> bool {
+    let graph = &net_graph.graph;
     let mut visited: BTreeSet<u64> = BTreeSet::new();
     let mut in_path: FnvHashSet<u64> = FnvHashSet::default();
 
@@ -449,10 +449,10 @@ pub fn snarl_is_acyclic(biedged: &BiedgedGraph, x: u64) -> bool {
     acyclic
 }
 
-pub fn snarl_is_bridgeless(snarl: &BiedgedGraph, x: u64, y: u64) -> bool {
-    for node in snarl.graph.nodes() {
+fn net_graph_is_bridgeless(net_graph: &BiedgedGraph, x: u64, y: u64) -> bool {
+    for node in net_graph.graph.nodes() {
         if node != x && node != y {
-            if snarl
+            if net_graph
                 .graph
                 .edges(node)
                 .find(|(_, _, w)| w.black == 1)

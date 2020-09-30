@@ -5,12 +5,15 @@ use bstr::{BString, ByteSlice};
 
 use structopt::StructOpt;
 
-use rs_cactusgraph::{biedged_to_cactus, biedgedgraph::*};
-
-use petgraph::unionfind::UnionFind;
+use rs_cactusgraph::{
+    biedged_to_cactus,
+    biedgedgraph::*,
+    cactusgraph::{BiedgedWrapper, BridgeForest, CactusGraph, CactusTree},
+    projection::Projection,
+};
 
 use gfa::{
-    gfa::{name_conversion::NameMap, GFA},
+    gfa::{name_conversion::NameMap, Orientation, GFA},
     parser::GFAParser,
 };
 
@@ -40,33 +43,22 @@ fn main() {
     };
 
     let mut be_graph = BiedgedGraph::from_gfa(&gfa);
+    let mut projection = Projection::new_for_biedged_graph(&be_graph);
 
     let orig_graph = be_graph.clone();
 
-    let mut union_find: UnionFind<usize> =
-        UnionFind::new(be_graph.graph.node_count());
+    let mut cactus_graph = CactusGraph::from_biedged_graph(&orig_graph);
+    cactus_graph.projection.build_inverse();
 
-    println!(" --- Contracting gray edges --- ");
-    biedged_to_cactus::contract_all_gray_edges(&mut be_graph, &mut union_find);
+    let cactus_tree = CactusTree::from_cactus_graph(&cactus_graph);
+    // cactus_tree.projection.build_inverse();
 
-    println!(" --- Finding 3EC-components --- ");
-    let components =
-        biedged_to_cactus::find_3_edge_connected_components(&be_graph);
+    let mut bridge_forest = BridgeForest::from_cactus_graph(&cactus_graph);
+    bridge_forest.projection.build_inverse();
 
-    println!("  {} components", components.len());
-    for c in components.iter() {
-        println!("    {:?}", c);
-    }
+    // let orig_graph_2 = cactus_tree
 
-    println!(" --- Merging 3EC-components --- ");
-    biedged_to_cactus::merge_components(
-        &mut be_graph,
-        components,
-        &mut union_find,
-    );
-
-    let cactus_graph_projections = union_find.clone();
-
+    /*
     println!(" --- Finding cycles --- ");
     let cycles = biedged_to_cactus::find_cycles(&be_graph);
 
@@ -79,144 +71,38 @@ fn main() {
         }
         println!("{}\t{:?}", i, cycle);
     }
+    */
 
-    let mut bridge_forest = be_graph.clone();
+    // let mut bridge_edges = Vec::new();
 
-    let mut bridge_forest_projections = union_find.clone();
-
-    println!(" --- Constructing bridge forest --- ");
-    biedged_to_cactus::contract_simple_cycles(
-        &mut bridge_forest,
-        &cycles,
-        &mut bridge_forest_projections,
-    );
-
-    println!(" --- Constructing cactus tree --- ");
-
-    let mut cactus_tree = be_graph.clone();
-
-    let chain_vertices =
-        biedged_to_cactus::build_cactus_tree(&mut cactus_tree, &cycles);
-
-    let mut chain_edges = Vec::new();
-    let mut bridge_edges = Vec::new();
-    cactus_tree.graph.all_edges().for_each(|(a, b, _)| {
-        if biedged_to_cactus::is_chain_edge(
-            &cactus_tree,
-            &cactus_graph_projections,
-            a,
-            b,
-        ) {
-            chain_edges.push((a, b))
+    let chain_edges = cactus_tree.chain_edges();
+    /*
+    cactus_tree.base_graph().all_edges().for_each(|(a, b, _)| {
+        if cactus_tree.is_chain_edge(a, b) {
+            println!(" chain edge {} {}", a, b);
+            chain_edges.push((a, b));
         }
     });
+    */
+
+    /*
+    println!("----------");
 
     orig_graph.graph.all_edges().for_each(|(a, b, w)| {
-        if w.black > 0
-            && biedged_to_cactus::is_bridge_edge(
-                &cactus_tree,
-                &cactus_graph_projections,
-                a,
-                b,
-            )
-        {
-            bridge_edges.push((a, b))
+        if w.black > 0 && cactus_tree.is_bridge_edge(a, b) {
+            println!(" bridge edge {} {}", a, b);
+            bridge_edges.push((a, b));
         }
     });
+    */
 
-    let mut cactus_graph_inverse: FnvHashMap<u64, Vec<u64>> =
-        FnvHashMap::default();
+    let chain_pairs = cactus_tree.find_chain_pairs();
 
-    let cactus_reps = cactus_graph_projections.clone().into_labeling();
-    for (i, k) in cactus_reps.iter().enumerate() {
-        let i = i as u64;
-        let k = *k as u64;
-        cactus_graph_inverse.entry(k).or_default().push(i);
+    for ((a, b), c) in chain_pairs.iter() {
+        println!(" -- {}, {} - - {}", a, b, c);
     }
 
-    println!();
-    println!("Cactus graph vertex projections");
-    for (k, v) in cactus_graph_inverse.iter() {
-        println!("{} mapped from {:?}", k, v);
-    }
-
-    let mut bridge_forest_inverse: FnvHashMap<usize, Vec<usize>> =
-        FnvHashMap::default();
-
-    let bridge_reps = bridge_forest_projections.into_labeling();
-    for (i, k) in bridge_reps.iter().enumerate() {
-        bridge_forest_inverse.entry(*k).or_default().push(i);
-    }
-
-    println!();
-    println!("Bridge forest vertex projections");
-    for (k, v) in bridge_forest_inverse.iter() {
-        println!("{} mapped from {:?}", k, v);
-    }
-
-    let name_map = gfa_name_map.unwrap();
-    for seg in gfa.segments.iter() {
-        let id = seg.name as u64;
-        let name = name_map.inverse_map_name(seg.name).unwrap();
-        let name = name.to_str().unwrap();
-        let (a, b) = id_to_black_edge(id);
-        let (x, y) = projected_edge(&cactus_graph_projections, a, b);
-        let cyc = cycle_map.get(&(x, y));
-        println!(
-            "{} projects to edge ({}, {}) = {},\tcycles {:?}",
-            name,
-            x,
-            y,
-            be_graph.graph.contains_edge(x, y),
-            cyc,
-        );
-    }
-
-    let mut chain_pairs = FnvHashMap::default();
-
-    println!("----- chain edges -----\n");
-    for (a, chain_ix) in chain_edges.iter() {
-        let ix = chain_ix - cactus_tree.max_net_vertex - 1;
-        let chain_vx = chain_vertices[ix as usize];
-        let cycle = &cycles[chain_vx.1];
-
-        for (x, y) in cycle.iter() {
-            let orig_xs = cactus_graph_inverse.get(&x).unwrap();
-
-            let filtered: Vec<_> = orig_xs
-                .iter()
-                .filter(|&&u| {
-                    let (w, v) = end_to_black_edge(u as u64);
-                    if orig_xs.contains(&w) && orig_xs.contains(&v) {
-                        false
-                    } else {
-                        true
-                    }
-                })
-                .copied()
-                .collect();
-
-            for x_a in filtered.iter() {
-                for x_b in filtered.iter() {
-                    if x_a != x_b {
-                        let a = x_a.min(x_b);
-                        let b = x_a.max(x_b);
-                        let x_a = *a as u64;
-                        let x_b = *b as u64;
-                        let is_chain_pair = biedged_to_cactus::is_chain_pair(
-                            &cactus_graph_projections,
-                            &cycle_map,
-                            x_a,
-                            x_b,
-                        );
-                        if is_chain_pair {
-                            chain_pairs.insert((x_a, x_b), chain_ix);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    /*
 
     println!("bridge edges");
     for (a, b) in bridge_edges.iter() {
@@ -249,6 +135,7 @@ fn main() {
             println!("{}, {} - bridgeless\t{}", a, b, bridgeless);
         }
     }
+    */
 
     /*
     let nodes: Vec<_> = gfa

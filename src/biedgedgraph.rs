@@ -191,10 +191,6 @@ impl BiedgedGraph {
 
     pub fn projected_node(&self, projection: &Projection, n: u64) -> u64 {
         if n <= self.max_net_vertex {
-            println!(
-                "projecting {}\tmax net vertex {}\tproj size {}",
-                n, self.max_net_vertex, projection.size
-            );
             projection.find(n)
         } else {
             n

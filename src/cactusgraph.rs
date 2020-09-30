@@ -1,8 +1,11 @@
+use fnv::{FnvHashMap, FnvHashSet};
 use petgraph::prelude::*;
 
 use crate::{
     biedged_to_cactus,
-    biedgedgraph::{BiedgedGraph, BiedgedWeight},
+    biedgedgraph::{
+        end_to_black_edge, opposite_vertex, BiedgedGraph, BiedgedWeight,
+    },
     projection::Projection,
 };
 
@@ -44,6 +47,7 @@ pub struct CactusGraph<'a> {
     pub graph: BiedgedGraph,
     pub projection: Projection,
     pub cycles: Vec<Vec<(u64, u64)>>,
+    pub cycle_map: FnvHashMap<(u64, u64), Vec<usize>>,
 }
 
 impl_biedged_wrapper!(CactusGraph<'a>);
@@ -71,29 +75,81 @@ impl<'a> CactusGraph<'a> {
 
         let cycles = biedged_to_cactus::find_cycles(&graph);
 
+        let mut cycle_map: FnvHashMap<(u64, u64), Vec<usize>> =
+            FnvHashMap::default();
+
+        for (i, cycle) in cycles.iter().enumerate() {
+            for &(a, b) in cycle.iter() {
+                cycle_map.entry((a, b)).or_default().push(i);
+            }
+        }
+
+        projection.build_inverse();
+
         CactusGraph {
             original_graph: biedged_graph,
             graph,
             projection,
             cycles,
+            cycle_map,
         }
+    }
+
+    fn black_edge_cycle(&self, x: u64) -> Option<&Vec<usize>> {
+        let (l, r) = end_to_black_edge(x);
+        let p_l = self.projection.find(l);
+        let p_r = self.projection.find(r);
+        let intersection = self.cycle_map.get(&(p_l, p_r))?;
+        Some(&intersection)
+    }
+
+    pub fn is_chain_pair(&self, x: u64, y: u64) -> bool {
+        if x == y {
+            return false;
+        }
+
+        let p_x = self.projection.find(x);
+        let p_y = self.projection.find(y);
+
+        if p_x != p_y {
+            return false;
+        }
+
+        let x_cycles = self.black_edge_cycle(x);
+        let y_cycles = self.black_edge_cycle(y);
+
+        if x_cycles.is_none() || y_cycles.is_none() {
+            return false;
+        }
+
+        x_cycles == y_cycles
     }
 }
 
 pub struct CactusTree<'a> {
     pub original_graph: &'a BiedgedGraph,
+    pub cactus_graph: &'a CactusGraph<'a>,
     pub graph: BiedgedGraph,
-    pub projection: Projection,
-    pub cycles: Vec<Vec<(u64, u64)>>,
     pub chain_vertices: Vec<(u64, usize)>,
 }
 
-impl_biedged_wrapper!(CactusTree<'a>);
+impl<'a> BiedgedWrapper for CactusTree<'a> {
+    fn base_graph(&self) -> &UnGraphMap<u64, BiedgedWeight> {
+        &self.graph.graph
+    }
+
+    fn biedged_graph(&self) -> &BiedgedGraph {
+        &self.graph
+    }
+
+    fn projection(&self) -> &Projection {
+        &self.cactus_graph.projection
+    }
+}
 
 impl<'a> CactusTree<'a> {
-    pub fn from_cactus_graph(cactus_graph: &'_ CactusGraph<'a>) -> Self {
+    pub fn from_cactus_graph(cactus_graph: &'a CactusGraph<'a>) -> Self {
         let mut graph = cactus_graph.graph.clone();
-        let projection = cactus_graph.projection.clone();
 
         let cycles = cactus_graph.cycles.clone();
 
@@ -103,9 +159,8 @@ impl<'a> CactusTree<'a> {
         Self {
             original_graph: cactus_graph.original_graph,
             graph,
-            projection,
-            cycles,
             chain_vertices,
+            cactus_graph,
         }
     }
 
@@ -137,7 +192,193 @@ impl<'a> CactusTree<'a> {
         }
     }
 
-    // pub fn build_net_graph(
+    pub fn chain_edges(&self) -> Vec<(u64, u64)> {
+        let mut chain_edges = Vec::new();
+        for (chain_ix, _) in self.chain_vertices.iter() {
+            chain_edges.extend(
+                self.base_graph().edges(*chain_ix).map(|(a, b, _)| (a, b)),
+            );
+        }
+        chain_edges
+    }
+
+    pub fn bridge_edges(&self) -> Vec<(u64, u64)> {
+        self.original_graph
+            .graph
+            .all_edges()
+            .filter_map(|(a, b, w)| {
+                if w.black > 0 && self.is_bridge_edge(a, b) {
+                    Some((a, b))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn get_chain_vertex_cycle(
+        &self,
+        chain_ix: u64,
+    ) -> Option<&[(u64, u64)]> {
+        let be_graph = self.biedged_graph();
+
+        if be_graph.is_chain_vertex(chain_ix) {
+            let ix = chain_ix - self.graph.max_net_vertex - 1;
+            let chain_vx = &self.chain_vertices[ix as usize];
+            let cycle = &self.cactus_graph.cycles[chain_vx.1];
+
+            Some(cycle)
+        } else {
+            None
+        }
+    }
+
+    pub fn find_chain_pairs(&self) -> FnvHashMap<(u64, u64), usize> {
+        let mut chain_pairs = FnvHashMap::default();
+
+        let chain_edges = self.chain_edges();
+
+        let cactus_graph_inverse =
+            self.cactus_graph.projection.get_inverse().unwrap();
+
+        for (chain_ix, _) in chain_edges.iter() {
+            let cycle = self.get_chain_vertex_cycle(*chain_ix).unwrap();
+
+            for (x, _y) in cycle.iter() {
+                let orig_xs = cactus_graph_inverse.get(&x).unwrap();
+
+                let filtered: Vec<_> = orig_xs
+                    .iter()
+                    .filter(|&&u| {
+                        let (w, v) = end_to_black_edge(u as u64);
+                        if orig_xs.contains(&w) && orig_xs.contains(&v) {
+                            false
+                        } else {
+                            true
+                        }
+                    })
+                    .copied()
+                    .collect();
+
+                for x_a in filtered.iter() {
+                    for x_b in filtered.iter() {
+                        if x_a != x_b {
+                            let (x_a, x_b) = (*x_a as u64, *x_b as u64);
+                            let a = x_a.min(x_b);
+                            let b = x_a.max(x_b);
+                            let is_chain_pair =
+                                self.cactus_graph.is_chain_pair(a, b);
+                            if is_chain_pair {
+                                chain_pairs.insert((a, b), *chain_ix as usize);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        chain_pairs
+    }
+
+    pub fn build_net_graph(&self, x: u64, y: u64) -> Option<BiedgedGraph> {
+        use biedged_to_cactus::{
+            net_graph_black_edge_walk, snarl_cactus_tree_path,
+        };
+
+        let orig_graph = self.original_graph;
+
+        let path = snarl_cactus_tree_path(
+            &self.graph,
+            &self.cactus_graph.projection,
+            x,
+            y,
+        )?;
+
+        let proj_inv = self.cactus_graph.projection.get_inverse()?;
+
+        let tree_graph = &self.graph;
+
+        let vertices: FnvHashSet<u64> = path
+            .into_iter()
+            .filter_map(|n| {
+                if tree_graph.is_net_vertex(n) {
+                    proj_inv.get(&n)
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .copied()
+            .collect();
+
+        let gray_edges: FnvHashSet<(u64, u64)> = vertices
+            .iter()
+            .flat_map(|v| orig_graph.graph.edges(*v))
+            .filter_map(|(v, n, w)| {
+                if vertices.contains(&n) && w.gray > 0 {
+                    let a = v.min(n);
+                    let b = v.max(n);
+                    Some((a, b))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let mut black_edges: FnvHashSet<(u64, u64)> = FnvHashSet::default();
+        let mut black_vertices: FnvHashSet<u64> = FnvHashSet::default();
+
+        // Treat the edges of the snarl as if they already have black
+        // edges, since they shouldn't have any in the net graph
+        black_vertices.insert(x);
+        black_vertices.insert(y);
+
+        for v in vertices.iter() {
+            for u in vertices.iter() {
+                let mut add_pair = false;
+
+                if opposite_vertex(*v) == *u {
+                    add_pair = true;
+                } else if v != u {
+                    let b_v = self.cactus_graph.black_edge_cycle(*v);
+                    let b_u = self.cactus_graph.black_edge_cycle(*u);
+
+                    if b_v.is_some()
+                        && b_v == b_u
+                        && !black_vertices.contains(v)
+                        && !black_vertices.contains(u)
+                    {
+                        if net_graph_black_edge_walk(orig_graph, *v, *u) {
+                            add_pair = true;
+                        }
+                    }
+                }
+
+                if add_pair {
+                    let a = v.min(u);
+                    let b = v.max(u);
+                    black_edges.insert((*a, *b));
+                    black_vertices.insert(*a);
+                    black_vertices.insert(*b);
+                }
+            }
+        }
+
+        let mut net_graph = BiedgedGraph::new();
+        for v in vertices.iter() {
+            net_graph.add_node(*v);
+        }
+
+        for (a, b) in gray_edges.iter() {
+            net_graph.add_edge(*a, *b, BiedgedWeight::gray(1));
+        }
+
+        for (a, b) in black_edges.iter() {
+            net_graph.add_edge(*a, *b, BiedgedWeight::black(1));
+        }
+
+        Some(net_graph)
+    }
 }
 
 pub struct BridgeForest<'a> {
@@ -151,13 +392,15 @@ impl_biedged_wrapper!(BridgeForest<'a>);
 impl<'a> BridgeForest<'a> {
     pub fn from_cactus_graph(cactus_graph: &'_ CactusGraph<'a>) -> Self {
         let mut graph = cactus_graph.graph.clone();
-        let mut projection = cactus_graph.projection.clone();
+        let mut projection = cactus_graph.projection.copy_without_inverse();
 
         biedged_to_cactus::contract_simple_cycles(
             &mut graph,
             &cactus_graph.cycles,
             &mut projection,
         );
+
+        projection.build_inverse();
 
         Self {
             original_graph: cactus_graph.original_graph,

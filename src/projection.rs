@@ -14,6 +14,14 @@ pub struct Projection {
 pub type InverseProjection = FnvHashMap<u64, Vec<u64>>;
 
 impl Projection {
+    pub fn copy_without_inverse(&self) -> Self {
+        Projection {
+            size: self.size,
+            union_find: self.union_find.clone(),
+            inverse: None,
+        }
+    }
+
     pub fn new_for_biedged_graph(graph: &BiedgedGraph) -> Self {
         let size = (graph.max_net_vertex + 1) as usize;
         let union_find = UnionFind::new(size);
