@@ -193,6 +193,33 @@ impl<'a> CactusTree<'a> {
         }
     }
 
+    pub fn chain_edges_(&self) -> FnvHashMap<u64, (Vec<u64>, usize)> {
+        // maps net vertices to chain vertices & length of cycle
+        let mut chain_edges_help: FnvHashMap<u64, (Vec<u64>, usize)> =
+            FnvHashMap::default();
+
+        for (chain_ix, x) in self.chain_vertices.iter() {
+            let cycle = &self.cactus_graph.cycles[*x];
+            let cycle_len = cycle.len();
+
+            for (p_x, _) in cycle {
+                let ix = *p_x;
+                if let Some(ref mut entry) = chain_edges_help.get_mut(&ix) {
+                    if cycle_len < entry.1 {
+                        entry.1 = cycle_len;
+                        entry.0 = vec![*chain_ix];
+                    } else if cycle_len == entry.1 {
+                        entry.0.push(*chain_ix);
+                    }
+                } else {
+                    chain_edges_help.insert(ix, (vec![*chain_ix], cycle.len()));
+                }
+            }
+        }
+
+        chain_edges_help
+    }
+
     pub fn chain_edges(&self) -> Vec<(u64, u64)> {
         let mut chain_edges = Vec::new();
         for (chain_ix, x) in self.chain_vertices.iter() {
