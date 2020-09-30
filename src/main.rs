@@ -87,8 +87,6 @@ fn main() {
     let mut bridge_forest = BridgeForest::from_cactus_graph(&cactus_graph);
     bridge_forest.projection.build_inverse();
 
-    let chain_edges = cactus_tree.chain_edges();
-
     /*
     let mut bridge_edges = Vec::new();
     orig_graph.graph.all_edges().for_each(|(a, b, w)| {
@@ -98,87 +96,79 @@ fn main() {
         }
     });
     */
+    let chain_edges = cactus_tree.chain_edges();
 
-    println!("{:?}", cactus_tree.chain_vertices);
+    for (a, b) in chain_edges.iter() {
+        println!("{} - {}", a, b);
+    }
 
-    let mut chain_edge_labels: FnvHashMap<(u64, u64), bool> =
+    for x in cactus_tree.chain_vertices.iter() {
+        println!("  - {:?}", x);
+    }
+
+    let mut chain_edge_labels: FnvHashMap<(u64, u64, u64), bool> =
         FnvHashMap::default();
 
     let chain_pairs = cactus_tree.find_chain_pairs();
 
-    println!("found {} chain pairs", chain_pairs.len());
-
     for ((a, b), c) in chain_pairs.iter() {
-        println!(" -- {}, {} - - {}", a, b, c);
+        let p_x = cactus_tree.projected_node(*a);
+        println!("  -- {} -- {}, {} \t {:?}", p_x, a, b, c);
     }
 
-    let chain_net_graphs: FnvHashMap<(u64, u64), NetGraph> = chain_pairs
+    println!("{} chain pairs", chain_pairs.len());
+
+    let chain_net_graphs: Vec<((u64, u64), NetGraph, Vec<usize>)> = chain_pairs
         .iter()
-        .map(|(&(a, b), _)| {
+        .map(|(&(a, b), c)| {
             let net_graph = cactus_tree.build_net_graph(a, b).unwrap();
-            ((a, b), net_graph)
+            println!(" {} {}\t in chain pair {:?}", a, b, c);
+            ((a, b), net_graph, c.clone())
         })
         .collect();
 
-    for (chain_pair, net_graph) in chain_net_graphs.iter() {
+    println!("{} net graphs", chain_net_graphs.len());
+    for (chain_pair, net_graph, chain) in chain_net_graphs.iter() {
         let result = net_graph.is_ultrabubble();
-        chain_edge_labels.insert(*chain_pair, result);
-    }
-
-    /*
-
-    println!("bridge edges");
-    for (a, b) in bridge_edges.iter() {
-        println!("  {}, {}", a, b);
-    }
-
-    let mut chain_labels: FnvHashMap<u64, bool> = FnvHashMap::default();
-
-    println!(" --- chain pairs --- ");
-    for ((a, b), chain_ix) in chain_pairs.iter() {
-        if !chain_labels.contains_key(chain_ix) {
-            let net_graph = biedged_to_cactus::build_net_graph(
-                &orig_graph,
-                &cactus_tree,
-                &cactus_graph_projections,
-                &cactus_graph_inverse,
-                &cycle_map,
-                *a,
-                *b,
-            )
-            .unwrap();
-
-            let acyclic = biedged_to_cactus::snarl_is_acyclic(&net_graph, *a);
-            let bridgeless =
-                biedged_to_cactus::snarl_is_bridgeless(&net_graph, *a, *b);
-
-            chain_labels.insert(**chain_ix, acyclic && bridgeless);
-
-            println!("{}, {} -    acyclic\t{}", a, b, acyclic);
-            println!("{}, {} - bridgeless\t{}", a, b, bridgeless);
+        for c_vx in chain {
+            let p_x = cactus_tree.projected_node(chain_pair.0);
+            let a = chain_pair.0;
+            let b = chain_pair.1;
+            let key = (a, b, *c_vx as u64);
+            println!(
+                "net graph\t{:?}  \t{} {} {:?} - {}",
+                chain_pair, p_x, c_vx, key, result
+            );
+            chain_edge_labels.insert(key, result);
         }
     }
-    */
 
-    /*
-    let nodes: Vec<_> = gfa
-        .segments
-        .iter()
-        .map(|seg| id_to_black_edge(segment.name as u64))
-        .collect();
+    println!("max net vertex: {}", cactus_tree.graph.max_net_vertex);
 
-    */
-    /*
-        let mut cycle_inverse: HashMap<usize, Vec<usize>> = HashMap::new();
+    println!(" {} chain pairs", chain_pairs.len());
+    for ((x, y), chain) in chain_pairs.iter() {
+        let mut ultrabubble = true;
+        let mut chain = chain.clone();
+        chain.dedup();
+        for chain_vx in chain.iter() {
+            let vx = *chain_vx as u64;
 
-        let cycle_reps = cycle_projections.into_labeling();
-        for (i, k) in bridge_reps.iter().enumerate() {
-            cycle_inverse.entry(*k).or_default().push(i);
+            let is_ultrabubble = cactus_tree.is_chain_pair_ultrabubble(
+                &mut chain_edge_labels,
+                *x,
+                *y,
+                vx,
+            );
+
+            if !is_ultrabubble {
+                ultrabubble = false
+            }
         }
 
-        println!("Cactus graph cycle projections");
-        for (k, v) in cycle_inverse.iter() {
-            println!("{}
+        if ultrabubble {
+            println!("{} - {} is ultrabubble", x, y);
+        } else {
+            println!("{} - {} is NOT ultrabubble", x, y);
         }
-    */
+    }
 }

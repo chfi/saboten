@@ -403,7 +403,7 @@ impl<'a> CactusTree<'a> {
     pub fn is_chain_pair_ultrabubble(
         &self,
         // labels: &mut FnvHashMap<u64, bool>,
-        labels: &mut FnvHashMap<(u64, u64), bool>,
+        labels: &mut FnvHashMap<(u64, u64, u64), bool>,
         x: u64,
         y: u64,
         chain_vx: u64,
@@ -415,9 +415,10 @@ impl<'a> CactusTree<'a> {
 
         // let chain_edge =
 
-        if let Some(is_ultrabubble) = labels.get(&(p_x, chain_vx)) {
+        if let Some(is_ultrabubble) = labels.get(&(x, y, chain_vx)) {
             if !is_ultrabubble {
-                println!("{} {} is not ultrabubble", x, y);
+                // println!("\t{} {} is not ultrabubble", x, y);
+                // println!("\t{} {} is not ultrabubble", p_x, chain_vx);
                 return false;
             }
         }
@@ -435,7 +436,7 @@ impl<'a> CactusTree<'a> {
             .count()
             == 0
         {
-            if let Some(is_ultrabubble) = labels.get(&(p_x, chain_vx)) {
+            if let Some(is_ultrabubble) = labels.get(&(x, y, chain_vx)) {
                 return *is_ultrabubble;
             } else {
                 return false;
@@ -446,23 +447,29 @@ impl<'a> CactusTree<'a> {
         visited.insert(chain_vx);
         stack.push((chain_vx, p_x));
 
+        let mut last_chain = chain_vx;
+
         // if self.graph.graph.neighbors(
 
         //         for (_, adj, _) in self.graph.graph.edges(current) {
 
-        println!("\nultrabubble {} {} - {}", x, y, chain_vx);
-        println!("projected {}", p_x);
+        // println!("\nultrabubble {} {} - {}", x, y, chain_vx);
+        // println!("projected {}", p_x);
         while let Some((prev, current)) = stack.pop() {
             // println!(" at node {}", current);
             if !visited.contains(&current) {
                 let a = prev.min(current);
                 let b = prev.max(current);
-                if let Some(is_ultrabubble) = labels.get(&(a, b)) {
-                    println!("at chain label {}\t{}", current, is_ultrabubble);
+                if let Some(is_ultrabubble) = labels.get(&(a, b, last_chain)) {
+                    // println!("at chain label {}\t{}", current, is_ultrabubble);
                     if !is_ultrabubble {
                         // labels.insert(chain_vx, false);
                         return false;
                     }
+                }
+
+                if self.graph.is_chain_vertex(current) {
+                    last_chain = current;
                 }
                 visited.insert(current);
 
