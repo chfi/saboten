@@ -414,17 +414,13 @@ impl BiedgedGraph {
         right: u64,
         projection: &mut Projection,
     ) -> Option<u64> {
-        if !self.graph.contains_node(left) || !self.graph.contains_node(right) {
-            return None;
-        }
-
-        if self.graph.contains_edge(left, right) {
-            return self.contract_edge(left, right, projection);
-        }
-
         // is this necessary? I think so?
         projection.union(left, right);
         let (from, to) = projection.kept_pair(left, right);
+
+        if !self.graph.contains_node(from) || !self.graph.contains_node(to) {
+            return None;
+        }
 
         // Retrieve the edges of the node we're removing
         let to_edges: Vec<(u64, u64, BiedgedWeight)> = self

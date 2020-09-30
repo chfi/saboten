@@ -133,7 +133,7 @@ pub fn contract_simple_cycles(
 ) {
     for cycle in cycles {
         for (from, to) in cycle {
-            biedged.contract_edge(*from, *to, projection);
+            biedged.merge_vertices(*from, *to, projection);
         }
     }
 }
