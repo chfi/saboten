@@ -512,4 +512,56 @@ impl<'a> BridgeForest<'a> {
             projection,
         }
     }
+
+    pub fn find_bridge_pairs(&self) -> FnvHashSet<(u64, u64)> {
+        // let mut bridge_pairs = Vec::new();
+        let mut bridge_pairs: FnvHashSet<(u64, u64)> = FnvHashSet::default();
+
+        let proj_inv = self.projection.get_inverse().unwrap();
+
+        let mut partials = Vec::new();
+
+        for p_x in self.base_graph().nodes() {
+            let neighbors =
+                self.base_graph().neighbors(p_x).collect::<Vec<_>>();
+
+            if neighbors.len() == 2 {
+                partials.push((p_x, neighbors));
+            }
+        }
+
+        for (p_x, others) in partials {
+            let mut stuff = Vec::new();
+            for o in others {
+                let b_os = proj_inv.get(&o).unwrap();
+                let b_os = b_os
+                    .iter()
+                    .filter(|&b_o| {
+                        let bo_o_ = opposite_vertex(*b_o);
+                        let po_o_ = self.projected_node(bo_o_);
+                        po_o_ == p_x
+                    })
+                    .collect::<Vec<_>>();
+
+                println!("{:?}", b_os);
+
+                for &b_0 in b_os.iter() {
+                    stuff.push(*b_0);
+                }
+            }
+            for &a in stuff.iter() {
+                for &b in stuff.iter() {
+                    let x = a.min(b);
+                    let y = a.max(b);
+                    if x != y {
+                        let x_ = opposite_vertex(x);
+                        let y_ = opposite_vertex(y);
+                        bridge_pairs.insert((x_, y_));
+                    }
+                }
+            }
+        }
+
+        bridge_pairs
+    }
 }
