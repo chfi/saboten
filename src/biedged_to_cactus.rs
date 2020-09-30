@@ -52,7 +52,16 @@ pub fn merge_components(
         let mut iter = comp.into_iter();
         let head = iter.next().unwrap() as u64;
         for other in iter {
-            biedged.merge_vertices(head, other as u64, projection);
+            let other = other as u64;
+            if biedged.graph.contains_node(head)
+                && biedged.graph.contains_node(other)
+            {
+                if biedged.graph.contains_edge(head, other) {
+                    biedged.contract_edge(head, other, projection);
+                } else {
+                    biedged.merge_vertices(head, other, projection);
+                }
+            }
         }
     }
 }
