@@ -131,7 +131,7 @@ pub struct CactusTree<'a> {
     pub original_graph: &'a BiedgedGraph,
     pub cactus_graph: &'a CactusGraph<'a>,
     pub graph: BiedgedGraph,
-    pub chain_vertices: Vec<(u64, usize)>,
+    pub chain_vertices: FnvHashMap<u64, Vec<u64>>,
 }
 
 impl<'a> BiedgedWrapper for CactusTree<'a> {
@@ -193,42 +193,33 @@ impl<'a> CactusTree<'a> {
         }
     }
 
-    pub fn chain_edges_(&self) -> FnvHashMap<u64, (Vec<u64>, usize)> {
+    pub fn chain_edges(&self) -> FnvHashMap<u64, (Vec<u64>, usize)> {
         // maps net vertices to chain vertices & length of cycle
-        let mut chain_edges_help: FnvHashMap<u64, (Vec<u64>, usize)> =
+        let mut chain_edges: FnvHashMap<u64, (Vec<u64>, usize)> =
             FnvHashMap::default();
 
-        for (chain_ix, x) in self.chain_vertices.iter() {
-            let cycle = &self.cactus_graph.cycles[*x];
-            let cycle_len = cycle.len();
+        // To handle the nesting of chain pairs, we need to track the
+        // number of neighbors each chain vertex has.
 
-            for (p_x, _) in cycle {
-                let ix = *p_x;
-                if let Some(ref mut entry) = chain_edges_help.get_mut(&ix) {
-                    if cycle_len < entry.1 {
-                        entry.1 = cycle_len;
-                        entry.0 = vec![*chain_ix];
-                    } else if cycle_len == entry.1 {
-                        entry.0.push(*chain_ix);
-                    }
-                } else {
-                    chain_edges_help.insert(ix, (vec![*chain_ix], cycle.len()));
+        // Further down in the nesting, a chain vertex will have fewer
+        // neighbors, so chain pairs that contain another chain pair
+        // will have longer cycles.
+
+        // By mapping the net vertex to the parent chain vertices with
+        // the shortest cycle length, we get can extract the hierarchy
+        for (chain_ix, net_vxs) in self.chain_vertices.iter() {
+            for net in net_vxs.iter() {
+                let (chains, len) = chain_edges.entry(*net).or_default();
+
+                if *len == 0 || *len > net_vxs.len() {
+                    *len = net_vxs.len();
+                    chains.clear();
                 }
+
+                chains.push(*chain_ix);
             }
         }
 
-        chain_edges_help
-    }
-
-    pub fn chain_edges(&self) -> Vec<(u64, u64)> {
-        let mut chain_edges = Vec::new();
-        for (chain_ix, x) in self.chain_vertices.iter() {
-            let cycle = &self.cactus_graph.cycles[*x];
-            println!("chain {}\t{}  {:?}", chain_ix, x, cycle);
-            chain_edges.extend(
-                self.base_graph().edges(*chain_ix).map(|(a, b, _)| (a, b)),
-            );
-        }
         chain_edges
     }
 
@@ -246,23 +237,6 @@ impl<'a> CactusTree<'a> {
             .collect()
     }
 
-    pub fn get_chain_vertex_cycle(
-        &self,
-        chain_ix: u64,
-    ) -> Option<&[(u64, u64)]> {
-        let be_graph = self.biedged_graph();
-
-        if be_graph.is_chain_vertex(chain_ix) {
-            let ix = chain_ix - self.graph.max_net_vertex - 1;
-            let chain_vx = &self.chain_vertices[ix as usize];
-            let cycle = &self.cactus_graph.cycles[chain_vx.1];
-
-            Some(cycle)
-        } else {
-            None
-        }
-    }
-
     pub fn find_chain_pairs(&self) -> FnvHashMap<(u64, u64), Vec<usize>> {
         let mut chain_pairs: FnvHashMap<(u64, u64), Vec<usize>> =
             FnvHashMap::default();
@@ -272,47 +246,42 @@ impl<'a> CactusTree<'a> {
         let cactus_graph_inverse =
             self.cactus_graph.projection.get_inverse().unwrap();
 
-        for (chain_ix, _) in chain_edges.iter() {
-            // println!(" in chain edge {}", chain_ix);
-            let cycle = self.get_chain_vertex_cycle(*chain_ix).unwrap();
-            // println!(" ---- \t{:?}", cycle);
+        let chain_vertices = &self.chain_vertices;
 
-            for (x, y) in cycle.iter() {
-                let orig_xs = cactus_graph_inverse.get(&x).unwrap();
+        for (net_vx, (chain_vxs, _)) in chain_edges.iter() {
+            for chain_vx in chain_vxs.iter() {
+                let p_xs = chain_vertices.get(chain_vx).unwrap();
 
-                // println!("         \t{:?}", orig_xs);
-                let filtered: Vec<_> = orig_xs
-                    .iter()
-                    .filter(|&&u| {
-                        let (v, w) = end_to_black_edge(u as u64);
-                        if orig_xs.contains(&w) && orig_xs.contains(&v) {
-                            false
-                        } else {
-                            true
-                        }
-                    })
-                    .copied()
-                    .collect();
+                for x in p_xs.iter() {
+                    let orig_xs = cactus_graph_inverse.get(&x).unwrap();
 
-                // println!("   filtered\t{:?}", filtered);
+                    let filtered: Vec<_> = orig_xs
+                        .iter()
+                        .filter(|&&u| {
+                            let (v, w) = end_to_black_edge(u as u64);
+                            if orig_xs.contains(&w) && orig_xs.contains(&v) {
+                                false
+                            } else {
+                                true
+                            }
+                        })
+                        .copied()
+                        .collect();
 
-                for x_a in filtered.iter() {
-                    for x_b in filtered.iter() {
-                        if x_a != x_b {
-                            let (x_a, x_b) = (*x_a as u64, *x_b as u64);
-                            let a = x_a.min(x_b);
-                            let b = x_a.max(x_b);
-                            let is_chain_pair =
-                                self.cactus_graph.is_chain_pair(a, b);
-                            // println!(
-                            //     "{} {} chain pair? {}",
-                            //     a, b, is_chain_pair
-                            // );
-                            if is_chain_pair {
-                                chain_pairs
-                                    .entry((a, b))
-                                    .or_default()
-                                    .push(*chain_ix as usize);
+                    for x_a in filtered.iter() {
+                        for x_b in filtered.iter() {
+                            if x_a != x_b {
+                                let (x_a, x_b) = (*x_a as u64, *x_b as u64);
+                                let a = x_a.min(x_b);
+                                let b = x_a.max(x_b);
+                                let is_chain_pair =
+                                    self.cactus_graph.is_chain_pair(a, b);
+                                if is_chain_pair {
+                                    chain_pairs
+                                        .entry((a, b))
+                                        .or_default()
+                                        .push(*chain_vx as usize);
+                                }
                             }
                         }
                     }

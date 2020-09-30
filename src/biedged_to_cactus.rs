@@ -155,18 +155,21 @@ pub fn contract_simple_cycles(
 pub fn build_cactus_tree(
     biedged: &mut BiedgedGraph,
     cycles: &[Vec<(u64, u64)>],
-) -> Vec<(u64, usize)> {
-    let mut chain_vertices = Vec::with_capacity(cycles.len());
+) -> FnvHashMap<u64, Vec<u64>> {
+    let mut chain_vertices = FnvHashMap::default();
 
     for (i, cycle) in cycles.iter().enumerate() {
         let chain_vx = biedged.add_chain_vertex();
 
+        let mut net_vxs = Vec::new();
+
         for (from, to) in cycle {
             biedged.add_edge(*to, chain_vx, BiedgedWeight::black(1));
             biedged.remove_one_black_edge(*from, *to);
+            net_vxs.push(*from);
         }
 
-        chain_vertices.push((chain_vx, i));
+        chain_vertices.insert(chain_vx, net_vxs);
     }
 
     chain_vertices
