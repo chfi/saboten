@@ -195,7 +195,9 @@ impl<'a> CactusTree<'a> {
 
     pub fn chain_edges(&self) -> Vec<(u64, u64)> {
         let mut chain_edges = Vec::new();
-        for (chain_ix, _) in self.chain_vertices.iter() {
+        for (chain_ix, x) in self.chain_vertices.iter() {
+            let cycle = &self.cactus_graph.cycles[*x];
+            println!("chain {}\t{}  {:?}", chain_ix, x, cycle);
             chain_edges.extend(
                 self.base_graph().edges(*chain_ix).map(|(a, b, _)| (a, b)),
             );
@@ -234,23 +236,24 @@ impl<'a> CactusTree<'a> {
         }
     }
 
-    pub fn find_chain_pairs(&self) -> FnvHashMap<(u64, u64), usize> {
-        let mut chain_pairs = FnvHashMap::default();
+    pub fn find_chain_pairs(&self) -> FnvHashMap<(u64, u64), Vec<usize>> {
+        let mut chain_pairs: FnvHashMap<(u64, u64), Vec<usize>> =
+            FnvHashMap::default();
 
         let chain_edges = self.chain_edges();
 
         let cactus_graph_inverse =
             self.cactus_graph.projection.get_inverse().unwrap();
 
-        for (chain_ix, b) in chain_edges.iter() {
+        for (chain_ix, _) in chain_edges.iter() {
+            // println!(" in chain edge {}", chain_ix);
             let cycle = self.get_chain_vertex_cycle(*chain_ix).unwrap();
+            // println!(" ---- \t{:?}", cycle);
 
-            println!("\ncycle {:?}", cycle);
             for (x, y) in cycle.iter() {
-                println!("in cycle edge ({}, {})", x, y);
                 let orig_xs = cactus_graph_inverse.get(&x).unwrap();
-                println!("\t{:?}", orig_xs);
 
+                // println!("         \t{:?}", orig_xs);
                 let filtered: Vec<_> = orig_xs
                     .iter()
                     .filter(|&&u| {
@@ -264,6 +267,8 @@ impl<'a> CactusTree<'a> {
                     .copied()
                     .collect();
 
+                // println!("   filtered\t{:?}", filtered);
+
                 for x_a in filtered.iter() {
                     for x_b in filtered.iter() {
                         if x_a != x_b {
@@ -272,8 +277,15 @@ impl<'a> CactusTree<'a> {
                             let b = x_a.max(x_b);
                             let is_chain_pair =
                                 self.cactus_graph.is_chain_pair(a, b);
+                            // println!(
+                            //     "{} {} chain pair? {}",
+                            //     a, b, is_chain_pair
+                            // );
                             if is_chain_pair {
-                                chain_pairs.insert((a, b), *chain_ix as usize);
+                                chain_pairs
+                                    .entry((a, b))
+                                    .or_default()
+                                    .push(*chain_ix as usize);
                             }
                         }
                     }
@@ -386,6 +398,83 @@ impl<'a> CactusTree<'a> {
             x,
             y,
         })
+    }
+
+    pub fn is_chain_pair_ultrabubble(
+        &self,
+        // labels: &mut FnvHashMap<u64, bool>,
+        labels: &mut FnvHashMap<(u64, u64), bool>,
+        x: u64,
+        y: u64,
+        chain_vx: u64,
+    ) -> bool {
+        if !self.cactus_graph.is_chain_pair(x, y) {
+            return false;
+        }
+        let p_x = self.projected_node(x);
+
+        // let chain_edge =
+
+        if let Some(is_ultrabubble) = labels.get(&(p_x, chain_vx)) {
+            if !is_ultrabubble {
+                println!("{} {} is not ultrabubble", x, y);
+                return false;
+            }
+        }
+
+        // let p_y = self.projected_node(y);
+
+        let mut visited: FnvHashSet<u64> = FnvHashSet::default();
+        // visited.insert(p_x);
+
+        if self
+            .graph
+            .graph
+            .neighbors(chain_vx)
+            .filter(|&n| n != p_x)
+            .count()
+            == 0
+        {
+            if let Some(is_ultrabubble) = labels.get(&(p_x, chain_vx)) {
+                return *is_ultrabubble;
+            } else {
+                return false;
+            }
+        }
+
+        let mut stack: Vec<(u64, u64)> = Vec::new();
+        visited.insert(chain_vx);
+        stack.push((chain_vx, p_x));
+
+        // if self.graph.graph.neighbors(
+
+        //         for (_, adj, _) in self.graph.graph.edges(current) {
+
+        println!("\nultrabubble {} {} - {}", x, y, chain_vx);
+        println!("projected {}", p_x);
+        while let Some((prev, current)) = stack.pop() {
+            // println!(" at node {}", current);
+            if !visited.contains(&current) {
+                let a = prev.min(current);
+                let b = prev.max(current);
+                if let Some(is_ultrabubble) = labels.get(&(a, b)) {
+                    println!("at chain label {}\t{}", current, is_ultrabubble);
+                    if !is_ultrabubble {
+                        // labels.insert(chain_vx, false);
+                        return false;
+                    }
+                }
+                visited.insert(current);
+
+                for (_, adj, _) in self.graph.graph.edges(current) {
+                    if !visited.contains(&adj) {
+                        stack.push((current, adj));
+                    }
+                }
+            }
+        }
+
+        true
     }
 }
 

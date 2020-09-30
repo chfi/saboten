@@ -63,8 +63,8 @@ pub fn merge_components(
 pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<(u64, u64)>> {
     let graph = &biedged.graph;
 
-    let mut visited: BTreeSet<u64> = BTreeSet::new();
-    let mut parents: BTreeMap<u64, u64> = BTreeMap::new();
+    let mut visited: FnvHashSet<u64> = FnvHashSet::default();
+    let mut parents: FnvHashMap<u64, u64> = FnvHashMap::default();
 
     let mut stack: Vec<u64> = Vec::new();
 
