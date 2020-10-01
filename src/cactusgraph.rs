@@ -362,8 +362,6 @@ impl<'a> CactusTree<'a> {
         y: u64,
         path: &[u64],
     ) -> Option<Vec<(u64, u64)>> {
-        let p_x = self.projected_node(x);
-
         let a = opposite_vertex(x);
         let b = opposite_vertex(y);
         let p_a = self.projected_node(a);
@@ -377,33 +375,32 @@ impl<'a> CactusTree<'a> {
 
         let mut contained_chain_pairs: Vec<(u64, u64)> = Vec::new();
 
+        let mut chain_vertices: FnvHashSet<u64> = FnvHashSet::default();
+
         for &v in path {
-            let on_chain_vertex = self.graph.is_chain_vertex(v);
-
-            let neighbors = self.base_graph().neighbors(v).filter(|&n| {
-                if on_chain_vertex {
-                    !path_vertices.contains(&n) && self.graph.is_net_vertex(n)
-                } else {
-                    !path_vertices.contains(&n) && self.graph.is_chain_vertex(n)
-                }
-            });
-
-            if on_chain_vertex {
-                for n in neighbors {
-                    contained_chain_pairs.push((n, v));
-                }
+            if self.graph.is_chain_vertex(v) {
+                chain_vertices.insert(v);
+            } else {
+                chain_vertices.extend(self.base_graph().neighbors(v).filter(
+                    |&n| {
+                        !path_vertices.contains(&n)
+                            && self.graph.is_chain_vertex(n)
+                    },
+                ));
             }
         }
 
-        println!(
-            " ~~ contained chain pairs\n ~~~~ {:?}",
-            contained_chain_pairs
-        );
+        for &cx in chain_vertices.iter() {
+            let net_neighbors = self.base_graph().neighbors(cx).filter(|n| {
+                !path_vertices.contains(&n) && !chain_vertices.contains(&n)
+            });
 
-        for &(net_vx, chain_vx) in contained_chain_pairs.iter() {
-            if let Some(is_ultrabubble) = labels.get(&(net_vx, chain_vx)) {
+            for nx in net_neighbors {
+                let is_ultrabubble = labels.get(&(nx, cx))?;
                 if !is_ultrabubble {
                     return None;
+                } else {
+                    contained_chain_pairs.push((nx, cx));
                 }
             }
         }
