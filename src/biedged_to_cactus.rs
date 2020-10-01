@@ -264,7 +264,6 @@ pub(crate) fn net_graph_black_edge_walk(
             visited.insert(current);
 
             let edges = biedged.graph.edges(current);
-            // .filter(|(_, n, _)| vertices.contains(n));
 
             if current == start || current == adj_end {
                 for (_, n, w) in edges {

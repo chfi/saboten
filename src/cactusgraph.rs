@@ -369,51 +369,46 @@ impl<'a> CactusTree<'a> {
         let p_a = self.projected_node(a);
         let p_b = self.projected_node(b);
 
-        let mut visited: FnvHashSet<u64> = FnvHashSet::default();
-        let mut stack: Vec<(u64, u64)> = Vec::new();
+        let mut path_vertices =
+            path.iter().copied().collect::<FnvHashSet<u64>>();
 
-        visited.insert(p_a);
-        visited.insert(p_b);
+        path_vertices.insert(p_a);
+        path_vertices.insert(p_b);
 
-        let mut children = Vec::new();
+        let mut contained_chain_pairs: Vec<(u64, u64)> = Vec::new();
 
-        for n in self.base_graph().neighbors(p_x) {
-            if !visited.contains(&n) {
-                stack.push((p_x, n));
-            }
-        }
-        while let Some((prev, current)) = stack.pop() {
-            if !visited.contains(&current) {
-                visited.insert(prev);
-                visited.insert(current);
-                // println!("getting {}, {}", prev, current);
+        for &v in path {
+            let on_chain_vertex = self.graph.is_chain_vertex(v);
 
-                if self.graph.is_chain_vertex(prev)
-                    && self.graph.is_net_vertex(current)
-                {
-                    if let Some(is_ultrabubble) = labels.get(&(current, prev)) {
-                        if !is_ultrabubble {
-                            println!(
-                                "getting {}, {} - not ultrabubble",
-                                current, prev
-                            );
-                            // labels.insert((p_x, chain_vx), false);
-                            return None;
-                        } else {
-                            children.push((current, prev));
-                        }
-                    }
+            let neighbors = self.base_graph().neighbors(v).filter(|&n| {
+                if on_chain_vertex {
+                    !path_vertices.contains(&n) && self.graph.is_net_vertex(n)
+                } else {
+                    !path_vertices.contains(&n) && self.graph.is_chain_vertex(n)
                 }
+            });
 
-                for n in self.base_graph().neighbors(current) {
-                    if !visited.contains(&n) {
-                        stack.push((current, n));
-                    }
+            if on_chain_vertex {
+                for n in neighbors {
+                    contained_chain_pairs.push((n, v));
                 }
             }
         }
 
-        Some(children)
+        println!(
+            " ~~ contained chain pairs\n ~~~~ {:?}",
+            contained_chain_pairs
+        );
+
+        for &(net_vx, chain_vx) in contained_chain_pairs.iter() {
+            if let Some(is_ultrabubble) = labels.get(&(net_vx, chain_vx)) {
+                if !is_ultrabubble {
+                    return None;
+                }
+            }
+        }
+
+        Some(contained_chain_pairs)
     }
 
     pub fn is_chain_pair_ultrabubble(
