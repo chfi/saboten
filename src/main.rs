@@ -1,20 +1,18 @@
-use fnv::{FnvHashMap, FnvHashSet};
-use std::{collections::HashMap, path::PathBuf};
+use fnv::FnvHashMap;
+use std::path::PathBuf;
 
-use bstr::{BString, ByteSlice};
+use bstr::BString;
 
 use structopt::StructOpt;
 
 use rs_cactusgraph::{
-    biedged_to_cactus,
     biedgedgraph::*,
     cactusgraph::{BiedgedWrapper, BridgeForest, CactusGraph, CactusTree},
     netgraph::NetGraph,
-    projection::Projection,
 };
 
 use gfa::{
-    gfa::{name_conversion::NameMap, Orientation, GFA},
+    gfa::{name_conversion::NameMap, GFA},
     parser::GFAParser,
 };
 
@@ -136,10 +134,14 @@ fn main() {
         FnvHashMap::default();
 
     println!(" --- Chain Pairs  --- ");
-    for (a, b, children) in chain_pair_ultrabubbles.iter() {
-        print!("  ({},{})", a, b);
-        if !children.is_empty() {
-            print!("  {:?}", children);
+    println!("x\ty\tnet\tchain\tcontains");
+    println!();
+    for (x, y, contained) in chain_pair_ultrabubbles.iter() {
+        let chain = cactus_tree.black_edge_chain_vertex(*x).unwrap();
+        let net = cactus_tree.projected_node(*x);
+        print!("{}\t{}\t{}\t{}", x, y, net, chain);
+        if !contained.is_empty() {
+            print!("\t{:?}", contained);
         }
         println!();
     }
@@ -168,10 +170,18 @@ fn main() {
     }
 
     println!(" --- Bridge Pairs --- ");
-    for (a, b, children) in bridge_pair_ultrabubbles.iter() {
-        print!("  ({},{})", a, b);
-        if !children.is_empty() {
-            print!("  {:?}", children);
+    println!("x\ty\tnet\tx edge\ty edge\tcontains");
+    println!();
+    for (x, y, contained) in bridge_pair_ultrabubbles.iter() {
+        let x_black_edge = end_to_black_edge(*x);
+        let y_black_edge = end_to_black_edge(*y);
+        let net = cactus_tree.projected_node(*x);
+        print!(
+            "{}\t{}\t{}\t{:?}\t{:?}",
+            x, y, net, x_black_edge, y_black_edge
+        );
+        if !contained.is_empty() {
+            print!("\t{:?}", contained);
         }
         println!();
     }
