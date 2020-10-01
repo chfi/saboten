@@ -237,8 +237,8 @@ impl<'a> CactusTree<'a> {
             .collect()
     }
 
-    pub fn find_chain_pairs(&self) -> FnvHashMap<(u64, u64), Vec<usize>> {
-        let mut chain_pairs: FnvHashMap<(u64, u64), Vec<usize>> =
+    pub fn find_chain_pairs(&self) -> FnvHashMap<(u64, u64), Vec<u64>> {
+        let mut chain_pairs: FnvHashMap<(u64, u64), Vec<u64>> =
             FnvHashMap::default();
 
         let chain_edges = self.chain_edges();
@@ -248,7 +248,44 @@ impl<'a> CactusTree<'a> {
 
         let chain_vertices = &self.chain_vertices;
 
-        for (net_vx, (chain_vxs, _)) in chain_edges.iter() {
+        for (net_vx, (chain_vxs, len)) in chain_edges.iter() {
+            let orig_xs = cactus_graph_inverse.get(&net_vx).unwrap();
+
+            let filtered: Vec<_> = orig_xs
+                .iter()
+                .filter(|&&u| {
+                    let (v, w) = end_to_black_edge(u as u64);
+                    if orig_xs.contains(&w) && orig_xs.contains(&v) {
+                        false
+                    } else {
+                        true
+                    }
+                })
+                .copied()
+                .collect();
+
+            for x_a in filtered.iter() {
+                for x_b in filtered.iter() {
+                    if x_a != x_b {
+                        let (x_a, x_b) = (*x_a as u64, *x_b as u64);
+                        let a = x_a.min(x_b);
+                        let b = x_a.max(x_b);
+                        let is_chain_pair =
+                            self.cactus_graph.is_chain_pair(a, b);
+                        if is_chain_pair {
+                            chain_pairs.insert((a, b), chain_vxs.clone());
+                            // chain_pairs
+                            //     .entry((a, b))
+                            //     .or_default()
+                            //     .push(*chain_vx as usize);
+                        }
+                    }
+                }
+            }
+        }
+
+        /*
+        for (net_vx, (chain_vxs, len)) in chain_edges.iter() {
             for chain_vx in chain_vxs.iter() {
                 let p_xs = chain_vertices.get(chain_vx).unwrap();
 
@@ -288,6 +325,7 @@ impl<'a> CactusTree<'a> {
                 }
             }
         }
+        */
 
         chain_pairs
     }
