@@ -207,60 +207,6 @@ impl<'a> CactusTree<'a> {
         }
     }
 
-    pub fn pair_chain_edge(
-        &self,
-        x: u64,
-        y: u64,
-    ) -> Option<(u64, &Vec<usize>)> {
-        let p_x = self.projected_node(x);
-        let p_y = self.projected_node(y);
-
-        if p_x != p_y {
-            return None;
-        }
-
-        let x_cycles = self.cactus_graph.black_edge_cycle(x)?;
-        let y_cycles = self.cactus_graph.black_edge_cycle(y)?;
-
-        if x_cycles == y_cycles {
-            Some((p_x, x_cycles))
-        // Some(x_cycles)
-        } else {
-            None
-        }
-    }
-
-    pub fn chain_edges(&self) -> FnvHashMap<u64, u64> {
-        // maps net vertices to chain vertices & length of cycle
-        // let mut chain_edges: FnvHashMap<u64, (Vec<u64>, usize)> =
-        let mut chain_edges: FnvHashMap<u64, u64> = FnvHashMap::default();
-
-        // let chain_vxs = chain_vertices;
-
-        // for chain_vx in self.chain_vertices.iter() {
-        //     let net_vxs =
-        // }
-
-        // for
-
-        /*
-        for (chain_ix, net_vxs) in self.chain_vertices.iter() {
-            for net in net_vxs.iter() {
-                let (chains, len) = chain_edges.entry(*net).or_default();
-
-                if *len == 0 || *len > net_vxs.len() {
-                    *len = net_vxs.len();
-                    chains.clear();
-                }
-
-                chains.push(*chain_ix);
-            }
-        }
-        */
-
-        chain_edges
-    }
-
     pub fn bridge_edges(&self) -> Vec<(u64, u64)> {
         self.original_graph
             .graph
@@ -323,8 +269,8 @@ impl<'a> CactusTree<'a> {
         let tree_graph = &self.graph;
 
         let vertices: FnvHashSet<u64> = path
-            .into_iter()
-            .filter_map(|n| {
+            .iter()
+            .filter_map(|&n| {
                 if tree_graph.is_net_vertex(n) {
                     proj_inv.get(&n)
                 } else {
@@ -405,91 +351,121 @@ impl<'a> CactusTree<'a> {
             graph: net_graph,
             x,
             y,
+            path,
         })
+    }
+
+    pub fn is_bridge_pair_ultrabubble(
+        &self,
+        labels: &FnvHashMap<(u64, u64), bool>,
+        x: u64,
+        y: u64,
+        path: &[u64],
+    ) -> Option<Vec<(u64, u64)>> {
+        let p_x = self.projected_node(x);
+
+        let a = opposite_vertex(x);
+        let b = opposite_vertex(y);
+        let p_a = self.projected_node(a);
+        let p_b = self.projected_node(b);
+
+        let mut visited: FnvHashSet<u64> = FnvHashSet::default();
+        let mut stack: Vec<(u64, u64)> = Vec::new();
+
+        visited.insert(p_a);
+        visited.insert(p_b);
+
+        let mut children = Vec::new();
+
+        for n in self.base_graph().neighbors(p_x) {
+            if !visited.contains(&n) {
+                stack.push((p_x, n));
+            }
+        }
+        while let Some((prev, current)) = stack.pop() {
+            if !visited.contains(&current) {
+                visited.insert(prev);
+                visited.insert(current);
+                // println!("getting {}, {}", prev, current);
+
+                if self.graph.is_chain_vertex(prev)
+                    && self.graph.is_net_vertex(current)
+                {
+                    if let Some(is_ultrabubble) = labels.get(&(current, prev)) {
+                        if !is_ultrabubble {
+                            println!(
+                                "getting {}, {} - not ultrabubble",
+                                current, prev
+                            );
+                            // labels.insert((p_x, chain_vx), false);
+                            return None;
+                        } else {
+                            children.push((current, prev));
+                        }
+                    }
+                }
+
+                for n in self.base_graph().neighbors(current) {
+                    if !visited.contains(&n) {
+                        stack.push((current, n));
+                    }
+                }
+            }
+        }
+
+        Some(children)
     }
 
     pub fn is_chain_pair_ultrabubble(
         &self,
-        // labels: &mut FnvHashMap<u64, bool>,
-        labels: &mut FnvHashMap<(u64, u64, u64), bool>,
+        labels: &mut FnvHashMap<(u64, u64), bool>,
         x: u64,
         y: u64,
         chain_vx: u64,
-    ) -> bool {
+    ) -> Option<Vec<(u64, u64)>> {
         if !self.cactus_graph.is_chain_pair(x, y) {
-            return false;
+            return None;
         }
+
         let p_x = self.projected_node(x);
-
-        // let chain_edge =
-
-        if let Some(is_ultrabubble) = labels.get(&(x, y, chain_vx)) {
+        if let Some(is_ultrabubble) = labels.get(&(p_x, chain_vx)) {
             if !is_ultrabubble {
-                // println!("\t{} {} is not ultrabubble", x, y);
-                // println!("\t{} {} is not ultrabubble", p_x, chain_vx);
-                return false;
+                return None;
             }
         }
-
-        // let p_y = self.projected_node(y);
 
         let mut visited: FnvHashSet<u64> = FnvHashSet::default();
-        // visited.insert(p_x);
-
-        if self
-            .graph
-            .graph
-            .neighbors(chain_vx)
-            .filter(|&n| n != p_x)
-            .count()
-            == 0
-        {
-            if let Some(is_ultrabubble) = labels.get(&(x, y, chain_vx)) {
-                return *is_ultrabubble;
-            } else {
-                return false;
-            }
-        }
-
         let mut stack: Vec<(u64, u64)> = Vec::new();
         visited.insert(chain_vx);
         stack.push((chain_vx, p_x));
 
-        let mut last_chain = chain_vx;
+        let mut children = Vec::new();
 
-        // if self.graph.graph.neighbors(
-
-        //         for (_, adj, _) in self.graph.graph.edges(current) {
-
-        // println!("\nultrabubble {} {} - {}", x, y, chain_vx);
-        // println!("projected {}", p_x);
         while let Some((prev, current)) = stack.pop() {
-            // println!(" at node {}", current);
             if !visited.contains(&current) {
-                let a = prev.min(current);
-                let b = prev.max(current);
-                if let Some(is_ultrabubble) = labels.get(&(a, b, last_chain)) {
-                    // println!("at chain label {}\t{}", current, is_ultrabubble);
-                    if !is_ultrabubble {
-                        // labels.insert(chain_vx, false);
-                        return false;
+                visited.insert(current);
+
+                if prev > current {
+                    if let Some(is_ultrabubble) = labels.get(&(current, prev)) {
+                        // println!("getting {}, {}", current, prev);
+                        if !is_ultrabubble {
+                            labels.insert((p_x, chain_vx), false);
+                            return None;
+                        } else {
+                            children.push((current, prev));
+                        }
                     }
                 }
 
-                if self.graph.is_chain_vertex(current) {
-                    last_chain = current;
-                }
-                visited.insert(current);
-
-                for (_, adj, _) in self.graph.graph.edges(current) {
-                    if !visited.contains(&adj) {
-                        stack.push((current, adj));
+                for n in self.base_graph().neighbors(current) {
+                    if !visited.contains(&n) {
+                        stack.push((current, n));
                     }
                 }
             }
         }
 
-        true
+        Some(children)
     }
 }
 

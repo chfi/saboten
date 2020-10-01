@@ -15,6 +15,7 @@ pub struct NetGraph {
     pub graph: BiedgedGraph,
     pub x: u64,
     pub y: u64,
+    pub path: Vec<u64>,
 }
 
 #[derive(Debug, PartialEq)]
