@@ -2,23 +2,21 @@ use crate::{biedgedgraph::*, projection::Projection};
 
 use fnv::{FnvHashMap, FnvHashSet};
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-
 use three_edge_connected as t_e_c;
 
 /// STEP 1: Contract all gray edges
-pub fn contract_all_gray_edges(
+pub(crate) fn contract_all_gray_edges(
     biedged: &mut BiedgedGraph,
     projection: &mut Projection,
 ) {
     while biedged.gray_edge_count() > 0 {
         let (from, to, _w) = biedged.gray_edges().next().unwrap();
-        let kept = biedged.contract_edge(from, to, projection).unwrap();
+        biedged.contract_edge(from, to, projection).unwrap();
     }
 }
 
 /// STEP 2: Find 3-edge connected components
-pub fn find_3_edge_connected_components(
+pub(crate) fn find_3_edge_connected_components(
     biedged: &BiedgedGraph,
 ) -> Vec<Vec<usize>> {
     let edges = biedged
@@ -43,7 +41,7 @@ pub fn find_3_edge_connected_components(
 
 // merge the detected components
 
-pub fn merge_components(
+pub(crate) fn merge_components(
     biedged: &mut BiedgedGraph,
     components: Vec<Vec<usize>>,
     projection: &mut Projection,
@@ -69,7 +67,7 @@ pub fn merge_components(
 /// Find the simple cycles in a cactus graph and return them. A cycle
 /// is represented as a vector of vertices, with the same start and
 /// end vertex.
-pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<(u64, u64)>> {
+pub(crate) fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<(u64, u64)>> {
     let graph = &biedged.graph;
 
     let mut visited: FnvHashSet<u64> = FnvHashSet::default();
@@ -135,7 +133,7 @@ pub fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<(u64, u64)>> {
 
 /// Contracts each cycle into a single vertex, updating the projection
 /// map accordingly.
-pub fn contract_simple_cycles(
+pub(crate) fn contract_simple_cycles(
     biedged: &mut BiedgedGraph,
     cycles: &[Vec<(u64, u64)>],
     projection: &mut Projection,
@@ -152,14 +150,14 @@ pub fn contract_simple_cycles(
 /// Returns a vector of tuples, where the first element is the chain
 /// vertex ID in the graph, and the second element is the index of the
 /// corresponding cycle in the provided cycles vector.
-pub fn build_cactus_tree(
+pub(crate) fn build_cactus_tree(
     biedged: &mut BiedgedGraph,
     cycles: &[Vec<(u64, u64)>],
 ) -> (FnvHashMap<(u64, u64), u64>, FnvHashSet<u64>) {
     let mut cycle_chain_map = FnvHashMap::default();
     let mut chain_vertices = FnvHashSet::default();
 
-    for (i, cycle) in cycles.iter().enumerate() {
+    for cycle in cycles.iter() {
         let chain_vx = biedged.add_chain_vertex();
 
         for (from, to) in cycle {
@@ -247,7 +245,6 @@ pub(crate) fn net_graph_black_edge_walk(
 ) -> bool {
     let start = x;
     let end = y;
-    let adj_start = opposite_vertex(x);
     let adj_end = opposite_vertex(y);
 
     let mut visited: FnvHashSet<u64> = FnvHashSet::default();
@@ -519,31 +516,20 @@ mod tests {
 
         let cycles = find_cycles(&graph);
 
-        let chains = build_cactus_tree(&mut graph, &cycles);
+        let (cycle_chain_map, chain_vertices) =
+            build_cactus_tree(&mut graph, &cycles);
 
-        assert_eq!(cycles.len(), chains.len());
+        assert_eq!(cycles.len(), chain_vertices.len());
 
-        for (chain_vx, cycle_ix) in chains.iter() {
+        for (edge, chain_vx) in cycle_chain_map.iter() {
             let chain_edges = graph
                 .graph
                 .edges(*chain_vx)
                 .map(|x| x.1)
                 .collect::<Vec<_>>();
 
-            let cycle =
-                cycles[*cycle_ix].iter().map(|x| x.1).collect::<Vec<_>>();
-
-            // The neighbors of the chain vertex are the same as the
-            // vertices in the cycle
-            assert_eq!(chain_edges, cycle);
-
-            // None of the edges in the cycle remain in the graph
-            for edge in cycles[*cycle_ix].iter() {
-                assert!(graph.graph.edge_weight(edge.0, edge.1).is_none());
-            }
+            assert!(chain_edges.contains(&edge.0));
+            assert!(chain_edges.contains(&edge.1));
         }
     }
-
-    // #[test]
-    // fn
 }

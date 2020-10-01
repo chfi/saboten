@@ -439,11 +439,10 @@ impl<'a> CactusTree<'a> {
 
                 if prev > current {
                     if let Some(is_ultrabubble) = labels.get(&(current, prev)) {
-                        // println!("getting {}, {}", current, prev);
                         if !is_ultrabubble {
                             labels.insert((p_x, chain_vx), false);
                             return None;
-                        } else {
+                        } else if (current, prev) != (p_x, chain_vx) {
                             children.push((current, prev));
                         }
                     }

@@ -630,7 +630,7 @@ mod tests {
             graph.graph.edge_weight(1, 2)
         );
 
-        graph.add_edge(20, 30, BiedgedWeight::black(1));
+        graph.add_edge(1, 2, BiedgedWeight::black(1));
 
         assert_eq!(
             Some(&BiedgedWeight { black: 1, gray: 1 }),
@@ -781,8 +781,6 @@ mod tests {
 
     #[test]
     fn merge_two_vertices() {
-        use Orientation::Forward as F;
-
         let edges =
             vec![(0, 1), (0, 2), (1, 3), (2, 3), (3, 4), (3, 5), (3, 0)];
 
@@ -808,13 +806,7 @@ mod tests {
 
         assert_eq!(
             edges,
-            vec![
-                (7, 6, 1, 0),
-                (7, 7, 2, 0),
-                (7, 10, 0, 1),
-                (7, 4, 0, 1),
-                (7, 2, 0, 1)
-            ]
+            vec![(7, 6, 1, 0), (7, 10, 0, 1), (7, 4, 0, 1), (7, 2, 0, 1)]
         );
 
         let merged: Vec<u64> = vec![0, 1, 7, 8, 9];
