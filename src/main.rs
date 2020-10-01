@@ -7,6 +7,7 @@ use structopt::StructOpt;
 
 use rs_cactusgraph::{
     biedgedgraph::*,
+    cactusgraph,
     cactusgraph::{BiedgedWrapper, BridgeForest, CactusGraph, CactusTree},
     netgraph::NetGraph,
 };
@@ -77,109 +78,29 @@ fn main() {
 
     let cactus_tree = CactusTree::from_cactus_graph(&cactus_graph);
 
-    let chain_pairs = cactus_tree.find_chain_pairs();
-
-    let chain_net_graphs: Vec<((u64, u64), NetGraph)> = chain_pairs
-        .iter()
-        .map(|&(a, b)| {
-            let net_graph = cactus_tree.build_net_graph(a, b).unwrap();
-            ((a, b), net_graph)
-        })
-        .collect();
-
-    let mut chain_edge_labels: FnvHashMap<(u64, u64), bool> =
-        FnvHashMap::default();
-
-    for (chain_pair, net_graph) in chain_net_graphs.iter() {
-        let result = net_graph.is_ultrabubble();
-
-        let a = chain_pair.0.min(chain_pair.1);
-        let c_x = cactus_tree.black_edge_chain_vertex(a).unwrap();
-
-        let p_a = cactus_tree.projected_node(a);
-
-        let key = (p_a, c_x);
-        chain_edge_labels.insert(key, result);
-    }
-
-    let mut chain_pair_ultrabubbles = Vec::new();
-    for &(x, y) in chain_pairs.iter() {
-        let c_x = cactus_tree.black_edge_chain_vertex(x).unwrap();
-
-        let contained_chain_pairs = cactus_tree.is_chain_pair_ultrabubble(
-            &mut chain_edge_labels,
-            x,
-            y,
-            c_x,
-        );
-
-        if let Some(children) = contained_chain_pairs {
-            chain_pair_ultrabubbles.push((x, y, children));
-        }
-    }
-
     let bridge_forest = BridgeForest::from_cactus_graph(&cactus_graph);
 
-    let bridge_pairs = bridge_forest.find_bridge_pairs();
+    let ultrabubbles =
+        cactusgraph::find_ultrabubbles(&cactus_tree, &bridge_forest);
 
-    let bridge_net_graphs: Vec<((u64, u64), NetGraph)> = bridge_pairs
-        .iter()
-        .map(|&(a, b)| {
-            let net_graph = cactus_tree.build_net_graph(a, b).unwrap();
-            ((a, b), net_graph)
-        })
-        .collect();
-
-    let mut bridge_pair_labels: FnvHashMap<(u64, u64), bool> =
-        FnvHashMap::default();
-
-    println!(" --- Chain Pairs  --- ");
-    println!("x\ty\tnet\tchain\tcontains");
+    println!("x\ty\tnet\tchain/edges\tcontains");
     println!();
-    for (x, y, contained) in chain_pair_ultrabubbles.iter() {
-        let chain = cactus_tree.black_edge_chain_vertex(*x).unwrap();
+    for ((x, y), contained) in ultrabubbles.iter() {
         let net = cactus_tree.projected_node(*x);
-        print!("{}\t{}\t{}\t{}", x, y, net, chain);
-        if !contained.is_empty() {
-            print!("\t{:?}", contained);
-        }
-        println!();
-    }
 
-    let mut bridge_pair_ultrabubbles = Vec::new();
+        // if x's black edge maps to a chain vertex, this is a chain pair
+        if let Some(chain) = cactus_tree.black_edge_chain_vertex(*x) {
+            print!("{}\t{}\t{}\t\t{}", x, y, net, chain);
+        } else {
+            let x_black_edge = end_to_black_edge(*x);
+            let y_black_edge = end_to_black_edge(*y);
 
-    println!();
-    for (bridge_pair, net_graph) in bridge_net_graphs.iter() {
-        let result = net_graph.is_ultrabubble();
-        bridge_pair_labels.insert(*bridge_pair, result);
-        if result {
-            let x = bridge_pair.0;
-            let y = bridge_pair.1;
-
-            let contained_chain_pairs = cactus_tree.is_bridge_pair_ultrabubble(
-                &chain_edge_labels,
-                x,
-                y,
-                &net_graph.path,
+            print!(
+                "{}\t{}\t{}\t{:?}\t{:?}",
+                x, y, net, x_black_edge, y_black_edge
             );
-
-            if let Some(children) = contained_chain_pairs {
-                bridge_pair_ultrabubbles.push((x, y, children));
-            }
         }
-    }
 
-    println!(" --- Bridge Pairs --- ");
-    println!("x\ty\tnet\tx edge\ty edge\tcontains");
-    println!();
-    for (x, y, contained) in bridge_pair_ultrabubbles.iter() {
-        let x_black_edge = end_to_black_edge(*x);
-        let y_black_edge = end_to_black_edge(*y);
-        let net = cactus_tree.projected_node(*x);
-        print!(
-            "{}\t{}\t{}\t{:?}\t{:?}",
-            x, y, net, x_black_edge, y_black_edge
-        );
         if !contained.is_empty() {
             print!("\t{:?}", contained);
         }
