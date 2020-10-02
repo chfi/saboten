@@ -538,19 +538,31 @@ pub fn chain_pair_ultrabubble_labels(
 ) -> FnvHashMap<(u64, u64), bool> {
     let mut chain_edge_labels = FnvHashMap::default();
 
+    let mut net_graphs: FnvHashMap<(u64, u64), NetGraph> =
+        FnvHashMap::default();
+
     for &snarl in chain_pairs.iter() {
         if let Snarl::ChainPair { x, y } = snarl {
-            let net_graph = cactus_tree.build_net_graph(x, y).unwrap();
+            let net = cactus_tree.projected_node(x);
+            let chain = cactus_tree.black_edge_chain_vertex(x).unwrap();
+            let key = (net, chain);
 
-            let result = net_graph.is_ultrabubble();
+            if let Some(is_ultrabubble) = chain_edge_labels.get(&key) {
+            } else {
+                let net_graph = if let Some(net_graph) =
+                    net_graphs.get(&(net, chain))
+                {
+                    net_graph
+                } else {
+                    let net_graph = cactus_tree.build_net_graph(x, y).unwrap();
+                    net_graphs.insert(key, net_graph);
+                    net_graphs.get(&key).unwrap()
+                };
 
-            let a = x.min(y);
-            let c_x = cactus_tree.black_edge_chain_vertex(a).unwrap();
+                let result = net_graph.is_ultrabubble();
 
-            let p_a = cactus_tree.projected_node(a);
-
-            let key = (p_a, c_x);
-            chain_edge_labels.insert(key, result);
+                chain_edge_labels.insert(key, result);
+            }
         }
     }
 
