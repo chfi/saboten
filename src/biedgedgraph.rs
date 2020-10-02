@@ -426,7 +426,7 @@ impl BiedgedGraph {
         let to_edges: Vec<(u64, u64, BiedgedWeight)> = self
             .graph
             .edges(to)
-            .filter(|(_, node, _)| node != &from)
+            .filter(|(_, node, _)| node != &from && node != &to)
             .map(|(a, b, w)| (a, b, *w))
             .collect();
 
@@ -450,12 +450,13 @@ impl BiedgedGraph {
         let (from, to) = projection.kept_pair(left, right);
 
         let weight = self.graph.edge_weight(from, to).copied()?;
+        let other_self_weight = self.graph.edge_weight(to, to).copied();
 
         // Retrieve the edges of the node we're removing
         let to_edges: Vec<(u64, u64, BiedgedWeight)> = self
             .graph
             .edges(to)
-            .filter(|(_, node, _)| node != &from)
+            .filter(|(_, node, _)| node != &from && node != &to)
             .map(|(a, b, w)| (a, b, *w))
             .collect();
 
@@ -467,16 +468,14 @@ impl BiedgedGraph {
         }
 
         if weight.black > 0 {
-            let new_weight = BiedgedWeight::black(weight.black);
+            let mut new_weight = BiedgedWeight::black(weight.black);
+            if from != to {
+                let other_black =
+                    other_self_weight.map(|w| w.black).unwrap_or_default();
+                new_weight.black += other_black
+            }
             self.add_edge(from, from, new_weight);
         }
-
-        /*
-        if weight.gray > 1 {
-            let new_weight = BiedgedWeight::gray(weight.gray - 1);
-            self.add_edge(from, from, new_weight);
-        }
-        */
 
         Some(from)
     }
