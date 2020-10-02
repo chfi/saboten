@@ -13,3 +13,4 @@ three-edge-connected = { git = "https://github.com/chfi/rs-3-edge", rev = "e8203
 bstr = "0.2"
 structopt = "0.3"
 fnv = "1.0"
+rayon = "1.4"
