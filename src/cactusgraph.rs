@@ -598,25 +598,41 @@ pub fn bridge_pair_ultrabubbles(
 ) -> FnvHashMap<(u64, u64), Vec<(u64, u64)>> {
     let mut bridge_pair_ultrabubbles = FnvHashMap::default();
 
-    for &snarl in bridge_pairs.iter() {
-        if let Snarl::BridgePair { x, y } = snarl {
-            let net_graph = cactus_tree.build_net_graph(x, y).unwrap();
+    let mut bridge_pair_labels: FnvHashMap<(u64, u64), Vec<u64>> =
+        FnvHashMap::default();
 
-            if net_graph.is_ultrabubble() {
-                let contained_chain_pairs = cactus_tree
-                    .is_bridge_pair_ultrabubble(
-                        &chain_edge_labels,
-                        x,
-                        y,
-                        &net_graph.path,
-                    );
+    bridge_pair_labels.par_extend(bridge_pairs.par_iter().filter_map(
+        |&snarl| {
+            if let Snarl::BridgePair { x, y } = snarl {
+                let net_graph = cactus_tree.build_net_graph(x, y).unwrap();
 
-                if let Some(children) = contained_chain_pairs {
-                    bridge_pair_ultrabubbles.insert((x, y), children);
+                if net_graph.is_ultrabubble() {
+                    Some(((x, y), net_graph.path.clone()))
+                } else {
+                    None
                 }
+            } else {
+                None
             }
-        }
-    }
+        },
+    ));
+
+    bridge_pair_ultrabubbles.par_extend(
+        bridge_pair_labels.par_iter().filter_map(|(&(x, y), path)| {
+            let contained_chain_pairs = cactus_tree.is_bridge_pair_ultrabubble(
+                &chain_edge_labels,
+                x,
+                y,
+                path,
+            );
+
+            if let Some(children) = contained_chain_pairs {
+                Some(((x, y), children))
+            } else {
+                None
+            }
+        }),
+    );
 
     bridge_pair_ultrabubbles
 }
