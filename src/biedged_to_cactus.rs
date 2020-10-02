@@ -29,7 +29,7 @@ pub(crate) fn find_3_edge_connected_components(
 
     let graph = t_e_c::Graph::from_edges(edges.into_iter());
 
-    let (components, _) = t_e_c::find_components(&graph.graph);
+    let components = t_e_c::find_components(&graph.graph);
 
     let components: Vec<_> =
         components.into_iter().filter(|c| c.len() > 1).collect();
