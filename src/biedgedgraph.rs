@@ -223,7 +223,6 @@ impl BiedgedGraph {
         let mut graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
         for (a, a_o, b, b_o) in i {
-            // println!("Adding edge\t({}, {})\t->\t({}, {})", a, a_o, b, b_o);
             min_node_id = min_node_id.min(a.min(b));
             max_node_id = max_node_id.max(a.max(b));
 
@@ -232,12 +231,10 @@ impl BiedgedGraph {
 
             if !graph.contains_edge(a_l, a_r) {
                 graph.add_edge(a_l, a_r, BiedgedWeight::black(1));
-                // println!("adding black edge\t{}, {}", a_l, a_r);
             }
 
             if !graph.contains_edge(b_l, b_r) {
                 graph.add_edge(b_l, b_r, BiedgedWeight::black(1));
-                // println!("adding black edge\t{}, {}", b_l, b_r);
             }
 
             let (left, right) = match (a_o, b_o) {
@@ -282,11 +279,6 @@ impl BiedgedGraph {
             be_graph.add_edge(left, right, BiedgedWeight::black(1));
         }
 
-        // Ensure the GFA segment IDs are compact in 0..len
-        assert_eq!(min_seg_id as usize, 0);
-        assert_eq!(max_seg_id as usize, gfa.segments.len() - 1);
-        assert_eq!(max_node_id as usize, (2 * gfa.segments.len()) - 1);
-
         use Orientation::*;
 
         for link in gfa.links.iter() {
@@ -304,13 +296,6 @@ impl BiedgedGraph {
             };
 
             be_graph.add_edge(left, right, BiedgedWeight::gray(1));
-
-            /*
-            let (_, from) = id_to_black_edge(link.from_segment as u64);
-            let (to, _) = id_to_black_edge(link.to_segment as u64);
-
-            be_graph.add_edge(from, to, BiedgedWeight::gray(1));
-            */
         }
 
         let max_net_vertex = max_node_id as u64;
@@ -325,10 +310,13 @@ impl BiedgedGraph {
 
     /// Convert a GFA to a biedged graph if file exists
     /// otherwise return None
-    pub fn from_gfa_file(path: &PathBuf) -> Option<BiedgedGraph> {
+    pub fn from_gfa_file(
+        path: &PathBuf,
+    ) -> Result<BiedgedGraph, Box<dyn std::error::Error>> {
         let parser = GFAParser::new();
-        let gfa: GFA<usize, ()> = parser.parse_file(path).ok()?;
-        Some(BiedgedGraph::from_gfa(&gfa))
+        let gfa: GFA<usize, ()> = parser.parse_file(path)?;
+        let biedged = BiedgedGraph::from_gfa(&gfa);
+        Ok(biedged)
     }
 
     /// Add the node with the given id to the graph
@@ -600,6 +588,34 @@ impl BiedgedGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[allow(dead_code)]
+    fn example_graph_2() -> BiedgedGraph {
+        let edges = vec![
+            (0, 1),
+            (0, 13),
+            (1, 2),
+            (1, 3),
+            (2, 4),
+            (3, 4),
+            (4, 5),
+            (4, 6),
+            (5, 7),
+            (6, 7),
+            (7, 8),
+            (7, 12),
+            (8, 9),
+            (8, 10),
+            (9, 11),
+            (10, 11),
+            (11, 12),
+            (12, 13),
+        ];
+
+        let graph = BiedgedGraph::from_directed_edges(edges).unwrap();
+
+        graph
+    }
 
     #[test]
     fn test_add_node() {

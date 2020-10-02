@@ -604,15 +604,11 @@ pub fn bridge_pair_ultrabubbles(
         |&snarl| {
             if let Snarl::BridgePair { x, y } = snarl {
                 let net_graph = cactus_tree.build_net_graph(x, y).unwrap();
-
                 if net_graph.is_ultrabubble() {
-                    Some(((x, y), net_graph.path.clone()))
-                } else {
-                    None
+                    return Some(((x, y), net_graph.path.clone()));
                 }
-            } else {
-                None
             }
+            None
         },
     ));
 
@@ -625,11 +621,7 @@ pub fn bridge_pair_ultrabubbles(
                 path,
             );
 
-            if let Some(children) = contained_chain_pairs {
-                Some(((x, y), children))
-            } else {
-                None
-            }
+            contained_chain_pairs.map(|c| ((x, y), c))
         }),
     );
 

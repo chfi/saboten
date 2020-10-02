@@ -1,7 +1,5 @@
 use std::path::PathBuf;
 
-use bstr::BString;
-
 use structopt::StructOpt;
 
 use rs_cactusgraph::{
@@ -10,62 +8,18 @@ use rs_cactusgraph::{
     cactusgraph::{BiedgedWrapper, BridgeForest, CactusGraph, CactusTree},
 };
 
-use gfa::{
-    gfa::{name_conversion::NameMap, GFA},
-    parser::GFAParser,
-};
+use gfa::{gfa::GFA, parser::GFAParser};
 
 #[derive(StructOpt, Debug)]
 struct Opt {
     in_gfa: PathBuf,
 }
 
-fn example_graph_2() -> BiedgedGraph {
-    let edges = vec![
-        (0, 1),
-        (0, 13),
-        (1, 2),
-        (1, 3),
-        (2, 4),
-        (3, 4),
-        (4, 5),
-        (4, 6),
-        (5, 7),
-        (6, 7),
-        (7, 8),
-        (7, 12),
-        (8, 9),
-        (8, 10),
-        (9, 11),
-        (10, 11),
-        (11, 12),
-        (12, 13),
-    ];
-
-    let graph = BiedgedGraph::from_directed_edges(edges).unwrap();
-
-    graph
-}
-
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
-    let mut gfa_name_map = None;
-
-    let gfa = {
-        let parser = GFAParser::new();
-        let bstr_gfa: GFA<BString, ()> =
-            parser.parse_file(&opt.in_gfa).unwrap();
-
-        let name_map = NameMap::build_from_gfa(&bstr_gfa);
-
-        let usize_gfa =
-            name_map.gfa_bstring_to_usize(&bstr_gfa, false).unwrap();
-
-        gfa_name_map = Some(name_map);
-
-        usize_gfa
-    };
+    let parser: GFAParser<usize, ()> = GFAParser::new();
+    let gfa: GFA<usize, ()> = parser.parse_file(&opt.in_gfa)?;
 
     let be_graph = BiedgedGraph::from_gfa(&gfa);
 
@@ -103,4 +57,6 @@ fn main() {
         }
         println!();
     }
+
+    Ok(())
 }
