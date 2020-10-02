@@ -1,4 +1,3 @@
-use fnv::FnvHashMap;
 use std::path::PathBuf;
 
 use bstr::BString;
@@ -9,7 +8,6 @@ use rs_cactusgraph::{
     biedgedgraph::*,
     cactusgraph,
     cactusgraph::{BiedgedWrapper, BridgeForest, CactusGraph, CactusTree},
-    netgraph::NetGraph,
 };
 
 use gfa::{
@@ -70,7 +68,6 @@ fn main() {
     };
 
     let be_graph = BiedgedGraph::from_gfa(&gfa);
-    // let mut be_graph = example_graph_2();
 
     let orig_graph = be_graph.clone();
 

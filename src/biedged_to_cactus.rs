@@ -138,8 +138,20 @@ pub(crate) fn contract_simple_cycles(
     projection: &mut Projection,
 ) {
     for cycle in cycles {
-        for (from, to) in cycle {
-            biedged.merge_vertices(*from, *to, projection);
+        for &(from, to) in cycle {
+            let from = if biedged.graph.contains_node(from) {
+                from
+            } else {
+                projection.find(from)
+            };
+
+            let to = if biedged.graph.contains_node(to) {
+                to
+            } else {
+                projection.find(to)
+            };
+
+            biedged.merge_vertices(from, to, projection);
         }
     }
 }

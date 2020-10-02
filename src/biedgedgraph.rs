@@ -417,14 +417,12 @@ impl BiedgedGraph {
     /// of the provided vertices were not present in the graph.
     pub fn merge_vertices(
         &mut self,
-        left: u64,
-        right: u64,
+        from: u64,
+        to: u64,
         projection: &mut Projection,
     ) -> Option<u64> {
-        // is this necessary? I think so?
-        projection.union(left, right);
-        let (from, to) = projection.kept_pair(left, right);
-
+        projection.union(from, to);
+        let (from, to) = projection.kept_pair(from, to);
         if !self.graph.contains_node(from) || !self.graph.contains_node(to) {
             return None;
         }

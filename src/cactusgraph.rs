@@ -233,7 +233,6 @@ impl<'a> CactusTree<'a> {
         for n in self.base_graph().nodes() {
             if self.graph.is_net_vertex(n) {
                 let b_ns = cactus_graph_inverse.get(&n).unwrap();
-
                 for &a in b_ns.iter() {
                     for &b in b_ns.iter() {
                         if a != b && opposite_vertex(a) != b {
@@ -642,6 +641,7 @@ pub fn find_ultrabubbles(
     bridge_forest: &BridgeForest<'_>,
 ) -> FnvHashMap<(u64, u64), Vec<(u64, u64)>> {
     let chain_pairs = cactus_tree.find_chain_pairs();
+
     let bridge_pairs = bridge_forest.find_bridge_pairs();
 
     let mut chain_edge_labels =
