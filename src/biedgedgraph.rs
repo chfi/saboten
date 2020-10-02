@@ -356,6 +356,13 @@ impl BiedgedGraph {
         self.graph.all_edges().filter(|(_, _, w)| w.gray > 0)
     }
 
+    pub fn next_gray_edge(&self) -> Option<(u64, u64)> {
+        self.graph
+            .all_edges()
+            .find(|(_, _, w)| w.gray > 0)
+            .map(|x| (x.0, x.1))
+    }
+
     /// Returns an iterator over the black edges in the graph, where
     /// the first two elements in the tuple are the `from` and `to`
     /// nodes, and the third is the weight containing the number of

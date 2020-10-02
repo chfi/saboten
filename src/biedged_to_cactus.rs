@@ -9,8 +9,7 @@ pub(crate) fn contract_all_gray_edges(
     biedged: &mut BiedgedGraph,
     projection: &mut Projection,
 ) {
-    while biedged.gray_edge_count() > 0 {
-        let (from, to, _w) = biedged.gray_edges().next().unwrap();
+    while let Some((from, to)) = biedged.next_gray_edge() {
         biedged.contract_edge(from, to, projection).unwrap();
     }
 }
