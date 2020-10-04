@@ -30,6 +30,8 @@ macro_rules! impl_biedged_wrapper {
     };
 }
 
+/// Convenience trait for providing a unified interface when accessing
+/// the underlying graph structure across the various graph types.
 pub trait BiedgedWrapper {
     fn base_graph(&self) -> &UnGraphMap<u64, BiedgedWeight>;
 
@@ -44,6 +46,12 @@ pub trait BiedgedWrapper {
     }
 }
 
+/// A cactus graph constructed from a biedged graph. The constructor
+/// clones the original graph to mutate, but also keeps a reference to
+/// original. This ensures the original can't be accidentally mutated
+/// while the CactusGraph exists, and makes it easy to access the
+/// untouched original graph. The mapping of vertices is tracked using
+/// the embedded `Projection` struct.
 #[derive(Clone)]
 pub struct CactusGraph<'a> {
     pub original_graph: &'a BiedgedGraph,
@@ -56,6 +64,9 @@ pub struct CactusGraph<'a> {
 impl_biedged_wrapper!(CactusGraph<'a>);
 
 impl<'a> CactusGraph<'a> {
+    /// Construct a cactus graph from a biedged graph. Clones the
+    /// input graph before mutating, and keeps a reference to the
+    /// original.
     pub fn from_biedged_graph(biedged_graph: &'a BiedgedGraph) -> Self {
         let mut graph = biedged_graph.clone();
 
@@ -112,10 +123,14 @@ impl<'a> CactusGraph<'a> {
         let graph = three_edge_connected::Graph::from_edges(edges.into_iter());
 
         let components = three_edge_connected::find_components(&graph.graph);
-
+        // Many of the components returned by the algorithm can be singletons, which we don't need to do anything with, hence we filter them out.
         let components: Vec<_> =
             components.into_iter().filter(|c| c.len() > 1).collect();
 
+        // The 3EC library maps the graph into node IDs starting from
+        // zero; even if the input biedged graph also does so, it's
+        // better to make sure the node IDs are mapped backed to their
+        // input IDs.
         let components = graph.invert_components(components);
 
         components
@@ -143,9 +158,9 @@ impl<'a> CactusGraph<'a> {
         }
     }
 
-    /// Find the simple cycles in a cactus graph and return them. A cycle
-    /// is represented as a vector of vertices, with the same start and
-    /// end vertex.
+    /// Find the simple cycles in a cactus graph and return them. A
+    /// cycle is represented as a vector of vertices, with the same
+    /// start and end vertex.
     fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<(u64, u64)>> {
         let graph = &biedged.graph;
 
@@ -208,12 +223,9 @@ impl<'a> CactusGraph<'a> {
         cycles
     }
 
-    /*
-
-
-    */
-
-    pub fn black_edge_cycle(&self, x: u64) -> Option<&Vec<usize>> {
+    /// Given a vertex ID in the original biedged graph, find the
+    /// simple cycle its incident black edge maps to.
+    fn black_edge_cycle(&self, x: u64) -> Option<&Vec<usize>> {
         let (l, r) = end_to_black_edge(x);
         let p_l = self.projection.find(l);
         let p_r = self.projection.find(r);
@@ -244,6 +256,12 @@ impl<'a> CactusGraph<'a> {
     }
 }
 
+/// A cactus tree derived from a cactus graph. Like the CactusGraph
+/// struct, this clones the underlying graph before mutating it into a
+/// cactus tree, and keeps a reference both to the original biedged
+/// graph as well as the cactus graph. Because the cactus tree only
+/// adds chain vertices, and only removes edges, no vertices, there's
+/// no need to track vertex projections.
 pub struct CactusTree<'a> {
     pub original_graph: &'a BiedgedGraph,
     pub cactus_graph: &'a CactusGraph<'a>,
@@ -311,6 +329,8 @@ impl<'a> CactusTree<'a> {
         (cycle_chain_map, chain_vertices)
     }
 
+    /// Given a vertex in the original biedged graph, find the chain
+    /// vertex its incident black edge projects to.
     pub fn black_edge_chain_vertex(&self, b: u64) -> Option<u64> {
         let (l, r) = end_to_black_edge(b);
         let p_l = self.projected_node(l);
@@ -347,20 +367,8 @@ impl<'a> CactusTree<'a> {
         }
     }
 
-    pub fn bridge_edges(&self) -> Vec<(u64, u64)> {
-        self.original_graph
-            .graph
-            .all_edges()
-            .filter_map(|(a, b, w)| {
-                if w.black > 0 && self.is_bridge_edge(a, b) {
-                    Some((a, b))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
+    /// Find the chain pairs using the chain vertices in the cactus
+    /// tree, and return them as a set of snarls.
     pub fn find_chain_pairs(&self) -> FnvHashSet<Snarl> {
         let mut chain_pairs: FnvHashSet<Snarl> = FnvHashSet::default();
 
@@ -389,6 +397,8 @@ impl<'a> CactusTree<'a> {
         chain_pairs
     }
 
+    /// Find the path between two vertices, used when constructing net
+    /// graphs.
     fn snarl_cactus_tree_path(
         &self,
         projection: &Projection,
@@ -423,13 +433,9 @@ impl<'a> CactusTree<'a> {
 
                     let neighbors = neighbors.filter(|&n| {
                         if current_net_vertex {
-                            cactus_tree.is_chain_vertex(n)
-                            // && n != prev
-                            && n != current
+                            cactus_tree.is_chain_vertex(n) && n != current
                         } else {
-                            cactus_tree.is_net_vertex(n)
-                            // && n != prev
-                            && n != current
+                            cactus_tree.is_net_vertex(n) && n != current
                         }
                     });
 
@@ -502,13 +508,14 @@ impl<'a> CactusTree<'a> {
         false
     }
 
-    pub fn build_net_graph(&self, x: u64, y: u64) -> Option<NetGraph> {
+    /// Build the net graph for the given snarl.
+    pub fn build_net_graph(&self, x: u64, y: u64) -> NetGraph {
         let orig_graph = self.original_graph;
 
         let path =
             self.snarl_cactus_tree_path(&self.cactus_graph.projection, x, y)?;
 
-        let proj_inv = self.cactus_graph.projection.get_inverse()?;
+        let proj_inv = self.cactus_graph.projection.get_inverse().unwrap();
 
         let tree_graph = &self.graph;
 
@@ -591,14 +598,75 @@ impl<'a> CactusTree<'a> {
             net_graph.add_edge(*a, *b, BiedgedWeight::black(1));
         }
 
-        Some(NetGraph {
+        NetGraph {
             graph: net_graph,
             x,
             y,
             path,
-        })
+        }
     }
 
+    /// Recursively check whether all of the chain pairs contained
+    /// within the given chain pair are ultrabubbles. If so, returns a
+    /// Some containing a vector of the contained chain pairs as chain
+    /// edges, otherwise, if the chain pair isn't an ultrabubble,
+    /// returns None.
+    pub fn is_chain_pair_ultrabubble(
+        &self,
+        labels: &mut FnvHashMap<(u64, u64), bool>,
+        x: u64,
+        y: u64,
+        chain_vx: u64,
+    ) -> Option<Vec<(u64, u64)>> {
+        if !self.cactus_graph.is_chain_pair(x, y) {
+            return None;
+        }
+
+        let p_x = self.projected_node(x);
+        if let Some(is_ultrabubble) = labels.get(&(p_x, chain_vx)) {
+            if !is_ultrabubble {
+                return None;
+            }
+        }
+
+        let mut visited: FnvHashSet<u64> = FnvHashSet::default();
+        let mut stack: Vec<(u64, u64)> = Vec::new();
+        visited.insert(chain_vx);
+        stack.push((chain_vx, p_x));
+
+        let mut children = Vec::new();
+
+        while let Some((prev, current)) = stack.pop() {
+            if !visited.contains(&current) {
+                visited.insert(current);
+
+                if prev > current {
+                    if let Some(is_ultrabubble) = labels.get(&(current, prev)) {
+                        if !is_ultrabubble {
+                            labels.insert((p_x, chain_vx), false);
+                            return None;
+                        } else if (current, prev) != (p_x, chain_vx) {
+                            children.push((current, prev));
+                        }
+                    }
+                }
+
+                for n in self.base_graph().neighbors(current) {
+                    if !visited.contains(&n) {
+                        stack.push((current, n));
+                    }
+                }
+            }
+        }
+
+        Some(children)
+    }
+
+    /// Recursively check whether all of the chain pairs contained
+    /// within the given bridge pair are ultrabubbles. If so, returns
+    /// a Some containing a vector of the contained chain pairs as
+    /// chain edges, otherwise, if the bridge pair isn't an
+    /// ultrabubble, returns None.
     pub fn is_bridge_pair_ultrabubble(
         &self,
         labels: &FnvHashMap<(u64, u64), bool>,
@@ -651,59 +719,11 @@ impl<'a> CactusTree<'a> {
 
         Some(contained_chain_pairs)
     }
-
-    pub fn is_chain_pair_ultrabubble(
-        &self,
-        labels: &mut FnvHashMap<(u64, u64), bool>,
-        x: u64,
-        y: u64,
-        chain_vx: u64,
-    ) -> Option<Vec<(u64, u64)>> {
-        if !self.cactus_graph.is_chain_pair(x, y) {
-            return None;
-        }
-
-        let p_x = self.projected_node(x);
-        if let Some(is_ultrabubble) = labels.get(&(p_x, chain_vx)) {
-            if !is_ultrabubble {
-                return None;
-            }
-        }
-
-        let mut visited: FnvHashSet<u64> = FnvHashSet::default();
-        let mut stack: Vec<(u64, u64)> = Vec::new();
-        visited.insert(chain_vx);
-        stack.push((chain_vx, p_x));
-
-        let mut children = Vec::new();
-
-        while let Some((prev, current)) = stack.pop() {
-            if !visited.contains(&current) {
-                visited.insert(current);
-
-                if prev > current {
-                    if let Some(is_ultrabubble) = labels.get(&(current, prev)) {
-                        if !is_ultrabubble {
-                            labels.insert((p_x, chain_vx), false);
-                            return None;
-                        } else if (current, prev) != (p_x, chain_vx) {
-                            children.push((current, prev));
-                        }
-                    }
-                }
-
-                for n in self.base_graph().neighbors(current) {
-                    if !visited.contains(&n) {
-                        stack.push((current, n));
-                    }
-                }
-            }
-        }
-
-        Some(children)
-    }
 }
 
+/// A bridge forest derived from a cactus graph. Holds a reference to
+/// the original biedged graph used to build the cactus graph, and
+/// tracks the vertex projections from the original graph.
 pub struct BridgeForest<'a> {
     pub original_graph: &'a BiedgedGraph,
     pub graph: BiedgedGraph,
@@ -758,6 +778,8 @@ impl<'a> BridgeForest<'a> {
         }
     }
 
+    /// Find the bridge pairs in the graph, returning them as a set of
+    /// snarls.
     pub fn find_bridge_pairs(&self) -> FnvHashSet<Snarl> {
         let mut bridge_pairs: FnvHashSet<Snarl> = FnvHashSet::default();
 
@@ -822,7 +844,7 @@ pub fn chain_pair_ultrabubble_labels(
 
     chain_edge_labels.par_extend(chain_edges.par_iter().map(
         |(&(net, chain), &(x, y))| {
-            let net_graph = cactus_tree.build_net_graph(x, y).unwrap();
+            let net_graph = cactus_tree.build_net_graph(x, y);
             let result = net_graph.is_ultrabubble();
             ((net, chain), result)
         },
@@ -871,7 +893,7 @@ pub fn bridge_pair_ultrabubbles(
     bridge_pair_labels.par_extend(bridge_pairs.par_iter().filter_map(
         |&snarl| {
             if let Snarl::BridgePair { x, y } = snarl {
-                let net_graph = cactus_tree.build_net_graph(x, y).unwrap();
+                let net_graph = cactus_tree.build_net_graph(x, y);
                 if net_graph.is_ultrabubble() {
                     return Some(((x, y), net_graph.path.clone()));
                 }
@@ -1059,8 +1081,6 @@ mod tests {
             graph.black_edge_count()
         );
         assert_eq!(graph.graph.node_count(), 12);
-
-        let inv_map = proj.mut_get_inverse();
     }
 
     #[test]
