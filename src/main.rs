@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bridge_forest = BridgeForest::from_cactus_graph(&cactus_graph);
 
     let ultrabubbles =
-        cactusgraph::find_ultrabubbles(&cactus_tree, &bridge_forest);
+        cactusgraph::find_ultrabubbles_par(&cactus_tree, &bridge_forest);
 
     println!("x\ty\tnet\tchain/edges\tcontains");
     println!();
