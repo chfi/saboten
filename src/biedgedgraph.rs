@@ -1,6 +1,4 @@
-use petgraph::{prelude::*, unionfind::UnionFind};
-
-use crate::projection::Projection;
+use petgraph::prelude::*;
 
 use gfa::{
     gfa::{name_conversion::NameMap, Header, Link, Orientation, Segment, GFA},
@@ -10,18 +8,23 @@ use gfa::{
 use bstr::BString;
 
 use std::{
-    collections::BTreeMap,
     io::Write,
     ops::{Add, AddAssign, Sub, SubAssign},
     path::PathBuf,
 };
 
+use crate::projection::Projection;
+
+/// Maps a vertex ID in the original (non-biedged) graph to its black
+/// edge vertices in the corresponding biedged graph.
 pub fn id_to_black_edge(n: u64) -> (u64, u64) {
     let left = n * 2;
     let right = left + 1;
     (left, right)
 }
 
+/// Given a vertex ID in a biedged graph, retrieve its opposite vertex
+/// and return their black edge.
 pub fn end_to_black_edge(n: u64) -> (u64, u64) {
     if n % 2 == 0 {
         (n, n + 1)
@@ -30,6 +33,7 @@ pub fn end_to_black_edge(n: u64) -> (u64, u64) {
     }
 }
 
+/// Given a vertex in a biedged graph, retrieve its opposite vertex.
 pub fn opposite_vertex(n: u64) -> u64 {
     if n % 2 == 0 {
         n + 1
@@ -39,50 +43,15 @@ pub fn opposite_vertex(n: u64) -> u64 {
 }
 
 #[inline]
+/// Maps a vertex in a biedged graph to its ID in the original,
+/// non-biedged graph.
 pub fn id_from_black_edge(n: u64) -> u64 {
     n / 2
 }
 
-pub fn find_projection(proj_map: &BTreeMap<u64, u64>, mut node: u64) -> u64 {
-    while let Some(&next) = proj_map.get(&node) {
-        if node == next {
-            break;
-        } else {
-            node = next;
-        }
-    }
-    node
-}
-
-pub fn projected_node_id(n: u64) -> String {
-    let not_orig = n % 2 != 0;
-    let id = id_from_black_edge(n);
-    let mut name = id.to_string();
-    if not_orig {
-        name.push_str("_");
-    }
-    name
-}
-
-pub fn segment_split_name(name_map: &NameMap, n: u64) -> Option<BString> {
-    let not_orig = n % 2 != 0;
-    let id = id_from_black_edge(n);
-    let mut name: BString = name_map.inverse_map_name(id as usize)?.to_owned();
-    if not_orig {
-        name.push(b'_');
-    }
-    Some(name)
-}
-
-pub fn projected_edge(union: &UnionFind<usize>, a: u64, b: u64) -> (u64, u64) {
-    let x = union.find(a as usize);
-    let y = union.find(b as usize);
-    (x as u64, y as u64)
-}
-
 /// To make a petgraph Graph(Map) into a multigraph, we track the
 /// number of black and gray edges between two nodes by using this
-/// struct as the edge weight type
+/// struct as the edge weight type.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct BiedgedWeight {
     pub black: usize,
@@ -113,6 +82,8 @@ impl BiedgedWeight {
     }
 }
 
+/// Adding two BiedgedWeights adds their corresponding edges, which
+/// makes it easy to move black edges when contracting gray edges.
 impl Add for BiedgedWeight {
     type Output = Self;
 
@@ -149,9 +120,14 @@ impl SubAssign for BiedgedWeight {
     }
 }
 
-/// A biedged graph is a graph with two types of edges: black edges and gray edges, such that each vertex is
-/// incident with at most one black edge. More information can be found in:
-/// Superbubbles, Ultrabubbles, and Cacti by BENEDICT PATEN et al.
+/// A biedged graph is a graph with two types of edges: black edges
+/// and gray edges, such that each vertex is incident with at most one
+/// black edge.
+
+/// To simplify differentiating between net vertices and chain
+/// vertices in the cactus graph, all chain vertices have an index
+/// higher than the original vertices. This also makes it easier to
+/// track the projections.
 #[derive(Default, Clone)]
 pub struct BiedgedGraph {
     pub graph: UnGraphMap<u64, BiedgedWeight>,
@@ -165,15 +141,8 @@ impl BiedgedGraph {
         Default::default()
     }
 
-    pub fn new_node(&mut self) -> u64 {
-        let mut id = self.graph.node_count() as u64;
-        while self.graph.contains_node(id) {
-            id += 1;
-        }
-        self.graph.add_node(id);
-        id
-    }
-
+    /// Adds a chain vertex, ensuring that it has an index higher than
+    /// any net vertex. Returns the new vertex identifier.
     pub fn add_chain_vertex(&mut self) -> u64 {
         self.max_chain_vertex += 1;
         let id = self.max_chain_vertex;
@@ -210,7 +179,6 @@ impl BiedgedGraph {
     /// graph. The edges should be tuples of the form (from, to),
     /// where the elements are node IDs, and each node ID must be in
     /// the range 0..N, where N is the number of nodes.
-    ///
     pub fn from_bidirected_edges<I>(i: I) -> Option<BiedgedGraph>
     where
         I: IntoIterator<Item = (u64, Orientation, u64, Orientation)>,
@@ -260,6 +228,7 @@ impl BiedgedGraph {
         })
     }
 
+    /// Construct a biedged graph from a GFA.
     pub fn from_gfa(gfa: &GFA<usize, ()>) -> BiedgedGraph {
         let mut be_graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
@@ -306,17 +275,6 @@ impl BiedgedGraph {
             max_net_vertex,
             max_chain_vertex,
         }
-    }
-
-    /// Convert a GFA to a biedged graph if file exists
-    /// otherwise return None
-    pub fn from_gfa_file(
-        path: &PathBuf,
-    ) -> Result<BiedgedGraph, Box<dyn std::error::Error>> {
-        let parser = GFAParser::new();
-        let gfa: GFA<usize, ()> = parser.parse_file(path)?;
-        let biedged = BiedgedGraph::from_gfa(&gfa);
-        Ok(biedged)
     }
 
     /// Add the node with the given id to the graph
@@ -433,6 +391,7 @@ impl BiedgedGraph {
         Some(from)
     }
 
+    /// Contract a (gray) edge between two vertices.
     pub fn contract_edge(
         &mut self,
         left: u64,

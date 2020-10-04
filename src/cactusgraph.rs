@@ -1196,9 +1196,24 @@ mod tests {
         assert_eq!(graph.graph.node_count(), 12);
     }
 
+    fn segment_split_name(
+        name_map: &gfa::gfa::name_conversion::NameMap,
+        n: u64,
+    ) -> Option<bstr::BString> {
+        use crate::biedgedgraph::id_from_black_edge;
+        let not_orig = n % 2 != 0;
+        let id = id_from_black_edge(n);
+        let mut name: bstr::BString =
+            name_map.inverse_map_name(id as usize)?.to_owned();
+        if not_orig {
+            name.push(b'_');
+        }
+        Some(name)
+    }
+
     #[test]
     fn edge_contraction_projection() {
-        use crate::biedgedgraph::{id_to_black_edge, segment_split_name};
+        use crate::biedgedgraph::id_to_black_edge;
         use bstr::BString;
         use gfa::{
             gfa::{name_conversion::NameMap, GFA},
