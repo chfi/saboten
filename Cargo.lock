@@ -525,7 +525,8 @@ dependencies = [
 [[package]]
 name = "three-edge-connected"
 version = "0.1.0"
-source = "git+https://github.com/chfi/rs-3-edge?rev=e820360718047668dc66371274bdd756dcfe41bf#e820360718047668dc66371274bdd756dcfe41bf"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1d4f514fa52f24fabf4aa1ccb1fa0a3db091c5836f8a234d3299401e30fbb34"
 dependencies = [
  "bstr",
  "gfa",

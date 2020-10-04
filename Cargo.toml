@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 petgraph = "0.5.0"
 gfa = "0.8"
-three-edge-connected = { git = "https://github.com/chfi/rs-3-edge", rev = "e820360718047668dc66371274bdd756dcfe41bf" }
+three-edge-connected = "0.1"
 bstr = "0.2"
 structopt = "0.3"
 fnv = "1.0"
