@@ -34,6 +34,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ultrabubbles =
         cactusgraph::find_ultrabubbles_par(&cactus_tree, &bridge_forest);
 
+    let ultrabubbles = cactusgraph::inverse_map_ultrabubbles(ultrabubbles);
+
     println!("x\ty\tnet\tchain/edges\tcontains");
     println!();
     for ((x, y), contained) in ultrabubbles.iter() {

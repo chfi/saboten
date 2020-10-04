@@ -1062,6 +1062,24 @@ pub fn find_ultrabubbles_par(
     ultrabubbles
 }
 
+pub fn inverse_map_ultrabubbles(
+    ultrabubbles: FnvHashMap<(u64, u64), Vec<(u64, u64)>>,
+) -> FnvHashMap<(u64, u64), Vec<(u64, u64)>> {
+    ultrabubbles
+        .into_iter()
+        .map(|((x, y), contained)| {
+            use crate::biedgedgraph::id_from_black_edge;
+            let x = id_from_black_edge(x);
+            let y = id_from_black_edge(y);
+            let contained = contained
+                .into_iter()
+                .map(|(a, b)| (id_from_black_edge(a), id_from_black_edge(b)))
+                .collect();
+            ((x, y), contained)
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

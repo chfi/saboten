@@ -1,16 +1,12 @@
 use petgraph::prelude::*;
 
-use gfa::{
-    gfa::{name_conversion::NameMap, Header, Link, Orientation, Segment, GFA},
-    parser::GFAParser,
-};
+use gfa::gfa::{Header, Link, Orientation, Segment, GFA};
 
 use bstr::BString;
 
 use std::{
     io::Write,
     ops::{Add, AddAssign, Sub, SubAssign},
-    path::PathBuf,
 };
 
 use crate::projection::Projection;
