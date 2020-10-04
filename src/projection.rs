@@ -4,6 +4,9 @@ use petgraph::unionfind::UnionFind;
 
 use fnv::FnvHashMap;
 
+/// Encapsulates a mapping of vertices in an original graph to their
+/// projections in another. Also provides an inverse mapping, so as to
+/// find which vertices were projected into a given vertex.
 #[derive(Clone)]
 pub struct Projection {
     pub size: usize,
@@ -14,6 +17,10 @@ pub struct Projection {
 pub type InverseProjection = FnvHashMap<u64, Vec<u64>>;
 
 impl Projection {
+    /// Utility function for use when cloning a graph and its
+    /// projection map, with the intention of mutating them. As the
+    /// inverse map must be rebuilt when there's been any change to
+    /// the projection, there's no sense in cloning that part as well.
     pub fn copy_without_inverse(&self) -> Self {
         Projection {
             size: self.size,
@@ -22,6 +29,9 @@ impl Projection {
         }
     }
 
+    /// Construct a new projection map for a biedged graph. The graph
+    /// must have its vertex IDs tightly packed, starting from zero or
+    /// one.
     pub fn new_for_biedged_graph(graph: &BiedgedGraph) -> Self {
         let size = (graph.max_net_vertex + 1) as usize;
         let union_find = UnionFind::new(size);
@@ -94,6 +104,8 @@ impl Projection {
         }
     }
 
+    /// Constructs the inverse projection map, replacing it if it
+    /// already exists.
     fn build_inverse_replace(&mut self) {
         let mut inverse: InverseProjection = FnvHashMap::default();
         let reps = self.union_find.clone().into_labeling();
@@ -107,6 +119,9 @@ impl Projection {
         self.inverse = Some(inverse);
     }
 
+    /// Constructs the inverse projection map if it does not already
+    /// exist. Returns false if the map already existed and did not
+    /// have to be built.
     pub fn build_inverse(&mut self) -> bool {
         if self.inverse.is_none() {
             self.build_inverse_replace();
@@ -117,6 +132,8 @@ impl Projection {
         }
     }
 
+    /// Retrieves the inverse map, building it if it does not already
+    /// exist.
     pub fn mut_get_inverse(&mut self) -> &InverseProjection {
         if let Some(ref inv) = self.inverse {
             inv
@@ -126,10 +143,14 @@ impl Projection {
         }
     }
 
+    /// Retrieves the inverse map, or None if it hasn't been built.
     pub fn get_inverse(&self) -> Option<&InverseProjection> {
         self.inverse.as_ref()
     }
 
+    /// Given a projected vertex, return a slice containing all the
+    /// vertex in the original graph that projected to it. Returns
+    /// None if the inverse map hasn't been built.
     pub fn projected_from(&self, x: u64) -> Option<&[u64]> {
         let inverse = self.inverse.as_ref()?;
         let projected = inverse.get(&x)?;
