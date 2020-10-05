@@ -235,9 +235,9 @@ impl BiedgedGraph {
         for segment in gfa.segments.iter() {
             let (left, right) = id_to_black_edge(segment.name as u64);
 
+            max_node_id = max_node_id.max(segment.name);
             max_seg_id = segment.name.max(max_seg_id);
             min_seg_id = segment.name.min(min_seg_id);
-            max_node_id = right.max(max_node_id);
 
             be_graph.add_node(left);
             be_graph.add_node(right);
@@ -263,8 +263,8 @@ impl BiedgedGraph {
             be_graph.add_edge(left, right, BiedgedWeight::gray(1));
         }
 
-        let max_net_vertex = max_node_id as u64;
-        let max_chain_vertex = max_node_id as u64;
+        let max_net_vertex = ((max_node_id + 1) * 2) as u64;
+        let max_chain_vertex = max_net_vertex;
 
         BiedgedGraph {
             graph: be_graph,
