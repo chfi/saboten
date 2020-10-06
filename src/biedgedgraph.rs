@@ -208,7 +208,11 @@ impl BiedgedGraph {
                 (Backward, Forward) => (a_l, b_l),
             };
 
-            graph.add_edge(left, right, BiedgedWeight::gray(1));
+            if let Some(w) = graph.edge_weight_mut(left, right) {
+                *w += BiedgedWeight::gray(1);
+            } else {
+                graph.add_edge(left, right, BiedgedWeight::gray(1));
+            }
         }
 
         let max_net_vertex = (max_node_id + 1) * 2;
@@ -260,7 +264,11 @@ impl BiedgedGraph {
                 (Backward, Forward) => (from.0, to.0),
             };
 
-            be_graph.add_edge(left, right, BiedgedWeight::gray(1));
+            if let Some(w) = be_graph.edge_weight_mut(left, right) {
+                *w += BiedgedWeight::gray(1);
+            } else {
+                be_graph.add_edge(left, right, BiedgedWeight::gray(1));
+            }
         }
 
         let max_net_vertex = ((max_node_id + 1) * 2) as u64;
