@@ -9,7 +9,7 @@ use crate::{
     },
     netgraph::NetGraph,
     projection::Projection,
-    ultrabubble::{Snarl, Ultrabubble},
+    ultrabubble::{BridgePair, ChainEdge, ChainPair, Snarl, Ultrabubble},
 };
 
 macro_rules! impl_biedged_wrapper {
@@ -337,6 +337,25 @@ impl<'a> CactusTree<'a> {
         let p_r = self.projected_node(r);
         let chain_vx = self.cycle_chain_map.get(&(p_r, p_l))?;
         Some(*chain_vx)
+    }
+
+    pub fn chain_pair_to_chain_edge(
+        &self,
+        x: u64,
+        y: u64,
+    ) -> Option<ChainEdge> {
+        let chain = self.black_edge_chain_vertex(x)?;
+        let chain_y = self.black_edge_chain_vertex(y)?;
+
+        let p_x = self.projected_node(x);
+        let p_y = self.projected_node(y);
+
+        if chain != chain_y || p_x != p_y {
+            return None;
+        }
+
+        let net = p_x;
+        Some(ChainEdge { net, chain })
     }
 
     pub fn is_chain_edge(&self, a: u64, b: u64) -> bool {
@@ -824,6 +843,46 @@ impl<'a> BridgeForest<'a> {
     }
 }
 
+pub fn chain_edges_sorted(
+    c_edges: &FnvHashMap<ChainEdge, FnvHashSet<ChainPair>>,
+) -> Vec<(ChainEdge, usize)> {
+    let mut edge_counts: Vec<_> = c_edges
+        .iter()
+        .map(|(c_e, pairs)| (*c_e, pairs.len()))
+        .collect();
+
+    edge_counts.sort_by(|a, b| a.1.cmp(&b.1));
+
+    edge_counts
+}
+
+pub fn chain_edges_<'a>(
+    chain_pairs: &'a FnvHashSet<Snarl>,
+    cactus_tree: &'a CactusTree<'a>,
+) -> FnvHashMap<ChainEdge, FnvHashSet<ChainPair>> {
+    let mut chain_edges_map: FnvHashMap<ChainEdge, FnvHashSet<ChainPair>> =
+        FnvHashMap::default();
+
+    for &snarl in chain_pairs.iter() {
+        if let Snarl::ChainPair { x, y } = snarl {
+            let net = cactus_tree.projected_node(x);
+            let chain = cactus_tree.black_edge_chain_vertex(x).unwrap();
+
+            let key = ChainEdge { net, chain };
+
+            let x_ = x.min(y);
+            let y_ = x.max(y);
+            let value = ChainPair { x: x_, y: y_ };
+
+            let entry = chain_edges_map.entry(key).or_default();
+
+            entry.insert(value);
+        }
+    }
+
+    chain_edges_map
+}
+
 /// Return the chain edges in the cactus tree as a map from pairs of
 /// net and chain vertices to chain pair snarls.
 fn chain_edges<'a>(
@@ -837,6 +896,46 @@ fn chain_edges<'a>(
                 let net = cactus_tree.projected_node(x);
                 let chain = cactus_tree.black_edge_chain_vertex(x).unwrap();
                 Some(((net, chain), (x, y)))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+pub fn chain_edges_all<'a>(
+    chain_pairs: &'a FnvHashSet<Snarl>,
+    cactus_tree: &'a CactusTree<'a>,
+) -> FnvHashMap<(u64, u64), FnvHashSet<(u64, u64)>> {
+    let mut chain_edges_map: FnvHashMap<(u64, u64), FnvHashSet<(u64, u64)>> =
+        FnvHashMap::default();
+
+    for &snarl in chain_pairs.iter() {
+        if let Snarl::ChainPair { x, y } = snarl {
+            let net = cactus_tree.projected_node(x);
+            let chain = cactus_tree.black_edge_chain_vertex(x).unwrap();
+            let entry = chain_edges_map.entry((net, chain)).or_default();
+            entry.insert((x, y));
+        }
+    }
+
+    chain_edges_map
+}
+
+fn chain_edges_inv<'a>(
+    chain_pairs: &'a FnvHashSet<Snarl>,
+    cactus_tree: &'a CactusTree<'a>,
+) -> FnvHashMap<(u64, u64), (u64, u64)> {
+    chain_pairs
+        .iter()
+        .filter_map(move |&snarl| {
+            if let Snarl::ChainPair { x, y } = snarl {
+                let x_ = x.min(y);
+                let y_ = x.max(y);
+                let net = cactus_tree.projected_node(x);
+                let chain = cactus_tree.black_edge_chain_vertex(x).unwrap();
+                // Some(((net, chain), (x, y)))
+                Some(((x_, y_), (net, chain)))
             } else {
                 None
             }
@@ -1015,11 +1114,44 @@ pub fn find_ultrabubbles(
         &mut chain_edge_labels,
     );
 
+    // let chain_edges_map = chain_edges(&chain_pairs, cactus_tree);
+
     let bridge_ultrabubbles = bridge_pair_ultrabubbles(
         cactus_tree,
         &bridge_pairs,
         &chain_edge_labels,
     );
+
+    /*
+    let chain_ultrabubbles =
+        chain_ultrabubbles.into_iter().map(|(key, chn_edges)| {
+            (
+                key,
+                chn_edges
+                    .into_iter()
+                    .filter_map(|e| chain_edges_map.get(&e).cloned())
+                    .collect::<Vec<_>>(),
+            )
+        });
+    // .collect();
+    // .collect();
+
+    let bridge_ultrabubbles = bridge_pair_ultrabubbles(
+        cactus_tree,
+        &bridge_pairs,
+        &chain_edge_labels,
+    )
+    .into_iter()
+    .map(|(key, chn_edges)| {
+        (
+            key,
+            chn_edges
+                .into_iter()
+                .filter_map(|e| chain_edges_map.get(&e).cloned())
+                .collect::<Vec<_>>(),
+        )
+    });
+    */
 
     let ultrabubbles = chain_ultrabubbles
         .into_iter()
@@ -1054,10 +1186,34 @@ pub fn find_ultrabubbles_par(
         &chain_edge_labels,
     );
 
+    let chain_edges_map = chain_edges(&chain_pairs, &cactus_tree);
+
+    /*
+    let ultrabubbles = bridge_ultrabubbles
+        .into_iter()
+        .map(|(key, cont)| {
+            (
+                key,
+                cont.into_iter()
+                    .filter_map(|e| chain_edges_map.get(&e).cloned())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect();
+    */
+
     let ultrabubbles = chain_ultrabubbles
         .into_iter()
         .chain(bridge_ultrabubbles.into_iter())
-        .collect::<FnvHashMap<(u64, u64), Vec<(u64, u64)>>>();
+        .map(|(key, cont)| {
+            (
+                key,
+                cont.into_iter()
+                    .filter_map(|e| chain_edges_map.get(&e).cloned())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect();
 
     ultrabubbles
 }
