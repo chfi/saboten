@@ -2,18 +2,19 @@ use std::path::PathBuf;
 
 use structopt::StructOpt;
 
-use rs_cactusgraph::{
+use saboten::{
     biedgedgraph::*,
     cactusgraph,
     cactusgraph::{BridgeForest, CactusGraph, CactusTree},
-    ultrabubble::ChainPair,
+    ultrabubble::Ultrabubble,
 };
 
 use gfa::{gfa::GFA, parser::GFAParser};
 
 #[derive(StructOpt, Debug)]
 struct Opt {
-    in_gfa: PathBuf,
+    /// Path to input GFA file
+    gfa: PathBuf,
     /// Output JSON
     #[structopt(short, long)]
     json: bool,
@@ -23,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
     let parser: GFAParser<usize, ()> = GFAParser::new();
-    let gfa: GFA<usize, ()> = parser.parse_file(&opt.in_gfa)?;
+    let gfa: GFA<usize, ()> = parser.parse_file(&opt.gfa)?;
 
     let be_graph = BiedgedGraph::from_gfa(&gfa);
 
@@ -43,13 +44,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if opt.json {
         let ultrabubble_vec = ultrabubbles
             .iter()
-            .map(|(&(x, y), _)| ChainPair { x, y })
+            .map(|(&(x, y), _)| Ultrabubble { start: x, end: y })
             .collect::<Vec<_>>();
 
         let json = serde_json::to_string(&ultrabubble_vec)?;
         println!("{}", json);
     } else {
-        println!("x\ty");
         for ((x, y), _) in ultrabubbles.iter() {
             println!("{}\t{}", x, y);
         }

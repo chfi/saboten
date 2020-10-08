@@ -9,7 +9,7 @@ use crate::{
     },
     netgraph::NetGraph,
     projection::Projection,
-    ultrabubble::{BridgePair, ChainEdge, ChainPair, Snarl, Ultrabubble},
+    ultrabubble::{ChainEdge, ChainPair, Snarl},
 };
 
 macro_rules! impl_biedged_wrapper {
@@ -920,27 +920,6 @@ pub fn chain_edges_all<'a>(
     }
 
     chain_edges_map
-}
-
-fn chain_edges_inv<'a>(
-    chain_pairs: &'a FnvHashSet<Snarl>,
-    cactus_tree: &'a CactusTree<'a>,
-) -> FnvHashMap<(u64, u64), (u64, u64)> {
-    chain_pairs
-        .iter()
-        .filter_map(move |&snarl| {
-            if let Snarl::ChainPair { x, y } = snarl {
-                let x_ = x.min(y);
-                let y_ = x.max(y);
-                let net = cactus_tree.projected_node(x);
-                let chain = cactus_tree.black_edge_chain_vertex(x).unwrap();
-                // Some(((net, chain), (x, y)))
-                Some(((x_, y_), (net, chain)))
-            } else {
-                None
-            }
-        })
-        .collect()
 }
 
 /// Labels chain edges as ultrabubbles if their net graphs are acyclic
