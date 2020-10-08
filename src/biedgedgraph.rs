@@ -680,8 +680,6 @@ mod tests {
 
     #[test]
     fn contract_multiple_edges() {
-        use Orientation::Forward as F;
-
         let edges =
             vec![(0, 1), (0, 2), (1, 3), (2, 3), (3, 4), (3, 5), (3, 0)];
 
@@ -773,7 +771,7 @@ mod tests {
         graph.merge_vertices(7, 8, &mut proj);
         graph.merge_vertices(7, 9, &mut proj);
 
-        let (x, y) = proj.kept_pair(7, 9);
+        let (x, _y) = proj.kept_pair(7, 9);
 
         let edges_vec = |g: &BiedgedGraph, x: u64| {
             g.graph

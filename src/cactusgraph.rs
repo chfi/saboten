@@ -1375,7 +1375,7 @@ mod tests {
 
         let parser = GFAParser::new();
         let bstr_gfa: GFA<bstr::BString, ()> =
-            parser.parse_file("./paper.gfa").unwrap();
+            parser.parse_file("./test/gfas/paper.gfa").unwrap();
 
         let name_map = NameMap::build_from_gfa(&bstr_gfa);
         let gfa = name_map.gfa_bstring_to_usize(&bstr_gfa, false).unwrap();
