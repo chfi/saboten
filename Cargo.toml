@@ -2,7 +2,13 @@
 name = "saboten"
 version = "0.0.1"
 authors = ["Christian Fischer <christian@chfi.se>"]
+description = "Provides biedged graphs, cactus graphs and trees, and an algorithm for finding ultrabubbles in variation graphs."
 edition = "2018"
+license = "MIT"
+repository = "https://github.com/chfi/saboten"
+readme = "readme.md"
+keywords = ["bioinformatics", "graph"]
+categories = ["science"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
