@@ -18,10 +18,21 @@ struct Opt {
     /// Output JSON
     #[structopt(short, long)]
     json: bool,
+    /// The number of threads to use. If omitted, Rayon's default will
+    /// be used, based on the RAYON_NUM_THREADS environment variable,
+    /// or the number of logical CPUs.
+    #[structopt(short, long)]
+    threads: Option<usize>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
+
+    if let Some(threads) = &opt.threads {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(*threads)
+            .build_global()?;
+    }
 
     let parser: GFAParser<usize, ()> = GFAParser::new();
     let gfa: GFA<usize, ()> = parser.parse_file(&opt.gfa)?;
