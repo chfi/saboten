@@ -3,6 +3,8 @@ use petgraph::prelude::*;
 
 use rayon::prelude::*;
 
+use log::debug;
+
 use crate::{
     biedgedgraph::{
         end_to_black_edge, opposite_vertex, BiedgedGraph, BiedgedWeight,
@@ -856,33 +858,6 @@ pub fn chain_edges_sorted(
     edge_counts
 }
 
-pub fn chain_edges_<'a>(
-    chain_pairs: &'a FnvHashSet<Snarl>,
-    cactus_tree: &'a CactusTree<'a>,
-) -> FnvHashMap<ChainEdge, FnvHashSet<ChainPair>> {
-    let mut chain_edges_map: FnvHashMap<ChainEdge, FnvHashSet<ChainPair>> =
-        FnvHashMap::default();
-
-    for &snarl in chain_pairs.iter() {
-        if let Snarl::ChainPair { x, y } = snarl {
-            let net = cactus_tree.projected_node(x);
-            let chain = cactus_tree.black_edge_chain_vertex(x).unwrap();
-
-            let key = ChainEdge { net, chain };
-
-            let x_ = x.min(y);
-            let y_ = x.max(y);
-            let value = ChainPair { x: x_, y: y_ };
-
-            let entry = chain_edges_map.entry(key).or_default();
-
-            entry.insert(value);
-        }
-    }
-
-    chain_edges_map
-}
-
 /// Return the chain edges in the cactus tree as a map from pairs of
 /// net and chain vertices to chain pair snarls.
 fn chain_edges<'a>(
@@ -925,26 +900,6 @@ pub fn chain_edges_all<'a>(
 /// Labels chain edges as ultrabubbles if their net graphs are acyclic
 /// and bridgeless, returning a map from chain edges to true/false.
 pub fn chain_pair_ultrabubble_labels(
-    cactus_tree: &CactusTree<'_>,
-    chain_pairs: &FnvHashSet<Snarl>,
-) -> FnvHashMap<(u64, u64), bool> {
-    let chain_edges = chain_edges(chain_pairs, cactus_tree);
-
-    let mut chain_edge_labels = FnvHashMap::default();
-
-    chain_edge_labels.extend(chain_edges.iter().map(
-        |(&(net, chain), &(x, y))| {
-            let net_graph = cactus_tree.build_net_graph(x, y);
-            let result = net_graph.is_ultrabubble();
-            ((net, chain), result)
-        },
-    ));
-
-    chain_edge_labels
-}
-
-/// Labels chain edges as ultrabubbles, in parallel using Rayon.
-pub fn chain_pair_ultrabubble_labels_par(
     cactus_tree: &CactusTree<'_>,
     chain_pairs: &FnvHashSet<Snarl>,
 ) -> FnvHashMap<(u64, u64), bool> {
@@ -995,46 +950,8 @@ pub fn chain_pair_contained_ultrabubbles(
 }
 
 /// Using the provided chain edge labels, returns a map from bridge
-/// pairs to their contained ultrabubbles.
-pub fn bridge_pair_ultrabubbles(
-    cactus_tree: &CactusTree<'_>,
-    bridge_pairs: &FnvHashSet<Snarl>,
-    chain_edge_labels: &FnvHashMap<(u64, u64), bool>,
-) -> FnvHashMap<(u64, u64), Vec<(u64, u64)>> {
-    let mut bridge_pair_ultrabubbles = FnvHashMap::default();
-
-    let mut bridge_pair_labels: FnvHashMap<(u64, u64), Vec<u64>> =
-        FnvHashMap::default();
-
-    bridge_pair_labels.extend(bridge_pairs.iter().filter_map(|&snarl| {
-        if let Snarl::BridgePair { x, y } = snarl {
-            let net_graph = cactus_tree.build_net_graph(x, y);
-            if net_graph.is_ultrabubble() {
-                return Some(((x, y), net_graph.path.clone()));
-            }
-        }
-        None
-    }));
-
-    bridge_pair_ultrabubbles.extend(bridge_pair_labels.iter().filter_map(
-        |(&(x, y), path)| {
-            let contained_chain_pairs = cactus_tree.is_bridge_pair_ultrabubble(
-                &chain_edge_labels,
-                x,
-                y,
-                path,
-            );
-
-            contained_chain_pairs.map(|c| ((x, y), c))
-        },
-    ));
-
-    bridge_pair_ultrabubbles
-}
-
-/// Using the provided chain edge labels, returns a map from bridge
 /// pairs to their contained ultrabubbles. Runs in parallel.
-pub fn bridge_pair_ultrabubbles_par(
+pub fn bridge_pair_ultrabubbles(
     cactus_tree: &CactusTree<'_>,
     bridge_pairs: &FnvHashSet<Snarl>,
     chain_edge_labels: &FnvHashMap<(u64, u64), bool>,
@@ -1073,93 +990,31 @@ pub fn bridge_pair_ultrabubbles_par(
 }
 
 /// Using the provided cactus tree and bridge forest for a biedged
-/// graph, find the ultrabubbles and their nesting in the graph.
-/// Returns a map from ultrabubbles to vectors of contained
-/// ultrabubbles.
+/// graph, find the ultrabubbles and their nesting in the graph. Runs
+/// in parallel.
 pub fn find_ultrabubbles(
     cactus_tree: &CactusTree<'_>,
     bridge_forest: &BridgeForest<'_>,
 ) -> FnvHashMap<(u64, u64), Vec<(u64, u64)>> {
+    debug!("Finding chain pairs");
     let chain_pairs = cactus_tree.find_chain_pairs();
 
+    debug!("Finding bridge pairs");
     let bridge_pairs = bridge_forest.find_bridge_pairs();
 
+    debug!("Labeling chain edges");
     let mut chain_edge_labels =
         chain_pair_ultrabubble_labels(cactus_tree, &chain_pairs);
 
+    debug!("Checking nested chain pairs");
     let chain_ultrabubbles = chain_pair_contained_ultrabubbles(
         cactus_tree,
         &chain_pairs,
         &mut chain_edge_labels,
     );
 
-    // let chain_edges_map = chain_edges(&chain_pairs, cactus_tree);
-
+    debug!("Checking bridge pairs");
     let bridge_ultrabubbles = bridge_pair_ultrabubbles(
-        cactus_tree,
-        &bridge_pairs,
-        &chain_edge_labels,
-    );
-
-    /*
-    let chain_ultrabubbles =
-        chain_ultrabubbles.into_iter().map(|(key, chn_edges)| {
-            (
-                key,
-                chn_edges
-                    .into_iter()
-                    .filter_map(|e| chain_edges_map.get(&e).cloned())
-                    .collect::<Vec<_>>(),
-            )
-        });
-    // .collect();
-    // .collect();
-
-    let bridge_ultrabubbles = bridge_pair_ultrabubbles(
-        cactus_tree,
-        &bridge_pairs,
-        &chain_edge_labels,
-    )
-    .into_iter()
-    .map(|(key, chn_edges)| {
-        (
-            key,
-            chn_edges
-                .into_iter()
-                .filter_map(|e| chain_edges_map.get(&e).cloned())
-                .collect::<Vec<_>>(),
-        )
-    });
-    */
-
-    let ultrabubbles = chain_ultrabubbles
-        .into_iter()
-        .chain(bridge_ultrabubbles.into_iter())
-        .collect::<FnvHashMap<(u64, u64), Vec<(u64, u64)>>>();
-
-    ultrabubbles
-}
-/// Using the provided cactus tree and bridge forest for a biedged
-/// graph, find the ultrabubbles and their nesting in the graph. Runs
-/// in parallel.
-pub fn find_ultrabubbles_par(
-    cactus_tree: &CactusTree<'_>,
-    bridge_forest: &BridgeForest<'_>,
-) -> FnvHashMap<(u64, u64), Vec<(u64, u64)>> {
-    let chain_pairs = cactus_tree.find_chain_pairs();
-
-    let bridge_pairs = bridge_forest.find_bridge_pairs();
-
-    let mut chain_edge_labels =
-        chain_pair_ultrabubble_labels_par(cactus_tree, &chain_pairs);
-
-    let chain_ultrabubbles = chain_pair_contained_ultrabubbles(
-        cactus_tree,
-        &chain_pairs,
-        &mut chain_edge_labels,
-    );
-
-    let bridge_ultrabubbles = bridge_pair_ultrabubbles_par(
         cactus_tree,
         &bridge_pairs,
         &chain_edge_labels,
