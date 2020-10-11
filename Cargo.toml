@@ -37,5 +37,5 @@ name = "saboten"
 required-features = ["cli_logging"]
 
 [[bench]]
-name = "graph_transforms"
+name = "saboten_benches"
 harness = false
