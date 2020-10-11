@@ -961,6 +961,7 @@ pub fn bridge_pair_ultrabubbles(
     let mut bridge_pair_labels: FnvHashMap<(u64, u64), Vec<u64>> =
         FnvHashMap::default();
 
+    debug!("Bridge pairs - checking net graphs");
     bridge_pair_labels.par_extend(bridge_pairs.par_iter().filter_map(
         |&snarl| {
             if let Snarl::BridgePair { x, y } = snarl {
@@ -973,6 +974,7 @@ pub fn bridge_pair_ultrabubbles(
         },
     ));
 
+    debug!("Bridge pairs - checking contained");
     bridge_pair_ultrabubbles.par_extend(
         bridge_pair_labels.par_iter().filter_map(|(&(x, y), path)| {
             let contained_chain_pairs = cactus_tree.is_bridge_pair_ultrabubble(
@@ -998,9 +1000,11 @@ pub fn find_ultrabubbles(
 ) -> FnvHashMap<(u64, u64), Vec<(u64, u64)>> {
     debug!("Finding chain pairs");
     let chain_pairs = cactus_tree.find_chain_pairs();
+    debug!("Found {} chain pairs", chain_pairs.len());
 
     debug!("Finding bridge pairs");
     let bridge_pairs = bridge_forest.find_bridge_pairs();
+    debug!("Found {} bridge pairs", bridge_pairs.len());
 
     debug!("Labeling chain edges");
     let mut chain_edge_labels =

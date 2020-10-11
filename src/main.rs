@@ -9,7 +9,10 @@ use saboten::{
     ultrabubble::Ultrabubble,
 };
 
-use gfa::{gfa::GFA, parser::GFAParser};
+use gfa::{
+    gfa::GFA,
+    parser::{GFAParser, GFAParserBuilder},
+};
 
 use log::info;
 
@@ -64,7 +67,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     info!("Parsing GFA");
-    let parser: GFAParser<usize, ()> = GFAParser::new();
+    let mut parser_builder = GFAParserBuilder::all();
+    parser_builder.paths = false;
+    parser_builder.containments = false;
+    let parser: GFAParser<usize, ()> = parser_builder.build();
     let gfa: GFA<usize, ()> = parser.parse_file(&opt.gfa)?;
 
     info!("Building biedged graph");
