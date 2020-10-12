@@ -544,7 +544,7 @@ impl<'a> CactusTree<'a> {
         let vertices: FnvHashSet<u64> = path
             .iter()
             .filter_map(|&n| {
-                if tree_graph.is_net_vertex(n) {
+                if n == x || n == y || tree_graph.is_net_vertex(n) {
                     proj_inv.get(&n)
                 } else {
                     None
@@ -558,7 +558,7 @@ impl<'a> CactusTree<'a> {
             .iter()
             .flat_map(|v| orig_graph.graph.edges(*v))
             .filter_map(|(v, n, w)| {
-                if vertices.contains(&n) && w.gray > 0 {
+                if (n == x || n == y || vertices.contains(&n)) && w.gray > 0 {
                     let a = v.min(n);
                     let b = v.max(n);
                     Some((a, b))

@@ -147,11 +147,11 @@ impl BiedgedGraph {
     }
 
     pub fn is_chain_vertex(&self, n: u64) -> bool {
-        self.graph.contains_node(n) && n > self.max_net_vertex
+        n > self.max_net_vertex
     }
 
     pub fn is_net_vertex(&self, n: u64) -> bool {
-        self.graph.contains_node(n) && n <= self.max_net_vertex
+        n <= self.max_net_vertex
     }
 
     pub fn projected_node(&self, projection: &Projection, n: u64) -> u64 {
