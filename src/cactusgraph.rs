@@ -860,7 +860,7 @@ pub fn chain_edges_sorted(
 
 /// Return the chain edges in the cactus tree as a map from pairs of
 /// net and chain vertices to chain pair snarls.
-fn chain_edges<'a>(
+pub fn chain_edges<'a>(
     chain_pairs: &'a FnvHashSet<Snarl>,
     cactus_tree: &'a CactusTree<'a>,
 ) -> FnvHashMap<(u64, u64), (u64, u64)> {
