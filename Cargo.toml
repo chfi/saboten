@@ -32,6 +32,9 @@ pretty_env_logger = { version = "0.4", optional = true }
 [dev-dependencies]
 criterion = "0.3"
 
+[lib]
+bench = false
+
 [[bin]]
 name = "saboten"
 required-features = ["cli_logging"]
@@ -39,3 +42,6 @@ required-features = ["cli_logging"]
 [[bench]]
 name = "saboten_benches"
 harness = false
+
+[profile.bench]
+debug = true
