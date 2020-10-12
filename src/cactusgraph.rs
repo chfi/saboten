@@ -607,21 +607,25 @@ impl<'a> CactusTree<'a> {
             }
         }
 
-        let mut net_graph = BiedgedGraph::new();
-        for v in vertices.iter() {
-            net_graph.add_node(*v);
+        let mut graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
+
+        for &(a, b) in black_edges.iter() {
+            graph.add_edge(a, b, BiedgedWeight::black(1));
         }
 
-        for (a, b) in gray_edges.iter() {
-            net_graph.add_edge(*a, *b, BiedgedWeight::gray(1));
+        for &(a, b) in gray_edges.iter() {
+            graph.add_edge(a, b, BiedgedWeight::gray(1));
         }
 
-        for (a, b) in black_edges.iter() {
-            net_graph.add_edge(*a, *b, BiedgedWeight::black(1));
-        }
+        let net_graph = BiedgedGraph {
+            graph,
+            max_net_vertex: self.original_graph.max_net_vertex,
+            max_chain_vertex: self.original_graph.max_chain_vertex,
+        };
 
         NetGraph {
             graph: net_graph,
+
             x,
             y,
             path,
