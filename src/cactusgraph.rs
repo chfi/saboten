@@ -549,7 +549,9 @@ impl<'a> CactusTree<'a> {
 
         let tree_graph = &self.graph;
 
-        let vertices: FnvHashSet<u64> = path
+        let mut graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
+
+        let mut vertices: Vec<u64> = path
             .iter()
             .filter_map(|&n| {
                 if n == x || n == y || tree_graph.is_net_vertex(n) {
@@ -561,6 +563,8 @@ impl<'a> CactusTree<'a> {
             .flatten()
             .copied()
             .collect();
+
+        vertices.sort();
 
         let gray_edges: FnvHashSet<(u64, u64)> = vertices
             .iter()
@@ -614,8 +618,6 @@ impl<'a> CactusTree<'a> {
                 }
             }
         }
-
-        let mut graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
         for &(a, b) in black_edges.iter() {
             graph.add_edge(a, b, BiedgedWeight::black(1));
