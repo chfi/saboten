@@ -14,6 +14,23 @@ use crate::{
     ultrabubble::{ChainEdge, ChainPair, Snarl},
 };
 
+#[cfg(feature = "cli_logging")]
+use indicatif::ParallelProgressIterator;
+
+#[cfg(feature = "cli_logging")]
+fn progress_bar(len: usize) -> indicatif::ProgressBar {
+    use indicatif::{ProgressBar, ProgressStyle};
+    let len = len as u64;
+    let p_bar = ProgressBar::new(len);
+    p_bar.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:80} {pos:>7}/{len:7}")
+            .progress_chars("##-"),
+    );
+    p_bar.enable_steady_tick(1000);
+    p_bar
+}
+
 macro_rules! impl_biedged_wrapper {
     ($for:ty) => {
         impl<'a> BiedgedWrapper for $for {
@@ -917,13 +934,24 @@ pub fn chain_pair_ultrabubble_labels(
 
     let mut chain_edge_labels = FnvHashMap::default();
 
-    chain_edge_labels.par_extend(chain_edges.par_iter().map(
-        |(&(net, chain), &(x, y))| {
-            let net_graph = cactus_tree.build_net_graph(x, y);
-            let result = net_graph.is_ultrabubble();
-            ((net, chain), result)
-        },
-    ));
+    let iter;
+
+    #[cfg(feature = "cli_logging")]
+    {
+        iter = chain_edges
+            .par_iter()
+            .progress_with(progress_bar(chain_edges.len()));
+    }
+    #[cfg(not(feature = "cli_logging"))]
+    {
+        iter = chain_edges.par_iter();
+    }
+
+    chain_edge_labels.par_extend(iter.map(|(&(net, chain), &(x, y))| {
+        let net_graph = cactus_tree.build_net_graph(x, y);
+        let result = net_graph.is_ultrabubble();
+        ((net, chain), result)
+    }));
 
     chain_edge_labels
 }
@@ -971,22 +999,45 @@ pub fn bridge_pair_ultrabubbles(
     let mut bridge_pair_labels: FnvHashMap<(u64, u64), Vec<u64>> =
         FnvHashMap::default();
 
+    let bridge_pair_iter;
+    #[cfg(feature = "cli_logging")]
+    {
+        bridge_pair_iter = bridge_pairs
+            .par_iter()
+            .progress_with(progress_bar(bridge_pairs.len()));
+    }
+    #[cfg(not(feature = "cli_logging"))]
+    {
+        bridge_pair_iter = bridge_pairs.par_iter();
+    }
+
     debug!("Bridge pairs - checking net graphs");
-    bridge_pair_labels.par_extend(bridge_pairs.par_iter().filter_map(
-        |&snarl| {
-            if let Snarl::BridgePair { x, y } = snarl {
-                let net_graph = cactus_tree.build_net_graph(x, y);
-                if net_graph.is_ultrabubble() {
-                    return Some(((x, y), net_graph.path.clone()));
-                }
+    bridge_pair_labels.par_extend(bridge_pair_iter.filter_map(|&snarl| {
+        if let Snarl::BridgePair { x, y } = snarl {
+            let net_graph = cactus_tree.build_net_graph(x, y);
+
+            if net_graph.is_ultrabubble() {
+                return Some(((x, y), net_graph.path.clone()));
             }
-            None
-        },
-    ));
+        }
+        None
+    }));
+
+    let label_iter;
+    #[cfg(feature = "cli_logging")]
+    {
+        label_iter = bridge_pair_labels
+            .par_iter()
+            .progress_with(progress_bar(bridge_pair_labels.len()));
+    }
+    #[cfg(not(feature = "cli_logging"))]
+    {
+        label_iter = bridge_pair_labels.par_iter();
+    }
 
     debug!("Bridge pairs - checking contained");
-    bridge_pair_ultrabubbles.par_extend(
-        bridge_pair_labels.par_iter().filter_map(|(&(x, y), path)| {
+    bridge_pair_ultrabubbles.par_extend(label_iter.filter_map(
+        |(&(x, y), path)| {
             let contained_chain_pairs = cactus_tree.is_bridge_pair_ultrabubble(
                 &chain_edge_labels,
                 x,
@@ -995,8 +1046,8 @@ pub fn bridge_pair_ultrabubbles(
             );
 
             contained_chain_pairs.map(|c| ((x, y), c))
-        }),
-    );
+        },
+    ));
 
     bridge_pair_ultrabubbles
 }
@@ -1035,20 +1086,6 @@ pub fn find_ultrabubbles(
     );
 
     let chain_edges_map = chain_edges(&chain_pairs, &cactus_tree);
-
-    /*
-    let ultrabubbles = bridge_ultrabubbles
-        .into_iter()
-        .map(|(key, cont)| {
-            (
-                key,
-                cont.into_iter()
-                    .filter_map(|e| chain_edges_map.get(&e).cloned())
-                    .collect::<Vec<_>>(),
-            )
-        })
-        .collect();
-    */
 
     let ultrabubbles = chain_ultrabubbles
         .into_iter()
