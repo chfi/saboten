@@ -87,7 +87,9 @@ impl<'a> CactusGraph<'a> {
 
         for (i, cycle) in cycles.iter().enumerate() {
             for &(a, b) in cycle.iter() {
-                cycle_map.entry((a, b)).or_default().push(i);
+                let l = a.min(b);
+                let r = a.max(b);
+                cycle_map.entry((l, r)).or_default().push(i);
             }
         }
 
@@ -231,7 +233,9 @@ impl<'a> CactusGraph<'a> {
         let (l, r) = end_to_black_edge(x);
         let p_l = self.projection.find(l);
         let p_r = self.projection.find(r);
-        let cycles = self.cycle_map.get(&(p_r, p_l))?;
+        let a = p_l.min(p_r);
+        let b = p_l.max(p_r);
+        let cycles = self.cycle_map.get(&(a, b))?;
         Some(&cycles)
     }
 
@@ -319,10 +323,12 @@ impl<'a> CactusTree<'a> {
         for cycle in cycles.iter() {
             let chain_vx = biedged.add_chain_vertex();
 
-            for (from, to) in cycle {
-                cycle_chain_map.insert((*from, *to), chain_vx);
-                biedged.add_edge(*to, chain_vx, BiedgedWeight::black(1));
-                biedged.remove_one_black_edge(*from, *to);
+            for &(from, to) in cycle {
+                let l = from.min(to);
+                let r = from.max(to);
+                cycle_chain_map.insert((l, r), chain_vx);
+                biedged.add_edge(to, chain_vx, BiedgedWeight::black(1));
+                biedged.remove_one_black_edge(from, to);
             }
 
             chain_vertices.insert(chain_vx);
@@ -337,7 +343,9 @@ impl<'a> CactusTree<'a> {
         let (l, r) = end_to_black_edge(b);
         let p_l = self.projected_node(l);
         let p_r = self.projected_node(r);
-        let chain_vx = self.cycle_chain_map.get(&(p_r, p_l))?;
+        let a = p_l.min(p_r);
+        let b = p_l.max(p_r);
+        let chain_vx = self.cycle_chain_map.get(&(a, b))?;
         Some(*chain_vx)
     }
 
@@ -402,8 +410,8 @@ impl<'a> CactusTree<'a> {
                 for &a in b_ns.iter() {
                     for &b in b_ns.iter() {
                         if a != b && opposite_vertex(a) != b {
-                            let c_a = self.black_edge_chain_vertex(a);
-                            let c_b = self.black_edge_chain_vertex(b);
+                            let c_a = self.cactus_graph.black_edge_cycle(a);
+                            let c_b = self.cactus_graph.black_edge_cycle(b);
                             if c_a.is_some() && c_a == c_b {
                                 let a_ = a.min(b);
                                 let b_ = a.max(b);
@@ -644,10 +652,6 @@ impl<'a> CactusTree<'a> {
         y: u64,
         chain_vx: u64,
     ) -> Option<Vec<(u64, u64)>> {
-        if !self.cactus_graph.is_chain_pair(x, y) {
-            return None;
-        }
-
         let p_x = self.projected_node(x);
         if let Some(is_ultrabubble) = labels.get(&(p_x, chain_vx)) {
             if !is_ultrabubble {
