@@ -1,6 +1,6 @@
 [package]
 name = "saboten"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Christian Fischer <christian@chfi.se>"]
 description = "Provides biedged graphs, cactus graphs and trees, and an algorithm for finding ultrabubbles in variation graphs."
 edition = "2018"
