@@ -1,13 +1,7 @@
 use petgraph::prelude::*;
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
-use gfa::gfa::{Header, Link, Orientation, Segment, GFA};
-
-use bstr::BString;
-
-use std::{
-    io::Write,
-    ops::{Add, AddAssign, Sub, SubAssign},
-};
+use gfa::gfa::{Orientation, GFA};
 
 use crate::projection::{id_to_black_edge, Projection};
 
@@ -120,6 +114,8 @@ impl BiedgedGraph {
         n <= self.max_net_vertex
     }
 
+    /// Convenience method for getting the projection of a node,
+    /// taking the possibility of chain vertices into account
     pub fn projected_node(&self, projection: &Projection, n: u64) -> u64 {
         if n <= self.max_net_vertex {
             projection.find(n)
@@ -272,6 +268,8 @@ impl BiedgedGraph {
         self.graph.all_edges().filter(|(_, _, w)| w.gray > 0)
     }
 
+    /// Convenience method for looping through all gray edges while
+    /// mutating the graph
     pub fn next_gray_edge(&self) -> Option<(u64, u64)> {
         self.graph
             .all_edges()
@@ -299,16 +297,6 @@ impl BiedgedGraph {
     /// the edge weights.
     pub fn black_edge_count(&self) -> usize {
         self.black_edges().map(|(_, _, w)| w.black).sum()
-    }
-
-    /// Produces the sum of all edges in the graph, counted using the
-    /// edge weights. Note that black and gray edges are summed
-    /// together.
-    pub fn edge_color_count(&self) -> usize {
-        self.graph
-            .all_edges()
-            .map(|(_, _, w)| w.black + w.gray)
-            .sum()
     }
 
     /// Remove a single black edge between two nodes, if any exists.
@@ -408,100 +396,6 @@ impl BiedgedGraph {
         }
 
         Some(from)
-    }
-}
-
-impl BiedgedGraph {
-    pub fn to_gfa_usize(&self) -> GFA<usize, ()> {
-        let mut segments = Vec::new();
-        let mut links = Vec::new();
-
-        for id in self.graph.nodes() {
-            let name = id as usize;
-            segments.push(Segment {
-                name,
-                sequence: BString::from("*"),
-                optional: (),
-            });
-        }
-
-        for (f, t, _) in self.black_edges() {
-            links.push(Link {
-                from_segment: f as usize,
-                from_orient: Orientation::Forward,
-                to_segment: t as usize,
-                to_orient: Orientation::Forward,
-                overlap: BString::from("0M"),
-                optional: (),
-            });
-        }
-
-        GFA {
-            header: Header {
-                version: Some("1.0".into()),
-                optional: (),
-            },
-            segments,
-            links,
-            containments: vec![],
-            paths: vec![],
-        }
-    }
-
-    pub fn to_gfa_bstring(&self) -> GFA<BString, ()> {
-        let mut segments = Vec::new();
-        let mut links = Vec::new();
-
-        for id in self.graph.nodes() {
-            let name = BString::from(id.to_string());
-            segments.push(Segment {
-                name,
-                sequence: BString::from("*"),
-                optional: (),
-            });
-        }
-
-        for (f, t, _w) in self.black_edges() {
-            links.push(Link {
-                from_segment: BString::from(f.to_string()),
-                from_orient: Orientation::Forward,
-                to_segment: BString::from(t.to_string()),
-                to_orient: Orientation::Forward,
-                overlap: BString::from("0M"),
-                optional: (),
-            });
-        }
-
-        segments.sort_by(|a, b| a.name.cmp(&b.name));
-        segments.dedup_by(|a, b| a.name == b.name);
-        links.sort_by(|f, t| f.from_segment.cmp(&t.from_segment));
-
-        GFA {
-            header: Header {
-                version: Some("1.0".into()),
-                optional: (),
-            },
-            segments,
-            links,
-            containments: vec![],
-            paths: vec![],
-        }
-    }
-
-    /// Print the biedged graph to a .dot file. This file can then be used by
-    /// various tools (i.e. Graphviz) to produce a graphical representation of the graph
-    /// (i.e. dot -Tpng graph.dot -o graph.png)
-    pub fn output_dot<T: Write>(&self, mut t: T) -> std::io::Result<()> {
-        use petgraph::dot::{Config, Dot};
-
-        // let mut f = File::create(path).unwrap();
-        // let output = format!("{}", Dot::with_config(&graph.graph, &[Config::EdgeNoLabel]));
-        let output = format!(
-            "{:?}",
-            Dot::with_config(&self.graph, &[Config::NodeNoLabel])
-        );
-        t.write_all(&output.as_bytes())?;
-        Ok(())
     }
 }
 

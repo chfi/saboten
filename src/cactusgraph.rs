@@ -1,22 +1,20 @@
 use fnv::{FnvHashMap, FnvHashSet};
-use petgraph::prelude::*;
-
-use rayon::prelude::*;
-
 use log::debug;
+use petgraph::prelude::*;
+use rayon::prelude::*;
 
 use crate::{
     biedgedgraph::{BiedgedGraph, BiedgedWeight},
     netgraph::NetGraph,
     projection::{end_to_black_edge, opposite_vertex, Projection},
-    ultrabubble::{ChainEdge, ChainPair, Snarl},
+    ultrabubble::Snarl,
 };
 
 #[cfg(feature = "progress_bars")]
 use indicatif::ParallelProgressIterator;
 
 #[cfg(feature = "progress_bars")]
-fn progress_bar(len: usize) -> indicatif::ProgressBar {
+fn progress_bar(len: usize, steady: bool) -> indicatif::ProgressBar {
     use indicatif::{ProgressBar, ProgressStyle};
     let len = len as u64;
     let p_bar = ProgressBar::new(len);
@@ -25,7 +23,9 @@ fn progress_bar(len: usize) -> indicatif::ProgressBar {
             .template("[{elapsed_precise}] {bar:80} {pos:>7}/{len:7}")
             .progress_chars("##-"),
     );
-    p_bar.enable_steady_tick(1000);
+    if steady {
+        p_bar.enable_steady_tick(1000);
+    }
     p_bar
 }
 
@@ -60,6 +60,11 @@ pub trait BiedgedWrapper {
         let graph = self.biedged_graph();
         let proj = self.projection();
         graph.projected_node(proj, n)
+    }
+
+    fn projected_edge(&self, (x, y): (u64, u64)) -> (u64, u64) {
+        let proj = self.projection();
+        proj.find_edge(x, y)
     }
 }
 
@@ -148,6 +153,7 @@ impl<'a> CactusGraph<'a> {
         // input IDs.
         graph.invert_components(components)
     }
+
     fn merge_components(
         biedged: &mut BiedgedGraph,
         components: Vec<Vec<usize>>,
@@ -232,38 +238,21 @@ impl<'a> CactusGraph<'a> {
         cycles
     }
 
-    /// Given a vertex ID in the original biedged graph, find the
-    /// simple cycle its incident black edge maps to.
-    fn black_edge_cycle(&self, x: u64) -> Option<&Vec<usize>> {
+    fn black_edge_projection(&self, x: u64) -> (u64, u64) {
         let (left, right) = end_to_black_edge(x);
         let p_l = self.projection.find(left);
         let p_r = self.projection.find(right);
         let from = p_l.min(p_r);
         let to = p_l.max(p_r);
-        let cycles = self.cycle_map.get(&(from, to))?;
-        Some(&cycles)
+        (from, to)
     }
 
-    pub fn is_chain_pair(&self, x: u64, y: u64) -> bool {
-        if x == y {
-            return false;
-        }
-
-        let p_x = self.projection.find(x);
-        let p_y = self.projection.find(y);
-
-        if p_x != p_y {
-            return false;
-        }
-
-        let x_cycles = self.black_edge_cycle(x);
-        let y_cycles = self.black_edge_cycle(y);
-
-        if x_cycles.is_none() || y_cycles.is_none() {
-            return false;
-        }
-
-        x_cycles == y_cycles
+    /// Given a vertex ID in the original biedged graph, find the
+    /// simple cycle its incident black edge maps to.
+    fn black_edge_cycle(&self, x: u64) -> Option<&Vec<usize>> {
+        let edge = self.black_edge_projection(x);
+        let cycles = self.cycle_map.get(&edge)?;
+        Some(&cycles)
     }
 }
 
@@ -345,60 +334,9 @@ impl<'a> CactusTree<'a> {
     /// Given a vertex in the original biedged graph, find the chain
     /// vertex its incident black edge projects to.
     pub fn black_edge_chain_vertex(&self, x: u64) -> Option<u64> {
-        let (left, right) = end_to_black_edge(x);
-        let p_l = self.projected_node(left);
-        let p_r = self.projected_node(right);
-        let from = p_l.min(p_r);
-        let to = p_l.max(p_r);
+        let (from, to) = self.cactus_graph.black_edge_projection(x);
         let chain_vx = self.cycle_chain_map.get(&(from, to))?;
         Some(*chain_vx)
-    }
-
-    pub fn chain_pair_to_chain_edge(
-        &self,
-        x: u64,
-        y: u64,
-    ) -> Option<ChainEdge> {
-        let chain = self.black_edge_chain_vertex(x)?;
-        let chain_y = self.black_edge_chain_vertex(y)?;
-
-        let p_x = self.projected_node(x);
-        let p_y = self.projected_node(y);
-
-        if chain != chain_y || p_x != p_y {
-            return None;
-        }
-
-        let net = p_x;
-        Some(ChainEdge { net, chain })
-    }
-
-    pub fn is_chain_edge(&self, a: u64, b: u64) -> bool {
-        let be_graph = self.biedged_graph();
-
-        let a = self.projected_node(a);
-        let b = self.projected_node(b);
-
-        if self.base_graph().contains_edge(a, b) {
-            let n = a.min(b);
-            let c = a.max(b);
-            be_graph.is_net_vertex(n) && be_graph.is_chain_vertex(c)
-        } else {
-            false
-        }
-    }
-
-    pub fn is_bridge_edge(&self, a: u64, b: u64) -> bool {
-        let a = self.projected_node(a);
-        let b = self.projected_node(b);
-
-        let be_graph = self.biedged_graph();
-
-        if be_graph.graph.contains_edge(a, b) {
-            be_graph.is_net_vertex(a) && be_graph.is_net_vertex(b)
-        } else {
-            false
-        }
     }
 
     /// Find the chain pairs using the chain vertices in the cactus
@@ -569,20 +507,6 @@ impl<'a> CactusTree<'a> {
 
         vertices.sort_unstable();
 
-        let gray_edges: FnvHashSet<(u64, u64)> = vertices
-            .iter()
-            .flat_map(|v| orig_graph.graph.edges(*v))
-            .filter_map(|(v, n, w)| {
-                if (n == x || n == y || vertices.contains(&n)) && w.gray > 0 {
-                    let a = v.min(n);
-                    let b = v.max(n);
-                    Some((a, b))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
         let mut black_edges: FnvHashSet<(u64, u64)> = FnvHashSet::default();
         let mut black_vertices: FnvHashSet<u64> = FnvHashSet::default();
 
@@ -621,11 +545,25 @@ impl<'a> CactusTree<'a> {
             }
         }
 
-        for &(a, b) in black_edges.iter() {
+        for (a, b) in black_edges.into_iter() {
             graph.add_edge(a, b, BiedgedWeight::black(1));
         }
 
-        for &(a, b) in gray_edges.iter() {
+        let gray_edges: FnvHashSet<(u64, u64)> = vertices
+            .iter()
+            .flat_map(|v| orig_graph.graph.edges(*v))
+            .filter_map(|(v, n, w)| {
+                if (n == x || n == y || vertices.contains(&n)) && w.gray > 0 {
+                    let a = v.min(n);
+                    let b = v.max(n);
+                    Some((a, b))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for (a, b) in gray_edges.into_iter() {
             graph.add_edge(a, b, BiedgedWeight::gray(1));
         }
 
@@ -856,19 +794,6 @@ impl<'a> BridgeForest<'a> {
     }
 }
 
-pub fn chain_edges_sorted(
-    c_edges: &FnvHashMap<ChainEdge, FnvHashSet<ChainPair>>,
-) -> Vec<(ChainEdge, usize)> {
-    let mut edge_counts: Vec<_> = c_edges
-        .iter()
-        .map(|(c_e, pairs)| (*c_e, pairs.len()))
-        .collect();
-
-    edge_counts.sort_by(|a, b| a.1.cmp(&b.1));
-
-    edge_counts
-}
-
 /// Return the chain edges in the cactus tree as a map from pairs of
 /// net and chain vertices to chain pair snarls.
 pub fn chain_edges<'a>(
@@ -889,25 +814,6 @@ pub fn chain_edges<'a>(
         .collect()
 }
 
-pub fn chain_edges_all<'a>(
-    chain_pairs: &'a FnvHashSet<Snarl>,
-    cactus_tree: &'a CactusTree<'a>,
-) -> FnvHashMap<(u64, u64), FnvHashSet<(u64, u64)>> {
-    let mut chain_edges_map: FnvHashMap<(u64, u64), FnvHashSet<(u64, u64)>> =
-        FnvHashMap::default();
-
-    for &snarl in chain_pairs.iter() {
-        if let Snarl::ChainPair { x, y } = snarl {
-            let net = cactus_tree.projected_node(x);
-            let chain = cactus_tree.black_edge_chain_vertex(x).unwrap();
-            let entry = chain_edges_map.entry((net, chain)).or_default();
-            entry.insert((x, y));
-        }
-    }
-
-    chain_edges_map
-}
-
 /// Labels chain edges as ultrabubbles if their net graphs are acyclic
 /// and bridgeless, returning a map from chain edges to true/false.
 pub fn chain_pair_ultrabubble_labels(
@@ -924,7 +830,7 @@ pub fn chain_pair_ultrabubble_labels(
     {
         iter = chain_edges
             .par_iter()
-            .progress_with(progress_bar(chain_edges.len()));
+            .progress_with(progress_bar(chain_edges.len(), false));
     }
     #[cfg(not(feature = "progress_bars"))]
     {
@@ -982,19 +888,19 @@ pub fn bridge_pair_ultrabubbles(
     let mut bridge_pair_labels: FnvHashMap<(u64, u64), Vec<u64>> =
         FnvHashMap::default();
 
+    debug!("Bridge pairs - checking net graphs");
     let bridge_pair_iter;
     #[cfg(feature = "progress_bars")]
     {
         bridge_pair_iter = bridge_pairs
             .par_iter()
-            .progress_with(progress_bar(bridge_pairs.len()));
+            .progress_with(progress_bar(bridge_pairs.len(), false));
     }
     #[cfg(not(feature = "progress_bars"))]
     {
         bridge_pair_iter = bridge_pairs.par_iter();
     }
 
-    debug!("Bridge pairs - checking net graphs");
     bridge_pair_labels.par_extend(bridge_pair_iter.filter_map(|&snarl| {
         if let Snarl::BridgePair { x, y } = snarl {
             let net_graph = cactus_tree.build_net_graph(x, y);
@@ -1006,19 +912,20 @@ pub fn bridge_pair_ultrabubbles(
         None
     }));
 
+    debug!("Bridge pairs - checking contained");
+
     let label_iter;
     #[cfg(feature = "progress_bars")]
     {
         label_iter = bridge_pair_labels
             .par_iter()
-            .progress_with(progress_bar(bridge_pair_labels.len()));
+            .progress_with(progress_bar(bridge_pair_labels.len(), false));
     }
     #[cfg(not(feature = "progress_bars"))]
     {
         label_iter = bridge_pair_labels.par_iter();
     }
 
-    debug!("Bridge pairs - checking contained");
     bridge_pair_ultrabubbles.par_extend(label_iter.filter_map(
         |(&(x, y), path)| {
             let contained_chain_pairs = cactus_tree.is_bridge_pair_ultrabubble(
@@ -1084,6 +991,9 @@ pub fn find_ultrabubbles(
         .collect()
 }
 
+/// Inverses the vertex projection of the provided ultrabubbles to the
+/// node ID space of the graph used to construct the original biedged
+/// graph.
 pub fn inverse_map_ultrabubbles(
     ultrabubbles: FnvHashMap<(u64, u64), Vec<(u64, u64)>>,
 ) -> FnvHashMap<(u64, u64), Vec<(u64, u64)>> {
@@ -1195,10 +1105,10 @@ mod tests {
 
         CactusGraph::contract_all_gray_edges(&mut graph, &mut proj);
 
-        let a = proj.projected(0);
-        let b = proj.projected(1);
-        let c = proj.projected(3);
-        let d = proj.projected(7);
+        let a = proj.find(0);
+        let b = proj.find(1);
+        let c = proj.find(3);
+        let d = proj.find(7);
 
         assert_eq!(
             graph.graph.edge_weight(a, b),
@@ -1280,8 +1190,8 @@ mod tests {
                 let orig = name_map.map_name(&s.name).unwrap();
                 let orig_name = s.name.to_owned();
                 let (l, r) = id_to_black_edge(orig as u64);
-                let l_end = proj.projected(l);
-                let r_end = proj.projected(r);
+                let l_end = proj.find(l);
+                let r_end = proj.find(r);
                 let l_end = segment_split_name(&name_map, l_end).unwrap();
                 let r_end = segment_split_name(&name_map, r_end).unwrap();
                 (orig_name, (l_end, r_end))

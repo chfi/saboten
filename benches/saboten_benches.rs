@@ -2,7 +2,6 @@ use saboten::{
     biedgedgraph::*,
     cactusgraph,
     cactusgraph::{BridgeForest, CactusGraph, CactusTree},
-    ultrabubble::Ultrabubble,
 };
 
 use fnv::FnvHashSet;

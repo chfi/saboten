@@ -43,48 +43,38 @@ impl Projection {
         }
     }
 
-    pub fn from_union_find(union_find: UnionFind<usize>, size: usize) -> Self {
-        Self {
-            size,
-            union_find,
-            inverse: None,
-        }
-    }
-
-    pub fn projected(&self, x: u64) -> u64 {
+    #[inline]
+    pub fn find(&self, x: u64) -> u64 {
         let x = x as usize;
         self.union_find.find(x) as u64
     }
 
-    pub fn find(&self, x: u64) -> u64 {
-        self.projected(x)
+    #[inline]
+    pub fn find_mut(&mut self, x: u64) -> u64 {
+        let x = x as usize;
+        self.union_find.find_mut(x) as u64
     }
 
-    pub fn projected_edge(&self, x: u64, y: u64) -> (u64, u64) {
+    #[inline]
+    pub fn find_edge(&self, x: u64, y: u64) -> (u64, u64) {
         let x = self.union_find.find(x as usize);
         let y = self.union_find.find(y as usize);
         (x as u64, y as u64)
     }
 
-    pub fn projected_mut(&mut self, x: u64) -> u64 {
-        let x = x as usize;
-        self.union_find.find_mut(x) as u64
-    }
-
-    pub fn find_mut(&mut self, x: u64) -> u64 {
-        self.projected_mut(x)
-    }
-
-    pub fn projected_edge_mut(&mut self, x: u64, y: u64) -> (u64, u64) {
+    #[inline]
+    pub fn find_edge_mut(&mut self, x: u64, y: u64) -> (u64, u64) {
         let x = self.union_find.find_mut(x as usize);
         let y = self.union_find.find_mut(y as usize);
         (x as u64, y as u64)
     }
 
+    #[inline]
     pub fn union(&mut self, x: u64, y: u64) -> bool {
         self.union_find.union(x as usize, y as usize)
     }
 
+    #[inline]
     pub fn equiv(&self, x: u64, y: u64) -> bool {
         self.union_find.equiv(x as usize, y as usize)
     }
@@ -93,6 +83,7 @@ impl Projection {
     /// of them replaced with their projection. The first one is
     /// guaranteed to be the representative of the union, so it's safe
     /// to use as an ID in the graph.
+    #[inline]
     pub fn kept_pair(&mut self, x: u64, y: u64) -> (u64, u64) {
         let union = self.union_find.find_mut(x as usize) as u64;
         if union == x {
@@ -123,7 +114,6 @@ impl Projection {
     pub fn build_inverse(&mut self) -> bool {
         if self.inverse.is_none() {
             self.build_inverse_replace();
-
             true
         } else {
             false
