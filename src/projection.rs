@@ -53,8 +53,7 @@ impl Projection {
 
     pub fn projected(&self, x: u64) -> u64 {
         let x = x as usize;
-        let p_x = self.union_find.find(x) as u64;
-        p_x
+        self.union_find.find(x) as u64
     }
 
     pub fn find(&self, x: u64) -> u64 {
@@ -69,8 +68,7 @@ impl Projection {
 
     pub fn projected_mut(&mut self, x: u64) -> u64 {
         let x = x as usize;
-        let p_x = self.union_find.find_mut(x) as u64;
-        p_x
+        self.union_find.find_mut(x) as u64
     }
 
     pub fn find_mut(&mut self, x: u64) -> u64 {

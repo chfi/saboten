@@ -133,15 +133,11 @@ impl<'a> CactusGraph<'a> {
     fn find_3_edge_connected_components(
         biedged: &BiedgedGraph,
     ) -> Vec<Vec<usize>> {
-        let edges = biedged
-            .graph
-            .all_edges()
-            .flat_map(|(a, b, w)| {
-                std::iter::repeat((a as usize, b as usize)).take(w.black)
-            })
-            .collect::<Vec<_>>();
+        let edges = biedged.graph.all_edges().flat_map(|(a, b, w)| {
+            std::iter::repeat((a as usize, b as usize)).take(w.black)
+        });
 
-        let graph = three_edge_connected::Graph::from_edges(edges.into_iter());
+        let graph = three_edge_connected::Graph::from_edges(edges);
 
         let components = three_edge_connected::find_components(&graph.graph);
         // Many of the components returned by the algorithm can be singletons, which we don't need to do anything with, hence we filter them out.
@@ -152,9 +148,7 @@ impl<'a> CactusGraph<'a> {
         // zero; even if the input biedged graph also does so, it's
         // better to make sure the node IDs are mapped backed to their
         // input IDs.
-        let components = graph.invert_components(components);
-
-        components
+        graph.invert_components(components)
     }
     fn merge_components(
         biedged: &mut BiedgedGraph,
@@ -204,21 +198,17 @@ impl<'a> CactusGraph<'a> {
                                 for _ in 0..weight.black {
                                     cycles.push(vec![(current, current)]);
                                 }
-                            } else {
-                                if !visited.contains(&adj) {
-                                    if weight.black == 2 {
-                                        cycles.push(vec![
-                                            (current, adj),
-                                            (adj, current),
-                                        ]);
-                                    }
-                                    stack.push(adj);
-                                    parents.insert(adj, current);
-                                } else {
-                                    if parents.get(&current) != Some(&adj) {
-                                        cycle_ends.push((adj, current));
-                                    }
+                            } else if !visited.contains(&adj) {
+                                if weight.black == 2 {
+                                    cycles.push(vec![
+                                        (current, adj),
+                                        (adj, current),
+                                    ]);
                                 }
+                                stack.push(adj);
+                                parents.insert(adj, current);
+                            } else if parents.get(&current) != Some(&adj) {
+                                cycle_ends.push((adj, current));
                             }
                         }
                     }
@@ -247,12 +237,12 @@ impl<'a> CactusGraph<'a> {
     /// Given a vertex ID in the original biedged graph, find the
     /// simple cycle its incident black edge maps to.
     fn black_edge_cycle(&self, x: u64) -> Option<&Vec<usize>> {
-        let (l, r) = end_to_black_edge(x);
-        let p_l = self.projection.find(l);
-        let p_r = self.projection.find(r);
-        let a = p_l.min(p_r);
-        let b = p_l.max(p_r);
-        let cycles = self.cycle_map.get(&(a, b))?;
+        let (left, right) = end_to_black_edge(x);
+        let p_l = self.projection.find(left);
+        let p_r = self.projection.find(right);
+        let from = p_l.min(p_r);
+        let to = p_l.max(p_r);
+        let cycles = self.cycle_map.get(&(from, to))?;
         Some(&cycles)
     }
 
@@ -356,13 +346,13 @@ impl<'a> CactusTree<'a> {
 
     /// Given a vertex in the original biedged graph, find the chain
     /// vertex its incident black edge projects to.
-    pub fn black_edge_chain_vertex(&self, b: u64) -> Option<u64> {
-        let (l, r) = end_to_black_edge(b);
-        let p_l = self.projected_node(l);
-        let p_r = self.projected_node(r);
-        let a = p_l.min(p_r);
-        let b = p_l.max(p_r);
-        let chain_vx = self.cycle_chain_map.get(&(a, b))?;
+    pub fn black_edge_chain_vertex(&self, x: u64) -> Option<u64> {
+        let (left, right) = end_to_black_edge(x);
+        let p_l = self.projected_node(left);
+        let p_r = self.projected_node(right);
+        let from = p_l.min(p_r);
+        let to = p_l.max(p_r);
+        let chain_vx = self.cycle_chain_map.get(&(from, to))?;
         Some(*chain_vx)
     }
 
@@ -535,10 +525,8 @@ impl<'a> CactusTree<'a> {
 
                 if current == start || current == adj_end {
                     for (_, n, w) in edges {
-                        if w.black > 0 {
-                            if !visited.contains(&n) {
-                                stack.push(n);
-                            }
+                        if w.black > 0 && !visited.contains(&n) {
+                            stack.push(n);
                         }
                     }
                 } else {
@@ -581,7 +569,7 @@ impl<'a> CactusTree<'a> {
             .copied()
             .collect();
 
-        vertices.sort();
+        vertices.sort_unstable();
 
         let gray_edges: FnvHashSet<(u64, u64)> = vertices
             .iter()
@@ -619,10 +607,9 @@ impl<'a> CactusTree<'a> {
                         && b_v == b_u
                         && !black_vertices.contains(v)
                         && !black_vertices.contains(u)
+                        && Self::net_graph_black_edge_walk(orig_graph, *v, *u)
                     {
-                        if Self::net_graph_black_edge_walk(orig_graph, *v, *u) {
-                            add_pair = true;
-                        }
+                        add_pair = true;
                     }
                 }
 
@@ -668,7 +655,6 @@ impl<'a> CactusTree<'a> {
         &self,
         labels: &mut FnvHashMap<(u64, u64), bool>,
         x: u64,
-        y: u64,
         chain_vx: u64,
     ) -> Option<Vec<(u64, u64)>> {
         let p_x = self.projected_node(x);
@@ -974,7 +960,6 @@ pub fn chain_pair_contained_ultrabubbles(
             let contained_chain_pairs = cactus_tree.is_chain_pair_ultrabubble(
                 chain_edge_labels,
                 x,
-                y,
                 c_x,
             );
 
@@ -1017,7 +1002,7 @@ pub fn bridge_pair_ultrabubbles(
             let net_graph = cactus_tree.build_net_graph(x, y);
 
             if net_graph.is_ultrabubble() {
-                return Some(((x, y), net_graph.path.clone()));
+                return Some(((x, y), net_graph.path));
             }
         }
         None
@@ -1087,7 +1072,7 @@ pub fn find_ultrabubbles(
 
     let chain_edges_map = chain_edges(&chain_pairs, &cactus_tree);
 
-    let ultrabubbles = chain_ultrabubbles
+    chain_ultrabubbles
         .into_iter()
         .chain(bridge_ultrabubbles.into_iter())
         .map(|(key, cont)| {
@@ -1098,9 +1083,7 @@ pub fn find_ultrabubbles(
                     .collect::<Vec<_>>(),
             )
         })
-        .collect();
-
-    ultrabubbles
+        .collect()
 }
 
 pub fn inverse_map_ultrabubbles(

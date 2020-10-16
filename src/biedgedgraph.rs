@@ -345,17 +345,25 @@ impl BiedgedGraph {
             .sum()
     }
 
+    /// Remove a single black edge between two nodes, if any exists.
+    /// If the nodes share more than one black edge, their
+    /// corresponding edge weight is decremented, but they will still
+    /// have an edge in the graph.
     pub fn remove_one_black_edge(&mut self, a: u64, b: u64) -> Option<usize> {
+        use std::cmp::Ordering;
+
         let weight = self.graph.edge_weight_mut(a, b)?;
 
-        if weight.black > 1 {
-            weight.black -= 1;
-            Some(weight.black)
-        } else if weight.black == 1 {
-            self.graph.remove_edge(a, b);
-            Some(0)
-        } else {
-            None
+        match weight.black.cmp(&1) {
+            Ordering::Greater => {
+                weight.black -= 1;
+                Some(weight.black)
+            }
+            Ordering::Equal => {
+                self.graph.remove_edge(a, b);
+                Some(0)
+            }
+            Ordering::Less => None,
         }
     }
 
@@ -438,22 +446,6 @@ impl BiedgedGraph {
 }
 
 impl BiedgedGraph {
-    pub fn sorted_edges(&self) -> Vec<(u64, u64, usize, usize)> {
-        let mut black_edges = self
-            .black_edges()
-            .map(|x| (x.0, x.1, x.2.black, x.2.gray))
-            .collect::<Vec<_>>();
-        let mut gray_edges = self
-            .gray_edges()
-            .map(|x| (x.0, x.1, x.2.black, x.2.gray))
-            .collect::<Vec<_>>();
-
-        black_edges.sort();
-        gray_edges.sort();
-        black_edges.extend(gray_edges);
-        black_edges
-    }
-
     pub fn to_gfa_usize(&self) -> GFA<usize, ()> {
         let mut segments = Vec::new();
         let mut links = Vec::new();

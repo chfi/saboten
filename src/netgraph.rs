@@ -37,12 +37,11 @@ impl NetGraph {
 
         let x = self.x;
 
-        let start_color =
-            if graph.edges(x).find(|(_, _, w)| w.black > 0).is_some() {
-                Color::Gray
-            } else {
-                Color::Black
-            };
+        let start_color = if graph.edges(x).any(|(_, _, w)| w.black > 0) {
+            Color::Gray
+        } else {
+            Color::Black
+        };
 
         stack.push((start_color, x));
 
@@ -77,16 +76,16 @@ impl NetGraph {
 
     pub fn is_bridgeless(&self) -> bool {
         for node in self.graph.graph.nodes() {
-            if node != self.x && node != self.y {
-                if self
+            if node != self.x
+                && node != self.y
+                && self
                     .graph
                     .graph
                     .edges(node)
                     .find(|(_, _, w)| w.black == 1)
                     .is_none()
-                {
-                    return false;
-                }
+            {
+                return false;
             }
         }
         true
