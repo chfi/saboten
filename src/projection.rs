@@ -155,3 +155,40 @@ impl Projection {
         Some(projected.as_slice())
     }
 }
+
+/// Maps a vertex ID in the original (non-biedged) graph to its black
+/// edge vertices in the corresponding biedged graph.
+#[inline]
+pub fn id_to_black_edge(n: u64) -> (u64, u64) {
+    let left = n * 2;
+    let right = left + 1;
+    (left, right)
+}
+
+/// Given a vertex ID in a biedged graph, retrieve its opposite vertex
+/// and return their black edge.
+#[inline]
+pub fn end_to_black_edge(n: u64) -> (u64, u64) {
+    if n % 2 == 0 {
+        (n, n + 1)
+    } else {
+        (n - 1, n)
+    }
+}
+
+/// Given a vertex in a biedged graph, retrieve its opposite vertex.
+#[inline]
+pub fn opposite_vertex(n: u64) -> u64 {
+    if n % 2 == 0 {
+        n + 1
+    } else {
+        n - 1
+    }
+}
+
+#[inline]
+/// Maps a vertex in a biedged graph to its ID in the original,
+/// non-biedged graph.
+pub fn id_from_black_edge(n: u64) -> u64 {
+    n / 2
+}

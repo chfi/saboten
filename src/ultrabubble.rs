@@ -35,12 +35,6 @@ pub struct ChainPair {
     Serialize,
     Deserialize,
 )]
-pub struct Ultrabubble {
-    pub start: u64,
-    pub end: u64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BridgePair {
     pub x: u64,
     pub y: u64,

@@ -6,11 +6,9 @@ use rayon::prelude::*;
 use log::debug;
 
 use crate::{
-    biedgedgraph::{
-        end_to_black_edge, opposite_vertex, BiedgedGraph, BiedgedWeight,
-    },
+    biedgedgraph::{BiedgedGraph, BiedgedWeight},
     netgraph::NetGraph,
-    projection::Projection,
+    projection::{end_to_black_edge, opposite_vertex, Projection},
     ultrabubble::{ChainEdge, ChainPair, Snarl},
 };
 
@@ -1092,7 +1090,7 @@ pub fn inverse_map_ultrabubbles(
     ultrabubbles
         .into_iter()
         .map(|((x, y), contained)| {
-            use crate::biedgedgraph::id_from_black_edge;
+            use crate::projection::id_from_black_edge;
             let x = id_from_black_edge(x);
             let y = id_from_black_edge(y);
             let contained = contained
@@ -1242,7 +1240,7 @@ mod tests {
         name_map: &gfa::gfa::name_conversion::NameMap,
         n: u64,
     ) -> Option<bstr::BString> {
-        use crate::biedgedgraph::id_from_black_edge;
+        use crate::projection::id_from_black_edge;
         let not_orig = n % 2 != 0;
         let id = id_from_black_edge(n);
         let mut name: bstr::BString =
@@ -1255,7 +1253,7 @@ mod tests {
 
     #[test]
     fn edge_contraction_projection() {
-        use crate::biedgedgraph::id_to_black_edge;
+        use crate::projection::id_to_black_edge;
         use bstr::BString;
         use gfa::{
             gfa::{name_conversion::NameMap, GFA},
