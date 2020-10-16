@@ -13,7 +13,7 @@ categories = ["science"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-cli_logging = ["env_logger", "pretty_env_logger", "indicatif"]
+progress_bars = ["indicatif"]
 
 [dependencies]
 gfa = "0.8"
@@ -26,8 +26,6 @@ rayon = "1.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 log = "0.4"
-env_logger = { version = "0.7", optional = true }
-pretty_env_logger = { version = "0.4", optional = true }
 indicatif = { version = "0.15", features = ["rayon"], optional = true }
 
 [dev-dependencies]
@@ -35,10 +33,6 @@ criterion = "0.3"
 
 [lib]
 bench = false
-
-[[bin]]
-name = "saboten"
-required-features = ["cli_logging"]
 
 [[bench]]
 name = "saboten_benches"

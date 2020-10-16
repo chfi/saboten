@@ -14,10 +14,10 @@ use crate::{
     ultrabubble::{ChainEdge, ChainPair, Snarl},
 };
 
-#[cfg(feature = "cli_logging")]
+#[cfg(feature = "progress_bars")]
 use indicatif::ParallelProgressIterator;
 
-#[cfg(feature = "cli_logging")]
+#[cfg(feature = "progress_bars")]
 fn progress_bar(len: usize) -> indicatif::ProgressBar {
     use indicatif::{ProgressBar, ProgressStyle};
     let len = len as u64;
@@ -936,13 +936,13 @@ pub fn chain_pair_ultrabubble_labels(
 
     let iter;
 
-    #[cfg(feature = "cli_logging")]
+    #[cfg(feature = "progress_bars")]
     {
         iter = chain_edges
             .par_iter()
             .progress_with(progress_bar(chain_edges.len()));
     }
-    #[cfg(not(feature = "cli_logging"))]
+    #[cfg(not(feature = "progress_bars"))]
     {
         iter = chain_edges.par_iter();
     }
@@ -1000,13 +1000,13 @@ pub fn bridge_pair_ultrabubbles(
         FnvHashMap::default();
 
     let bridge_pair_iter;
-    #[cfg(feature = "cli_logging")]
+    #[cfg(feature = "progress_bars")]
     {
         bridge_pair_iter = bridge_pairs
             .par_iter()
             .progress_with(progress_bar(bridge_pairs.len()));
     }
-    #[cfg(not(feature = "cli_logging"))]
+    #[cfg(not(feature = "progress_bars"))]
     {
         bridge_pair_iter = bridge_pairs.par_iter();
     }
@@ -1024,13 +1024,13 @@ pub fn bridge_pair_ultrabubbles(
     }));
 
     let label_iter;
-    #[cfg(feature = "cli_logging")]
+    #[cfg(feature = "progress_bars")]
     {
         label_iter = bridge_pair_labels
             .par_iter()
             .progress_with(progress_bar(bridge_pair_labels.len()));
     }
-    #[cfg(not(feature = "cli_logging"))]
+    #[cfg(not(feature = "progress_bars"))]
     {
         label_iter = bridge_pair_labels.par_iter();
     }
