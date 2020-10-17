@@ -571,7 +571,7 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
-        let x = proj.projected(4);
+        let x = proj.find(4);
         let edges = edges_vec(&graph, x);
 
         assert_eq!(edges, vec![(1, 0, 1, 0), (1, 3, 1, 0), (1, 5, 1, 0)]);
@@ -585,7 +585,7 @@ mod tests {
         assert!(proj.equiv(7, 8));
         assert!(proj.equiv(0, 8));
 
-        let x = proj.projected(7);
+        let x = proj.find(7);
         let edges = edges_vec(&graph, x);
 
         assert_eq!(
@@ -606,8 +606,8 @@ mod tests {
 
         // Now all nodes in the contracted edges have been unified
         for (a, b) in first_union.iter().zip(second_union.iter()) {
-            let x = proj.projected(*a);
-            let y = proj.projected(*b);
+            let x = proj.find(*a);
+            let y = proj.find(*b);
             assert_eq!(x, y);
         }
     }
@@ -645,7 +645,7 @@ mod tests {
         let merged: Vec<u64> = vec![0, 1, 7, 8, 9];
 
         for i in merged {
-            let x = proj.projected(i);
+            let x = proj.find(i);
             if i == x {
                 assert!(graph.graph.contains_node(i));
             } else {
