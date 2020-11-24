@@ -1155,14 +1155,17 @@ mod tests {
     fn segment_split_name(
         name_map: &gfa::gfa::name_conversion::NameMap,
         n: u64,
-    ) -> Option<bstr::BString> {
+    ) -> Option<String> {
         use crate::projection::id_from_black_edge;
         let not_orig = n % 2 != 0;
         let id = id_from_black_edge(n);
-        let mut name: bstr::BString =
-            name_map.inverse_map_name(id as usize)?.to_owned();
+        let mut name: String = {
+            let bytes = name_map.inverse_map_name(id as usize)?;
+            let name_str = std::str::from_utf8(bytes).unwrap();
+            name_str.into()
+        };
         if not_orig {
-            name.push(b'_');
+            name.push('_');
         }
         Some(name)
     }
@@ -1170,18 +1173,17 @@ mod tests {
     #[test]
     fn edge_contraction_projection() {
         use crate::projection::id_to_black_edge;
-        use bstr::BString;
         use gfa::{
             gfa::{name_conversion::NameMap, GFA},
             parser::GFAParser,
         };
 
         let parser = GFAParser::new();
-        let bstr_gfa: GFA<bstr::BString, ()> =
+        let vec_gfa: GFA<Vec<u8>, ()> =
             parser.parse_file("./test/gfas/paper.gfa").unwrap();
 
-        let name_map = NameMap::build_from_gfa(&bstr_gfa);
-        let gfa = name_map.gfa_bstring_to_usize(&bstr_gfa, false).unwrap();
+        let name_map = NameMap::build_from_gfa(&vec_gfa);
+        let gfa = name_map.gfa_bytestring_to_usize(&vec_gfa, false).unwrap();
 
         let mut graph = BiedgedGraph::from_gfa(&gfa);
 
@@ -1189,12 +1191,13 @@ mod tests {
 
         CactusGraph::contract_all_gray_edges(&mut graph, &mut proj);
 
-        let proj_names = bstr_gfa
+        let proj_names = vec_gfa
             .segments
             .iter()
             .map(|s| {
                 let orig = name_map.map_name(&s.name).unwrap();
-                let orig_name = s.name.to_owned();
+                let orig_str = std::str::from_utf8(&s.name).unwrap();
+                let orig_name = orig_str.to_string();
                 let (l, r) = id_to_black_edge(orig as u64);
                 let l_end = proj.find(l);
                 let r_end = proj.find(r);
@@ -1225,9 +1228,7 @@ mod tests {
             ("r", ("p_", "r_")),
         ]
         .into_iter()
-        .map(|(a, (l, r))| {
-            (BString::from(a), (BString::from(l), BString::from(r)))
-        })
+        .map(|(a, (l, r))| (a.to_string(), (l.to_string(), r.to_string())))
         .collect();
 
         assert_eq!(expected_names, proj_names);

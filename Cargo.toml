@@ -1,6 +1,6 @@
 [package]
 name = "saboten"
-version = "0.0.3"
+version = "0.1.0"
 authors = ["Christian Fischer <christian@chfi.se>"]
 description = "Provides biedged graphs, cactus graphs and trees, and an algorithm for finding ultrabubbles in variation graphs."
 edition = "2018"
@@ -16,10 +16,9 @@ categories = ["science"]
 progress_bars = ["indicatif"]
 
 [dependencies]
-gfa = "0.8"
-three-edge-connected = "0.1"
+gfa = "0.9"
+three-edge-connected = "0.2.1"
 petgraph = "0.5.0"
-bstr = "0.2"
 fxhash = "0.2"
 fnv = "1.0"
 rayon = "1.4"
