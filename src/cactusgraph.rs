@@ -33,14 +33,17 @@ fn progress_bar(len: usize, steady: bool) -> indicatif::ProgressBar {
 macro_rules! impl_biedged_wrapper {
     ($for:ty) => {
         impl<'a> BiedgedWrapper for $for {
+            #[inline]
             fn base_graph(&self) -> &UnGraphMap<u64, BiedgedWeight> {
                 &self.graph.graph
             }
 
+            #[inline]
             fn biedged_graph(&self) -> &BiedgedGraph {
                 &self.graph
             }
 
+            #[inline]
             fn projection(&self) -> &Projection {
                 &self.projection
             }
@@ -57,12 +60,14 @@ pub trait BiedgedWrapper {
 
     fn projection(&self) -> &Projection;
 
+    #[inline]
     fn projected_node(&self, n: u64) -> u64 {
         let graph = self.biedged_graph();
         let proj = self.projection();
         graph.projected_node(proj, n)
     }
 
+    #[inline]
     fn projected_edge(&self, (x, y): (u64, u64)) -> (u64, u64) {
         let proj = self.projection();
         proj.find_edge(x, y)
@@ -239,6 +244,7 @@ impl<'a> CactusGraph<'a> {
         cycles
     }
 
+    #[inline]
     fn black_edge_projection(&self, x: u64) -> (u64, u64) {
         let (left, right) = end_to_black_edge(x);
         let p_l = self.projection.find(left);
@@ -250,6 +256,7 @@ impl<'a> CactusGraph<'a> {
 
     /// Given a vertex ID in the original biedged graph, find the
     /// simple cycle its incident black edge maps to.
+    #[inline]
     fn black_edge_cycle(&self, x: u64) -> Option<&Vec<usize>> {
         let edge = self.black_edge_projection(x);
         let cycles = self.cycle_map.get(&edge)?;
@@ -272,14 +279,17 @@ pub struct CactusTree<'a> {
 }
 
 impl<'a> BiedgedWrapper for CactusTree<'a> {
+    #[inline]
     fn base_graph(&self) -> &UnGraphMap<u64, BiedgedWeight> {
         &self.graph.graph
     }
 
+    #[inline]
     fn biedged_graph(&self) -> &BiedgedGraph {
         &self.graph
     }
 
+    #[inline]
     fn projection(&self) -> &Projection {
         &self.cactus_graph.projection
     }
@@ -334,6 +344,7 @@ impl<'a> CactusTree<'a> {
 
     /// Given a vertex in the original biedged graph, find the chain
     /// vertex its incident black edge projects to.
+    #[inline]
     pub fn black_edge_chain_vertex(&self, x: u64) -> Option<u64> {
         let (from, to) = self.cactus_graph.black_edge_projection(x);
         let chain_vx = self.cycle_chain_map.get(&(from, to))?;
@@ -508,7 +519,8 @@ impl<'a> CactusTree<'a> {
 
         vertices.sort_unstable();
 
-        let mut black_edges: FxHashSet<(u64, u64)> = FxHashSet::default();
+        let mut black_edges: fnv::FnvHashSet<(u64, u64)> =
+            fnv::FnvHashSet::default();
         let mut black_vertices: FxHashSet<u64> = FxHashSet::default();
 
         // Treat the edges of the snarl as if they already have black
@@ -550,7 +562,7 @@ impl<'a> CactusTree<'a> {
             graph.add_edge(a, b, BiedgedWeight::black(1));
         }
 
-        let gray_edges: FxHashSet<(u64, u64)> = vertices
+        let gray_edges: fnv::FnvHashSet<(u64, u64)> = vertices
             .iter()
             .flat_map(|v| orig_graph.graph.edges(*v))
             .filter_map(|(v, n, w)| {

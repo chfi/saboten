@@ -21,6 +21,7 @@ impl Projection {
     /// projection map, with the intention of mutating them. As the
     /// inverse map must be rebuilt when there's been any change to
     /// the projection, there's no sense in cloning that part as well.
+    #[inline]
     pub fn copy_without_inverse(&self) -> Self {
         Projection {
             size: self.size,
@@ -32,6 +33,7 @@ impl Projection {
     /// Construct a new projection map for a biedged graph. The graph
     /// must have its vertex IDs tightly packed, starting from zero or
     /// one.
+    #[inline]
     pub fn new_for_biedged_graph(graph: &BiedgedGraph) -> Self {
         let size = (graph.max_net_vertex + 1) as usize;
         let union_find = UnionFind::new(size);
@@ -122,6 +124,7 @@ impl Projection {
 
     /// Retrieves the inverse map, building it if it does not already
     /// exist.
+    #[inline]
     pub fn mut_get_inverse(&mut self) -> &InverseProjection {
         if let Some(ref inv) = self.inverse {
             inv
@@ -132,6 +135,7 @@ impl Projection {
     }
 
     /// Retrieves the inverse map, or None if it hasn't been built.
+    #[inline]
     pub fn get_inverse(&self) -> Option<&InverseProjection> {
         self.inverse.as_ref()
     }
@@ -139,6 +143,7 @@ impl Projection {
     /// Given a projected vertex, return a slice containing all the
     /// vertex in the original graph that projected to it. Returns
     /// None if the inverse map hasn't been built.
+    #[inline]
     pub fn projected_from(&self, x: u64) -> Option<&[u64]> {
         let inverse = self.inverse.as_ref()?;
         let projected = inverse.get(&x)?;

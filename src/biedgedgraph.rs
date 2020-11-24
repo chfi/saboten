@@ -16,23 +16,27 @@ pub struct BiedgedWeight {
 
 impl BiedgedWeight {
     /// An empty weight has zero edges of either color.
+    #[inline]
     pub fn empty() -> Self {
         Default::default()
     }
 
     /// Construct a new edge weight with the provided edge counts.
+    #[inline]
     pub fn new(black: usize, gray: usize) -> Self {
         BiedgedWeight { black, gray }
     }
 
     /// Construct a new edge weight with the provided black count,
     /// with gray set to zero.
+    #[inline]
     pub fn black(black: usize) -> Self {
         BiedgedWeight { black, gray: 0 }
     }
 
     /// Construct a new edge weight with the provided gray count,
     /// with black set to zero.
+    #[inline]
     pub fn gray(gray: usize) -> Self {
         BiedgedWeight { black: 0, gray }
     }
@@ -43,6 +47,7 @@ impl BiedgedWeight {
 impl Add for BiedgedWeight {
     type Output = Self;
 
+    #[inline]
     fn add(self, other: Self) -> Self {
         Self {
             black: self.black + other.black,
@@ -52,6 +57,7 @@ impl Add for BiedgedWeight {
 }
 
 impl AddAssign for BiedgedWeight {
+    #[inline]
     fn add_assign(&mut self, other: Self) {
         self.black += other.black;
         self.gray += other.gray;
@@ -61,6 +67,7 @@ impl AddAssign for BiedgedWeight {
 impl Sub for BiedgedWeight {
     type Output = Self;
 
+    #[inline]
     fn sub(self, other: Self) -> Self {
         Self {
             black: self.black - other.black,
@@ -70,6 +77,7 @@ impl Sub for BiedgedWeight {
 }
 
 impl SubAssign for BiedgedWeight {
+    #[inline]
     fn sub_assign(&mut self, other: Self) {
         self.black -= other.black;
         self.gray -= other.gray;
@@ -93,12 +101,14 @@ pub struct BiedgedGraph {
 
 impl BiedgedGraph {
     /// Create an empty biedged graph
+    #[inline]
     pub fn new() -> BiedgedGraph {
         Default::default()
     }
 
     /// Adds a chain vertex, ensuring that it has an index higher than
     /// any net vertex. Returns the new vertex identifier.
+    #[inline]
     pub fn add_chain_vertex(&mut self) -> u64 {
         self.max_chain_vertex += 1;
         let id = self.max_chain_vertex;
@@ -106,16 +116,19 @@ impl BiedgedGraph {
         id
     }
 
+    #[inline]
     pub fn is_chain_vertex(&self, n: u64) -> bool {
         n > self.max_net_vertex
     }
 
+    #[inline]
     pub fn is_net_vertex(&self, n: u64) -> bool {
         n <= self.max_net_vertex
     }
 
     /// Convenience method for getting the projection of a node,
     /// taking the possibility of chain vertices into account
+    #[inline]
     pub fn projected_node(&self, projection: &Projection, n: u64) -> u64 {
         if n <= self.max_net_vertex {
             projection.find(n)
@@ -244,12 +257,14 @@ impl BiedgedGraph {
     }
 
     /// Add the node with the given id to the graph
+    #[inline]
     pub fn add_node(&mut self, id: u64) -> u64 {
         self.graph.add_node(id)
     }
 
     /// Add an edge with the provided edge weight. If a corresponding
     /// edge already exists in the graph, the edge weights are added.
+    #[inline]
     pub fn add_edge(&mut self, from: u64, to: u64, weight: BiedgedWeight) {
         if let Some(old) = self.graph.edge_weight_mut(from, to) {
             *old += weight;
@@ -262,6 +277,7 @@ impl BiedgedGraph {
     /// the first two elements in the tuple are the `from` and `to`
     /// nodes, and the third is the weight containing the number of
     /// gray and black edges between the two nodes.
+    #[inline]
     pub fn gray_edges(
         &self,
     ) -> impl Iterator<Item = (u64, u64, &BiedgedWeight)> {
@@ -270,6 +286,7 @@ impl BiedgedGraph {
 
     /// Convenience method for looping through all gray edges while
     /// mutating the graph
+    #[inline]
     pub fn next_gray_edge(&self) -> Option<(u64, u64)> {
         self.graph
             .all_edges()
@@ -281,6 +298,7 @@ impl BiedgedGraph {
     /// the first two elements in the tuple are the `from` and `to`
     /// nodes, and the third is the weight containing the number of
     /// gray and black edges between the two nodes.
+    #[inline]
     pub fn black_edges(
         &self,
     ) -> impl Iterator<Item = (u64, u64, &BiedgedWeight)> {
@@ -289,12 +307,14 @@ impl BiedgedGraph {
 
     /// Produces the sum of the gray edges in the graph, counted using
     /// the edge weights.
+    #[inline]
     pub fn gray_edge_count(&self) -> usize {
         self.gray_edges().map(|(_, _, w)| w.gray).sum()
     }
 
     /// Produces the sum of the black edges in the graph, counted using
     /// the edge weights.
+    #[inline]
     pub fn black_edge_count(&self) -> usize {
         self.black_edges().map(|(_, _, w)| w.black).sum()
     }
@@ -303,6 +323,7 @@ impl BiedgedGraph {
     /// If the nodes share more than one black edge, their
     /// corresponding edge weight is decremented, but they will still
     /// have an edge in the graph.
+    #[inline]
     pub fn remove_one_black_edge(&mut self, a: u64, b: u64) -> Option<usize> {
         use std::cmp::Ordering;
 
@@ -327,6 +348,7 @@ impl BiedgedGraph {
     ///
     /// Returns the index of the resulting vertex, or None if either
     /// of the provided vertices were not present in the graph.
+    #[inline]
     pub fn merge_vertices(
         &mut self,
         from: u64,
@@ -358,6 +380,7 @@ impl BiedgedGraph {
     }
 
     /// Contract a (gray) edge between two vertices.
+    #[inline]
     pub fn contract_edge(
         &mut self,
         left: u64,
