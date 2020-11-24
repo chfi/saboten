@@ -2,7 +2,7 @@ use crate::biedgedgraph::BiedgedGraph;
 
 use petgraph::unionfind::UnionFind;
 
-use fnv::FnvHashMap;
+use fxhash::FxHashMap;
 
 /// Encapsulates a mapping of vertices in an original graph to their
 /// projections in another. Also provides an inverse mapping, so as to
@@ -11,10 +11,10 @@ use fnv::FnvHashMap;
 pub struct Projection {
     pub size: usize,
     union_find: UnionFind<usize>,
-    inverse: Option<FnvHashMap<u64, Vec<u64>>>,
+    inverse: Option<FxHashMap<u64, Vec<u64>>>,
 }
 
-pub type InverseProjection = FnvHashMap<u64, Vec<u64>>;
+pub type InverseProjection = FxHashMap<u64, Vec<u64>>;
 
 impl Projection {
     /// Utility function for use when cloning a graph and its
@@ -96,7 +96,7 @@ impl Projection {
     /// Constructs the inverse projection map, replacing it if it
     /// already exists.
     fn build_inverse_replace(&mut self) {
-        let mut inverse: InverseProjection = FnvHashMap::default();
+        let mut inverse: InverseProjection = FxHashMap::default();
         let reps = self.union_find.clone().into_labeling();
 
         for (i, k) in reps.iter().enumerate() {

@@ -1,7 +1,8 @@
-use fnv::{FnvHashMap, FnvHashSet};
 use log::debug;
 use petgraph::prelude::*;
 use rayon::prelude::*;
+
+use fxhash::{FxHashMap, FxHashSet};
 
 use crate::{
     biedgedgraph::{BiedgedGraph, BiedgedWeight},
@@ -80,7 +81,7 @@ pub struct CactusGraph<'a> {
     pub graph: BiedgedGraph,
     pub projection: Projection,
     pub cycles: Vec<Vec<(u64, u64)>>,
-    pub cycle_map: FnvHashMap<(u64, u64), Vec<usize>>,
+    pub cycle_map: FxHashMap<(u64, u64), Vec<usize>>,
 }
 
 impl_biedged_wrapper!(CactusGraph<'a>);
@@ -102,8 +103,8 @@ impl<'a> CactusGraph<'a> {
 
         let cycles = Self::find_cycles(&graph);
 
-        let mut cycle_map: FnvHashMap<(u64, u64), Vec<usize>> =
-            FnvHashMap::default();
+        let mut cycle_map: FxHashMap<(u64, u64), Vec<usize>> =
+            FxHashMap::default();
 
         for (i, cycle) in cycles.iter().enumerate() {
             for &(a, b) in cycle.iter() {
@@ -183,8 +184,8 @@ impl<'a> CactusGraph<'a> {
     fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<(u64, u64)>> {
         let graph = &biedged.graph;
 
-        let mut visited: FnvHashSet<u64> = FnvHashSet::default();
-        let mut parents: FnvHashMap<u64, u64> = FnvHashMap::default();
+        let mut visited: FxHashSet<u64> = FxHashSet::default();
+        let mut parents: FxHashMap<u64, u64> = FxHashMap::default();
 
         let mut stack: Vec<u64> = Vec::new();
 
@@ -266,8 +267,8 @@ pub struct CactusTree<'a> {
     pub original_graph: &'a BiedgedGraph,
     pub cactus_graph: &'a CactusGraph<'a>,
     pub graph: BiedgedGraph,
-    pub chain_vertices: FnvHashSet<u64>,
-    pub cycle_chain_map: FnvHashMap<(u64, u64), u64>,
+    pub chain_vertices: FxHashSet<u64>,
+    pub cycle_chain_map: FxHashMap<(u64, u64), u64>,
 }
 
 impl<'a> BiedgedWrapper for CactusTree<'a> {
@@ -310,9 +311,9 @@ impl<'a> CactusTree<'a> {
     fn construct_chain_vertices(
         biedged: &mut BiedgedGraph,
         cycles: &[Vec<(u64, u64)>],
-    ) -> (FnvHashMap<(u64, u64), u64>, FnvHashSet<u64>) {
-        let mut cycle_chain_map = FnvHashMap::default();
-        let mut chain_vertices = FnvHashSet::default();
+    ) -> (FxHashMap<(u64, u64), u64>, FxHashSet<u64>) {
+        let mut cycle_chain_map = FxHashMap::default();
+        let mut chain_vertices = FxHashSet::default();
 
         for cycle in cycles.iter() {
             let chain_vx = biedged.add_chain_vertex();
@@ -341,8 +342,8 @@ impl<'a> CactusTree<'a> {
 
     /// Find the chain pairs using the chain vertices in the cactus
     /// tree, and return them as a set of snarls.
-    pub fn find_chain_pairs(&self) -> FnvHashSet<ChainPair> {
-        let mut chain_pairs: FnvHashSet<ChainPair> = FnvHashSet::default();
+    pub fn find_chain_pairs(&self) -> FxHashSet<ChainPair> {
+        let mut chain_pairs: FxHashSet<ChainPair> = FxHashSet::default();
 
         let cactus_graph_inverse =
             self.cactus_graph.projection.get_inverse().unwrap();
@@ -389,8 +390,8 @@ impl<'a> CactusTree<'a> {
             path.push(p_x);
         } else {
             // If {x, y} is not a chain pair
-            let mut visited: FnvHashSet<u64> = FnvHashSet::default();
-            let mut parents: FnvHashMap<u64, u64> = FnvHashMap::default();
+            let mut visited: FxHashSet<u64> = FxHashSet::default();
+            let mut parents: FxHashMap<u64, u64> = FxHashMap::default();
 
             let mut stack: Vec<u64> = Vec::new();
 
@@ -444,7 +445,7 @@ impl<'a> CactusTree<'a> {
         let end = y;
         let adj_end = opposite_vertex(y);
 
-        let mut visited: FnvHashSet<u64> = FnvHashSet::default();
+        let mut visited: FxHashSet<u64> = FxHashSet::default();
         let mut stack: Vec<u64> = Vec::new();
 
         stack.push(start);
@@ -507,8 +508,8 @@ impl<'a> CactusTree<'a> {
 
         vertices.sort_unstable();
 
-        let mut black_edges: FnvHashSet<(u64, u64)> = FnvHashSet::default();
-        let mut black_vertices: FnvHashSet<u64> = FnvHashSet::default();
+        let mut black_edges: FxHashSet<(u64, u64)> = FxHashSet::default();
+        let mut black_vertices: FxHashSet<u64> = FxHashSet::default();
 
         // Treat the edges of the snarl as if they already have black
         // edges, since they shouldn't have any in the net graph
@@ -549,7 +550,7 @@ impl<'a> CactusTree<'a> {
             graph.add_edge(a, b, BiedgedWeight::black(1));
         }
 
-        let gray_edges: FnvHashSet<(u64, u64)> = vertices
+        let gray_edges: FxHashSet<(u64, u64)> = vertices
             .iter()
             .flat_map(|v| orig_graph.graph.edges(*v))
             .filter_map(|(v, n, w)| {
@@ -589,7 +590,7 @@ impl<'a> CactusTree<'a> {
     /// returns None.
     pub fn is_chain_pair_ultrabubble(
         &self,
-        labels: &mut FnvHashMap<(u64, u64), bool>,
+        labels: &mut FxHashMap<(u64, u64), bool>,
         x: u64,
         chain_vx: u64,
     ) -> Option<Vec<(u64, u64)>> {
@@ -600,7 +601,7 @@ impl<'a> CactusTree<'a> {
             }
         }
 
-        let mut visited: FnvHashSet<u64> = FnvHashSet::default();
+        let mut visited: FxHashSet<u64> = FxHashSet::default();
         let mut stack: Vec<(u64, u64)> = Vec::new();
         visited.insert(chain_vx);
         stack.push((chain_vx, p_x));
@@ -640,7 +641,7 @@ impl<'a> CactusTree<'a> {
     /// ultrabubble, returns None.
     pub fn is_bridge_pair_ultrabubble(
         &self,
-        labels: &FnvHashMap<(u64, u64), bool>,
+        labels: &FxHashMap<(u64, u64), bool>,
         x: u64,
         y: u64,
         path: &[u64],
@@ -651,14 +652,14 @@ impl<'a> CactusTree<'a> {
         let p_b = self.projected_node(b);
 
         let mut path_vertices =
-            path.iter().copied().collect::<FnvHashSet<u64>>();
+            path.iter().copied().collect::<FxHashSet<u64>>();
 
         path_vertices.insert(p_a);
         path_vertices.insert(p_b);
 
         let mut contained_chain_pairs: Vec<(u64, u64)> = Vec::new();
 
-        let mut chain_vertices: FnvHashSet<u64> = FnvHashSet::default();
+        let mut chain_vertices: FxHashSet<u64> = FxHashSet::default();
 
         for &v in path {
             if self.graph.is_chain_vertex(v) {
@@ -751,8 +752,8 @@ impl<'a> BridgeForest<'a> {
 
     /// Find the bridge pairs in the graph, returning them as a set of
     /// snarls.
-    pub fn find_bridge_pairs(&self) -> FnvHashSet<BridgePair> {
-        let mut bridge_pairs: FnvHashSet<BridgePair> = FnvHashSet::default();
+    pub fn find_bridge_pairs(&self) -> FxHashSet<BridgePair> {
+        let mut bridge_pairs: FxHashSet<BridgePair> = FxHashSet::default();
 
         let proj_inv = self.projection.get_inverse().unwrap();
 
@@ -797,9 +798,9 @@ impl<'a> BridgeForest<'a> {
 /// Return the chain edges in the cactus tree as a map from pairs of
 /// net and chain vertices to chain pair snarls.
 pub fn chain_edges<'a>(
-    chain_pairs: &'a FnvHashSet<ChainPair>,
+    chain_pairs: &'a FxHashSet<ChainPair>,
     cactus_tree: &'a CactusTree<'a>,
-) -> FnvHashMap<(u64, u64), (u64, u64)> {
+) -> FxHashMap<(u64, u64), (u64, u64)> {
     chain_pairs
         .iter()
         .map(move |&snarl| {
@@ -815,11 +816,11 @@ pub fn chain_edges<'a>(
 /// and bridgeless, returning a map from chain edges to true/false.
 pub fn chain_pair_ultrabubble_labels(
     cactus_tree: &CactusTree<'_>,
-    chain_pairs: &FnvHashSet<ChainPair>,
-) -> FnvHashMap<(u64, u64), bool> {
+    chain_pairs: &FxHashSet<ChainPair>,
+) -> FxHashMap<(u64, u64), bool> {
     let chain_edges = chain_edges(chain_pairs, cactus_tree);
 
-    let mut chain_edge_labels = FnvHashMap::default();
+    let mut chain_edge_labels = FxHashMap::default();
 
     let iter;
 
@@ -849,10 +850,10 @@ pub fn chain_pair_ultrabubble_labels(
 /// ultrabubbles.
 pub fn chain_pair_contained_ultrabubbles(
     cactus_tree: &CactusTree<'_>,
-    chain_pairs: &FnvHashSet<ChainPair>,
-    chain_edge_labels: &mut FnvHashMap<(u64, u64), bool>,
-) -> FnvHashMap<(u64, u64), Vec<(u64, u64)>> {
-    let mut chain_pair_ultrabubbles = FnvHashMap::default();
+    chain_pairs: &FxHashSet<ChainPair>,
+    chain_edge_labels: &mut FxHashMap<(u64, u64), bool>,
+) -> FxHashMap<(u64, u64), Vec<(u64, u64)>> {
+    let mut chain_pair_ultrabubbles = FxHashMap::default();
 
     for &snarl in chain_pairs.iter() {
         let ChainPair { x, y } = snarl;
@@ -873,13 +874,13 @@ pub fn chain_pair_contained_ultrabubbles(
 /// pairs to their contained ultrabubbles. Runs in parallel.
 pub fn bridge_pair_ultrabubbles(
     cactus_tree: &CactusTree<'_>,
-    bridge_pairs: &FnvHashSet<BridgePair>,
-    chain_edge_labels: &FnvHashMap<(u64, u64), bool>,
-) -> FnvHashMap<(u64, u64), Vec<(u64, u64)>> {
-    let mut bridge_pair_ultrabubbles = FnvHashMap::default();
+    bridge_pairs: &FxHashSet<BridgePair>,
+    chain_edge_labels: &FxHashMap<(u64, u64), bool>,
+) -> FxHashMap<(u64, u64), Vec<(u64, u64)>> {
+    let mut bridge_pair_ultrabubbles = FxHashMap::default();
 
-    let mut bridge_pair_labels: FnvHashMap<(u64, u64), Vec<u64>> =
-        FnvHashMap::default();
+    let mut bridge_pair_labels: FxHashMap<(u64, u64), Vec<u64>> =
+        FxHashMap::default();
 
     debug!("Bridge pairs - checking net graphs");
     let bridge_pair_iter;
@@ -941,7 +942,7 @@ pub fn bridge_pair_ultrabubbles(
 pub fn find_ultrabubbles(
     cactus_tree: &CactusTree<'_>,
     bridge_forest: &BridgeForest<'_>,
-) -> FnvHashMap<(u64, u64), Vec<(u64, u64)>> {
+) -> FxHashMap<(u64, u64), Vec<(u64, u64)>> {
     debug!("Finding chain pairs");
     let chain_pairs = cactus_tree.find_chain_pairs();
     debug!("Found {} chain pairs", chain_pairs.len());
@@ -988,8 +989,8 @@ pub fn find_ultrabubbles(
 /// node ID space of the graph used to construct the original biedged
 /// graph.
 pub fn inverse_map_ultrabubbles(
-    ultrabubbles: FnvHashMap<(u64, u64), Vec<(u64, u64)>>,
-) -> FnvHashMap<(u64, u64), Vec<(u64, u64)>> {
+    ultrabubbles: FxHashMap<(u64, u64), Vec<(u64, u64)>>,
+) -> FxHashMap<(u64, u64), Vec<(u64, u64)>> {
     ultrabubbles
         .into_iter()
         .map(|((x, y), contained)| {

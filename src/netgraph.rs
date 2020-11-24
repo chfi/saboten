@@ -1,4 +1,4 @@
-use fnv::FnvHashSet;
+use fxhash::FxHashSet;
 
 use crate::biedgedgraph::BiedgedGraph;
 
@@ -29,8 +29,8 @@ impl NetGraph {
     pub fn is_acyclic(&self) -> bool {
         let graph = &self.graph.graph;
 
-        let mut visited: FnvHashSet<u64> = FnvHashSet::default();
-        let mut in_path: FnvHashSet<u64> = FnvHashSet::default();
+        let mut visited: FxHashSet<u64> = FxHashSet::default();
+        let mut in_path: FxHashSet<u64> = FxHashSet::default();
         let mut stack: Vec<(Color, u64)> = Vec::new();
 
         let mut acyclic = true;

@@ -4,8 +4,6 @@ use saboten::{
     cactusgraph::{BridgeForest, CactusGraph, CactusTree},
 };
 
-use fnv::FnvHashSet;
-
 use std::path::PathBuf;
 
 use gfa::{gfa::GFA, parser::GFAParser};
