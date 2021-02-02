@@ -10,6 +10,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "afddf7f520a80dbf76e6f50a35bca42a2331ef227a28b3b6dc5c2e2338d114b1"
+
+[[package]]
 name = "arrayvec"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -278,6 +284,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "gfa"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc91d0e20bb75d015851e7a95c9bcf006d4e16472132bc02e1d873e9b6a94dc1"
+dependencies = [
+ "anyhow",
+ "bstr",
+ "bytemuck",
+ "fnv",
+ "lazy_static",
+ "memmap",
+ "nom",
+ "regex",
+]
+
+[[package]]
 name = "half"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -393,6 +415,16 @@ name = "memchr"
 version = "2.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
+
+[[package]]
+name = "memmap"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6585fd95e7bb50d6cc31e20d4cf9afb4e2ba16c5846fc76793f11218da9c475b"
+dependencies = [
+ "libc",
+ "winapi",
+]
 
 [[package]]
 name = "memoffset"
@@ -554,12 +586,12 @@ checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
 
 [[package]]
 name = "saboten"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "criterion",
  "fnv",
  "fxhash",
- "gfa",
+ "gfa 0.10.0",
  "indicatif",
  "log",
  "petgraph",
@@ -697,7 +729,7 @@ checksum = "70668d723a2e70c016191fa454213be884928c92aac1b26bd152b43d3dd0b070"
 dependencies = [
  "bstr",
  "fxhash",
- "gfa",
+ "gfa 0.9.0",
 ]
 
 [[package]]
