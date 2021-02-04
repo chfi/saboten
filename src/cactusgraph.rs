@@ -188,7 +188,7 @@ impl<'a> CactusGraph<'a> {
                 let edge = biedged.graph.edge_weight(from_, to_).copied();
                 if let Some(w) = edge {
                     if w.gray > 0 {
-                        let proj_from = biedged
+                        let _proj_from = biedged
                             .contract_edge(from_, to_, projection)
                             .unwrap();
                     }
@@ -221,7 +221,7 @@ impl<'a> CactusGraph<'a> {
                 let edge = biedged.graph.edge_weight(from_, to_).copied();
                 if let Some(w) = edge {
                     if w.gray > 0 {
-                        let proj_from = biedged
+                        let _proj_from = biedged
                             .contract_edge(from_, to_, projection)
                             .unwrap();
                     }
