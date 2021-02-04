@@ -863,19 +863,12 @@ impl<'a> BridgeForest<'a> {
             );
             for cycle in cycles {
                 for &(from, to) in cycle {
-                    let from = if biedged.graph.contains_node(from) {
-                        from
-                    } else {
-                        projection.find(from)
-                    };
+                    let from = projection.find(from);
+                    let to = projection.find(to);
 
-                    let to = if biedged.graph.contains_node(to) {
-                        to
-                    } else {
-                        projection.find(to)
-                    };
-
-                    biedged.merge_vertices(from, to, projection);
+                    if from != to {
+                        biedged.merge_vertices(from, to, projection);
+                    }
                 }
 
                 p_bar.inc(1);
@@ -888,19 +881,12 @@ impl<'a> BridgeForest<'a> {
         {
             for cycle in cycles {
                 for &(from, to) in cycle {
-                    let from = if biedged.graph.contains_node(from) {
-                        from
-                    } else {
-                        projection.find(from)
-                    };
+                    let from = projection.find(from);
+                    let to = projection.find(to);
 
-                    let to = if biedged.graph.contains_node(to) {
-                        to
-                    } else {
-                        projection.find(to)
-                    };
-
-                    biedged.merge_vertices(from, to, projection);
+                    if from != to {
+                        biedged.merge_vertices(from, to, projection);
+                    }
                 }
             }
         }
