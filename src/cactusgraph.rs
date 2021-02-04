@@ -21,7 +21,7 @@ fn progress_bar(len: usize, steady: bool) -> indicatif::ProgressBar {
     let p_bar = ProgressBar::new(len);
     p_bar.set_style(
         ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] {bar:80} {pos:>7}/{len:7}")
+            .template("[{elapsed_precise}] {bar:40} {pos:>12}/{len:12}")
             .progress_chars("##-"),
     );
     if steady {
@@ -96,21 +96,42 @@ impl<'a> CactusGraph<'a> {
     /// input graph before mutating, and keeps a reference to the
     /// original.
     pub fn from_biedged_graph(biedged_graph: &'a BiedgedGraph) -> Self {
+        debug!("  ~~~  building cactus graph  ~~~");
+        debug!("cloning biedged graph");
+        let t = std::time::Instant::now();
         let mut graph = biedged_graph.clone();
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
+        debug!("cloning projection");
+        let t = std::time::Instant::now();
         let mut projection = Projection::new_for_biedged_graph(&graph);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
+        debug!("contracting gray edges");
+        let t = std::time::Instant::now();
         Self::contract_all_gray_edges(&mut graph, &mut projection);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
+        debug!("finding 3-edge-connected components");
+        let t = std::time::Instant::now();
         let components = Self::find_3_edge_connected_components(&graph);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
+        debug!("merging 3-edge-connected components");
+        let t = std::time::Instant::now();
         Self::merge_components(&mut graph, components, &mut projection);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
+        debug!("finding cycles");
+        let t = std::time::Instant::now();
         let cycles = Self::find_cycles(&graph);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         let mut cycle_map: FxHashMap<(u64, u64), Vec<usize>> =
             FxHashMap::default();
 
+        debug!("building cycle map");
+        let t = std::time::Instant::now();
         for (i, cycle) in cycles.iter().enumerate() {
             for &(a, b) in cycle.iter() {
                 let l = a.min(b);
@@ -118,8 +139,13 @@ impl<'a> CactusGraph<'a> {
                 cycle_map.entry((l, r)).or_default().push(i);
             }
         }
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
+        debug!("building inverse projection map");
+        let t = std::time::Instant::now();
         projection.build_inverse();
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        debug!("  ~~~  cactus graph constructed  ~~~");
 
         CactusGraph {
             original_graph: biedged_graph,
