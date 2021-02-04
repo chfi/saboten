@@ -156,16 +156,84 @@ impl<'a> CactusGraph<'a> {
         }
     }
 
-    fn contract_all_gray_edges(
+    pub fn contract_all_gray_edges(
         biedged: &mut BiedgedGraph,
         projection: &mut Projection,
     ) {
-        while let Some((from, to)) = biedged.next_gray_edge() {
-            biedged.contract_edge(from, to, projection).unwrap();
+        #[cfg(feature = "progress_bars")]
+        {
+            use indicatif::{ProgressBar, ProgressStyle};
+
+            debug!("calculating gray edge count");
+            let gray_edge_count = biedged.gray_edge_count();
+            let p_bar = ProgressBar::new(gray_edge_count as u64);
+            debug!("contracting {} gray edges", gray_edge_count);
+
+            p_bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("[{elapsed_precise}] {bar:40} {pos:>10}/{len:10}")
+                    .progress_chars("##-"),
+            );
+
+            debug!("collecting gray edges");
+            let gray_edges = biedged
+                .gray_edges()
+                .map(|(a, b, _w)| (a, b))
+                .collect::<Vec<_>>();
+            debug!("collected gray edges");
+
+            for (from, to) in gray_edges {
+                let from_ = projection.find(from);
+                let to_ = projection.find(to);
+                let edge = biedged.graph.edge_weight(from_, to_).copied();
+                if let Some(w) = edge {
+                    if w.gray > 0 {
+                        let proj_from = biedged
+                            .contract_edge(from_, to_, projection)
+                            .unwrap();
+                    }
+                }
+                p_bar.inc(1);
+            }
+
+            let gray_edge_count = biedged.gray_edge_count();
+            assert_eq!(gray_edge_count, 0);
+
+            p_bar.finish();
+        }
+
+        #[cfg(not(feature = "progress_bars"))]
+        {
+            debug!("calculating gray edge count");
+            let gray_edge_count = biedged.gray_edge_count();
+            debug!("contracting {} gray edges", gray_edge_count);
+
+            debug!("collecting gray edges");
+            let gray_edges = biedged
+                .gray_edges()
+                .map(|(a, b, _w)| (a, b))
+                .collect::<Vec<_>>();
+            debug!("collected gray edges");
+
+            for (from, to) in gray_edges {
+                let from_ = projection.find(from);
+                let to_ = projection.find(to);
+                let edge = biedged.graph.edge_weight(from_, to_).copied();
+                if let Some(w) = edge {
+                    if w.gray > 0 {
+                        let proj_from = biedged
+                            .contract_edge(from_, to_, projection)
+                            .unwrap();
+                    }
+                }
+            }
+
+            let gray_edge_count = biedged.gray_edge_count();
+            assert_eq!(gray_edge_count, 0);
         }
     }
 
-    fn find_3_edge_connected_components(
+    pub fn find_3_edge_connected_components(
         biedged: &BiedgedGraph,
     ) -> Vec<Vec<usize>> {
         let edges = biedged.graph.all_edges().flat_map(|(a, b, w)| {
@@ -186,7 +254,7 @@ impl<'a> CactusGraph<'a> {
         graph.invert_components(components)
     }
 
-    fn merge_components(
+    pub fn merge_components(
         biedged: &mut BiedgedGraph,
         components: Vec<Vec<usize>>,
         projection: &mut Projection,
