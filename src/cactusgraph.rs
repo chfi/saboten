@@ -130,7 +130,7 @@ impl<'a> CactusGraph<'a> {
         let mut cycle_map: FxHashMap<(u64, u64), Vec<usize>> =
             FxHashMap::default();
 
-        debug!("building cycle map");
+        debug!("building cycle map using {} cycles", cycles.len());
         let t = std::time::Instant::now();
         for (i, cycle) in cycles.iter().enumerate() {
             for &(a, b) in cycle.iter() {
@@ -812,16 +812,31 @@ impl_biedged_wrapper!(BridgeForest<'a>);
 
 impl<'a> BridgeForest<'a> {
     pub fn from_cactus_graph(cactus_graph: &'_ CactusGraph<'a>) -> Self {
+        debug!("  ~~~  building bridge forest  ~~~");
+        debug!("cloning cactus graph");
+        let t = std::time::Instant::now();
         let mut graph = cactus_graph.graph.clone();
-        let mut projection = cactus_graph.projection.copy_without_inverse();
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
+        debug!("cloning projection");
+        let t = std::time::Instant::now();
+        let mut projection = cactus_graph.projection.copy_without_inverse();
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+
+        debug!("contracting {} cycles", cactus_graph.cycles.len());
+        let t = std::time::Instant::now();
         Self::contract_cycles(
             &mut graph,
             &cactus_graph.cycles,
             &mut projection,
         );
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
+        debug!("building inverse projection map");
+        let t = std::time::Instant::now();
         projection.build_inverse();
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        debug!("  ~~~  bridge forest constructed  ~~~");
 
         Self {
             original_graph: cactus_graph.original_graph,
@@ -832,26 +847,61 @@ impl<'a> BridgeForest<'a> {
 
     /// Contracts each cycle into a single vertex, updating the projection
     /// map accordingly.
-    fn contract_cycles(
+    pub fn contract_cycles(
         biedged: &mut BiedgedGraph,
         cycles: &[Vec<(u64, u64)>],
         projection: &mut Projection,
     ) {
-        for cycle in cycles {
-            for &(from, to) in cycle {
-                let from = if biedged.graph.contains_node(from) {
-                    from
-                } else {
-                    projection.find(from)
-                };
+        #[cfg(feature = "progress_bars")]
+        {
+            use indicatif::{ProgressBar, ProgressStyle};
+            let p_bar = ProgressBar::new(cycles.len() as u64);
+            p_bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("[{elapsed_precise}] {bar:40} {pos:>10}/{len:10}")
+                    .progress_chars("##-"),
+            );
+            for cycle in cycles {
+                for &(from, to) in cycle {
+                    let from = if biedged.graph.contains_node(from) {
+                        from
+                    } else {
+                        projection.find(from)
+                    };
 
-                let to = if biedged.graph.contains_node(to) {
-                    to
-                } else {
-                    projection.find(to)
-                };
+                    let to = if biedged.graph.contains_node(to) {
+                        to
+                    } else {
+                        projection.find(to)
+                    };
 
-                biedged.merge_vertices(from, to, projection);
+                    biedged.merge_vertices(from, to, projection);
+                }
+
+                p_bar.inc(1);
+            }
+
+            p_bar.finish();
+        }
+
+        #[cfg(not(feature = "progress_bars"))]
+        {
+            for cycle in cycles {
+                for &(from, to) in cycle {
+                    let from = if biedged.graph.contains_node(from) {
+                        from
+                    } else {
+                        projection.find(from)
+                    };
+
+                    let to = if biedged.graph.contains_node(to) {
+                        to
+                    } else {
+                        projection.find(to)
+                    };
+
+                    biedged.merge_vertices(from, to, projection);
+                }
             }
         }
     }
