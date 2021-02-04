@@ -2,7 +2,7 @@ use crate::biedgedgraph::BiedgedGraph;
 
 use petgraph::unionfind::UnionFind;
 
-use fxhash::FxHashMap;
+use rustc_hash::FxHashMap;
 
 /// Encapsulates a mapping of vertices in an original graph to their
 /// projections in another. Also provides an inverse mapping, so as to

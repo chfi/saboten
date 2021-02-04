@@ -2,7 +2,7 @@ use log::debug;
 use petgraph::prelude::*;
 use rayon::prelude::*;
 
-use fxhash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     biedgedgraph::{BiedgedGraph, BiedgedWeight},
