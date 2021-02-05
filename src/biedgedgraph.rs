@@ -5,6 +5,8 @@ use gfa::gfa::{Orientation, GFA};
 
 use crate::projection::{id_to_black_edge, Projection};
 
+use log::debug;
+
 /// To make a petgraph Graph(Map) into a multigraph, we track the
 /// number of black and gray edges between two nodes by using this
 /// struct as the edge weight type.
@@ -205,6 +207,11 @@ impl BiedgedGraph {
 
     /// Construct a biedged graph from a GFA.
     pub fn from_gfa(gfa: &GFA<usize, ()>) -> BiedgedGraph {
+        debug!(
+            "building BiedgedGraph from GFA with {} nodes, {} edges",
+            gfa.segments.len(),
+            gfa.links.len()
+        );
         let mut be_graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
         let mut max_seg_id = 0;
@@ -248,6 +255,11 @@ impl BiedgedGraph {
 
         let max_net_vertex = ((max_node_id + 1) * 2) as u64;
         let max_chain_vertex = max_net_vertex;
+
+        let (node_cap, edge_cap) = be_graph.capacity();
+
+        debug!("BiedgedGraph with {} nodes, {} edges, capacity: {} nodes, {} edges",
+               be_graph.node_count(), be_graph.edge_count(), node_cap, edge_cap);
 
         BiedgedGraph {
             graph: be_graph,
@@ -419,6 +431,18 @@ impl BiedgedGraph {
         }
 
         Some(from)
+    }
+
+    pub(crate) fn edge_count_capacity(&self) -> (usize, usize) {
+        let count = self.graph.edge_count();
+        let (_, cap) = self.graph.capacity();
+        (count, cap)
+    }
+
+    pub(crate) fn node_count_capacity(&self) -> (usize, usize) {
+        let count = self.graph.node_count();
+        let (cap, _) = self.graph.capacity();
+        (count, cap)
     }
 }
 
