@@ -92,6 +92,6 @@ impl NetGraph {
     }
 
     pub fn is_ultrabubble(&self) -> bool {
-        self.is_bridgeless() & self.is_acyclic()
+        self.is_bridgeless() && self.is_acyclic()
     }
 }
