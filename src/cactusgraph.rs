@@ -1074,14 +1074,23 @@ impl<'a> BridgeForest<'a> {
     /// snarls.
     pub fn find_bridge_pairs(&self) -> FxHashSet<BridgePair> {
         debug!(" ~~~ in find_bridge_pairs() ~~~ ");
+
         let mut bridge_pairs: FxHashSet<BridgePair> = FxHashSet::default();
 
+        debug!(" getting inverse projection ");
         let proj_inv = self.projection.get_inverse().unwrap();
 
-        for p_x in self.base_graph().nodes() {
-            if bridge_pairs.len() % 1000000 == 0 && !bridge_pairs.is_empty() {
+        use std::time::Instant;
+        let mut last_t = Instant::now();
+        debug!(" iterating {} nodes", self.base_graph().node_count());
+        for (ix, p_x) in self.base_graph().nodes().enumerate() {
+            let mut log_now = false;
+            if last_t.elapsed().as_millis() > 100 {
+                log_now = true;
+                last_t = Instant::now();
                 debug!(
-                    "after {} bridge pairs, capacity: {}",
+                    "loop {} in bridge_pairs, len: {} , capacity: {}",
+                    ix,
                     bridge_pairs.len(),
                     bridge_pairs.capacity()
                 );
@@ -1090,9 +1099,21 @@ impl<'a> BridgeForest<'a> {
             let neighbors =
                 self.base_graph().neighbors(p_x).collect::<Vec<_>>();
 
+            if log_now {
+                debug!(
+                    "  neighbors len: {}, capacity: {}",
+                    neighbors.len(),
+                    neighbors.capacity()
+                );
+            }
+
             if neighbors.len() == 2 {
                 let mut all_neighbors: Vec<u64> = Vec::new();
                 for n in neighbors {
+                    if log_now {
+                        debug!(" extending all_neighbors ");
+                    }
+
                     let filtered = proj_inv
                         .get(&n)
                         .unwrap()
@@ -1104,19 +1125,63 @@ impl<'a> BridgeForest<'a> {
                         })
                         .copied();
                     all_neighbors.extend(filtered);
+
+                    if log_now {
+                        debug!(
+                            " all_neighbors now {} long, {} cap",
+                            all_neighbors.len(),
+                            all_neighbors.capacity()
+                        );
+                    }
                 }
 
+                debug!(
+                    "  all_neighbors len: {}, capacity: {}",
+                    all_neighbors.len(),
+                    all_neighbors.capacity()
+                );
+
+                if log_now || all_neighbors.len() > 10000 {
+                    let n = all_neighbors.len();
+                    debug!("  iterating {} * {} = {} neighbors", n, n, n * n);
+                }
+
+                let mut insertions = 0;
+                let mut duplicates = 0;
                 for &a in all_neighbors.iter() {
+                    if log_now {
+                        debug!("outer iteration {}", a);
+                    }
                     for &b in all_neighbors.iter() {
+                        if log_now {
+                            debug!("iteration {}, {}", a, b);
+                        }
                         let x = a.min(b);
                         let y = a.max(b);
                         if x != y {
+                            if log_now {
+                                debug!("{} != {}", x, y);
+                            }
                             let x_ = opposite_vertex(x);
+                            if log_now {
+                                debug!("opposite_vertex({}) = {}", x, x_);
+                            }
                             let y_ = opposite_vertex(y);
                             bridge_pairs.insert(BridgePair { x: x_, y: y_ });
+                            if log_now {
+                                debug!("opposite_vertex({}) = {}", y, y_);
+                            }
                         }
                     }
                 }
+
+                if log_now {
+                    debug!("done with all_neighbors");
+                }
+            }
+
+            if log_now {
+                debug!("end of loop {}", ix);
             }
         }
 
