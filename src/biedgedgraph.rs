@@ -106,6 +106,10 @@ impl BiedgedGraph {
         let (node_count, node_cap) = self.node_count_capacity();
         let (edge_count, edge_cap) = self.edge_count_capacity();
 
+        if node_count == node_cap && edge_count == edge_cap {
+            return;
+        }
+
         debug!(
             "shrink_to_fit - node count & cap: {} | {}",
             node_count, node_cap
@@ -141,6 +145,10 @@ impl BiedgedGraph {
     pub fn shrink_into(self) -> BiedgedGraph {
         let (node_count, node_cap) = self.node_count_capacity();
         let (edge_count, edge_cap) = self.edge_count_capacity();
+
+        if node_count == node_cap && edge_count == edge_cap {
+            return self;
+        }
 
         debug!(
             "shrink_into - node count & cap: {} | {}",
@@ -180,6 +188,10 @@ impl BiedgedGraph {
     pub fn shrink_clone(&self) -> BiedgedGraph {
         let (node_count, node_cap) = self.node_count_capacity();
         let (edge_count, edge_cap) = self.edge_count_capacity();
+
+        if node_count == node_cap && edge_count == edge_cap {
+            return self.clone();
+        }
 
         debug!(
             "shrink_clone - node count & cap: {} | {}",
@@ -331,7 +343,7 @@ impl BiedgedGraph {
         let links_len = gfa.links.len();
 
         let mut be_graph: UnGraphMap<u64, BiedgedWeight> =
-            UnGraphMap::with_capacity(segs_len, segs_len + links_len);
+            UnGraphMap::with_capacity(segs_len * 2, segs_len + links_len);
 
         let mut max_seg_id = 0;
         let mut min_seg_id = std::usize::MAX;
@@ -377,18 +389,11 @@ impl BiedgedGraph {
 
         let (node_cap, edge_cap) = be_graph.capacity();
 
-        let mut new_be_graph: UnGraphMap<u64, BiedgedWeight> =
-            UnGraphMap::with_capacity(node_cap + 10000, edge_cap + 10000);
-
-        new_be_graph.clone_from(&be_graph);
-
-        let (node_cap, edge_cap) = new_be_graph.capacity();
-
         debug!("BiedgedGraph with {} nodes, {} edges, capacity: {} nodes, {} edges",
-               new_be_graph.node_count(), new_be_graph.edge_count(), node_cap, edge_cap);
+               be_graph.node_count(), be_graph.edge_count(), node_cap, edge_cap);
 
         BiedgedGraph {
-            graph: new_be_graph,
+            graph: be_graph,
             max_net_vertex,
             max_chain_vertex,
         }
