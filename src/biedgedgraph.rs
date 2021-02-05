@@ -102,6 +102,120 @@ pub struct BiedgedGraph {
 }
 
 impl BiedgedGraph {
+    pub fn shrink_to_fit(&mut self) {
+        let (node_count, node_cap) = self.node_count_capacity();
+        let (edge_count, edge_cap) = self.edge_count_capacity();
+
+        debug!(
+            "shrink_to_fit - node count & cap: {} | {}",
+            node_count, node_cap
+        );
+        debug!(
+            "shrink_to_fit - edge count & cap: {} | {}",
+            edge_count, edge_cap
+        );
+
+        let mut new_graph: UnGraphMap<u64, BiedgedWeight> =
+            UnGraphMap::with_capacity(node_count, edge_count);
+
+        for (a, b, &w) in self.graph.all_edges() {
+            new_graph.add_edge(a, b, w);
+        }
+
+        let node_count = new_graph.node_count();
+        let edge_count = new_graph.edge_count();
+        let (node_cap, edge_cap) = new_graph.capacity();
+
+        debug!(
+            "shrink_to_fit - new node count & cap: {} | {}",
+            node_count, node_cap
+        );
+        debug!(
+            "shrink_to_fit - new edge count & cap: {} | {}",
+            edge_count, edge_cap
+        );
+
+        std::mem::swap(&mut self.graph, &mut new_graph);
+    }
+
+    pub fn shrink_into(self) -> BiedgedGraph {
+        let (node_count, node_cap) = self.node_count_capacity();
+        let (edge_count, edge_cap) = self.edge_count_capacity();
+
+        debug!(
+            "shrink_into - node count & cap: {} | {}",
+            node_count, node_cap
+        );
+        debug!(
+            "shrink_into - edge count & cap: {} | {}",
+            edge_count, edge_cap
+        );
+
+        let mut new_graph: UnGraphMap<u64, BiedgedWeight> =
+            UnGraphMap::with_capacity(node_count, edge_count);
+
+        for (a, b, &w) in self.graph.all_edges() {
+            new_graph.add_edge(a, b, w);
+        }
+
+        let node_count = new_graph.node_count();
+        let edge_count = new_graph.edge_count();
+        let (node_cap, edge_cap) = new_graph.capacity();
+
+        debug!(
+            "shrink_into - new node count & cap: {} | {}",
+            node_count, node_cap
+        );
+        debug!(
+            "shrink_into - new edge count & cap: {} | {}",
+            edge_count, edge_cap
+        );
+
+        BiedgedGraph {
+            graph: new_graph,
+            ..self
+        }
+    }
+
+    pub fn shrink_clone(&self) -> BiedgedGraph {
+        let (node_count, node_cap) = self.node_count_capacity();
+        let (edge_count, edge_cap) = self.edge_count_capacity();
+
+        debug!(
+            "shrink_clone - node count & cap: {} | {}",
+            node_count, node_cap
+        );
+        debug!(
+            "shrink_clone - edge count & cap: {} | {}",
+            edge_count, edge_cap
+        );
+
+        let mut new_graph: UnGraphMap<u64, BiedgedWeight> =
+            UnGraphMap::with_capacity(node_count, edge_count);
+
+        for (a, b, &w) in self.graph.all_edges() {
+            new_graph.add_edge(a, b, w);
+        }
+
+        let node_count = new_graph.node_count();
+        let edge_count = new_graph.edge_count();
+        let (node_cap, edge_cap) = new_graph.capacity();
+
+        debug!(
+            "shrink_clone - new node count & cap: {} | {}",
+            node_count, node_cap
+        );
+        debug!(
+            "shrink_clone - new edge count & cap: {} | {}",
+            edge_count, edge_cap
+        );
+
+        BiedgedGraph {
+            graph: new_graph,
+            ..*self
+        }
+    }
+
     /// Create an empty biedged graph
     #[inline]
     pub fn new() -> BiedgedGraph {
@@ -212,7 +326,12 @@ impl BiedgedGraph {
             gfa.segments.len(),
             gfa.links.len()
         );
-        let mut be_graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
+
+        let segs_len = gfa.segments.len();
+        let links_len = gfa.links.len();
+
+        let mut be_graph: UnGraphMap<u64, BiedgedWeight> =
+            UnGraphMap::with_capacity(segs_len, segs_len + links_len);
 
         let mut max_seg_id = 0;
         let mut min_seg_id = std::usize::MAX;
@@ -258,11 +377,18 @@ impl BiedgedGraph {
 
         let (node_cap, edge_cap) = be_graph.capacity();
 
+        let mut new_be_graph: UnGraphMap<u64, BiedgedWeight> =
+            UnGraphMap::with_capacity(node_cap + 10000, edge_cap + 10000);
+
+        new_be_graph.clone_from(&be_graph);
+
+        let (node_cap, edge_cap) = new_be_graph.capacity();
+
         debug!("BiedgedGraph with {} nodes, {} edges, capacity: {} nodes, {} edges",
-               be_graph.node_count(), be_graph.edge_count(), node_cap, edge_cap);
+               new_be_graph.node_count(), new_be_graph.edge_count(), node_cap, edge_cap);
 
         BiedgedGraph {
-            graph: be_graph,
+            graph: new_be_graph,
             max_net_vertex,
             max_chain_vertex,
         }
