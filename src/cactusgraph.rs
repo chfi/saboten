@@ -686,6 +686,7 @@ impl<'a> CactusTree<'a> {
     }
 
     fn net_graph_black_edge_walk(
+        vertices: &FxHashSet<u64>,
         biedged: &BiedgedGraph,
         x: u64,
         y: u64,
@@ -711,13 +712,19 @@ impl<'a> CactusTree<'a> {
 
                 if current == start || current == adj_end {
                     for (_, n, w) in edges {
-                        if w.black > 0 && !visited.contains(&n) {
+                        if w.black > 0
+                            && !visited.contains(&n)
+                            && vertices.contains(&n)
+                        {
                             stack.push(n);
                         }
                     }
                 } else {
                     for (_, n, _) in edges {
-                        if !visited.contains(&n) && n != end {
+                        if !visited.contains(&n)
+                            && n != end
+                            && vertices.contains(&n)
+                        {
                             stack.push(n);
                         }
                     }
@@ -761,6 +768,8 @@ impl<'a> CactusTree<'a> {
             fnv::FnvHashSet::default();
         let mut black_vertices: FxHashSet<u64> = FxHashSet::default();
 
+        let vertices_set = vertices.iter().copied().collect::<FxHashSet<_>>();
+
         // Treat the edges of the snarl as if they already have black
         // edges, since they shouldn't have any in the net graph
         black_vertices.insert(x);
@@ -780,7 +789,12 @@ impl<'a> CactusTree<'a> {
                         && b_v == b_u
                         && !black_vertices.contains(v)
                         && !black_vertices.contains(u)
-                        && Self::net_graph_black_edge_walk(orig_graph, *v, *u)
+                        && Self::net_graph_black_edge_walk(
+                            &vertices_set,
+                            orig_graph,
+                            *v,
+                            *u,
+                        )
                     {
                         add_pair = true;
                     }
