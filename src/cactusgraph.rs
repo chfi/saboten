@@ -1,4 +1,4 @@
-use log::debug;
+use log::{debug, trace};
 use petgraph::prelude::*;
 use rayon::prelude::*;
 
@@ -96,63 +96,65 @@ impl<'a> CactusGraph<'a> {
     /// input graph before mutating, and keeps a reference to the
     /// original.
     pub fn from_biedged_graph(biedged_graph: &'a BiedgedGraph) -> Self {
-        debug!("  ~~~  building cactus graph  ~~~");
-        debug!("cloning biedged graph");
+        trace!("  ~~~  building cactus graph  ~~~");
+        trace!("cloning biedged graph");
         let t = std::time::Instant::now();
         // let mut graph = biedged_graph.clone();
 
         let mut graph = biedged_graph.shrink_clone();
-        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         let (node_count, node_cap) = graph.node_count_capacity();
         let (edge_count, edge_cap) = graph.edge_count_capacity();
 
-        debug!(" | cactus, start, nodes | {} | {} |", node_count, node_cap);
-        debug!(" | cactus, start, edges | {} | {} |", edge_count, edge_cap);
+        trace!(" | cactus, start, nodes | {} | {} |", node_count, node_cap);
+        trace!(" | cactus, start, edges | {} | {} |", edge_count, edge_cap);
 
-        debug!("cloning projection");
+        trace!("cloning projection");
         let t = std::time::Instant::now();
         let mut projection = Projection::new_for_biedged_graph(&graph);
-        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
-        debug!("contracting gray edges");
+        trace!("contracting gray edges");
         let t = std::time::Instant::now();
         Self::contract_all_gray_edges(&mut graph, &mut projection);
-        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
-        debug!("finding 3-edge-connected components");
+        trace!("finding 3-edge-connected components");
         let t = std::time::Instant::now();
         let components = Self::find_3_edge_connected_components(&graph);
-        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
-        debug!("merging 3-edge-connected components");
+        trace!("merging 3-edge-connected components");
         let t = std::time::Instant::now();
         Self::merge_components(&mut graph, components, &mut projection);
-        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         graph.shrink_to_fit();
 
         let (node_count, node_cap) = graph.node_count_capacity();
         let (edge_count, edge_cap) = graph.edge_count_capacity();
 
-        debug!(
+        trace!(
             " | cactus, start, nodes, end | {} | {} |",
-            node_count, node_cap
+            node_count,
+            node_cap
         );
-        debug!(
+        trace!(
             " | cactus, start, edges, end | {} | {} |",
-            edge_count, edge_cap
+            edge_count,
+            edge_cap
         );
 
-        debug!("finding cycles");
+        trace!("finding cycles");
         let t = std::time::Instant::now();
         let mut cycles = Self::find_cycles(&graph);
-        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         let mut cycle_map: FxHashMap<(u64, u64), Vec<usize>> =
             FxHashMap::default();
 
-        debug!("building cycle map using {} cycles", cycles.len());
+        trace!("building cycle map using {} cycles", cycles.len());
         let t = std::time::Instant::now();
 
         let mut total_vals = 0;
@@ -171,17 +173,18 @@ impl<'a> CactusGraph<'a> {
 
         cycles.shrink_to_fit();
 
-        debug!(
+        trace!(
             "| cactus, cycles, outer | {} | {} |",
             cycles.len(),
             cycles.capacity()
         );
-        debug!(
+        trace!(
             " | cactus, cycles, inner | {} | {} |",
-            total_vals, total_cap
+            total_vals,
+            total_cap
         );
 
-        debug!(
+        trace!(
             "| cactus, cycle_map, outer | {} | {} |",
             cycle_map.len(),
             cycle_map.capacity()
@@ -200,18 +203,19 @@ impl<'a> CactusGraph<'a> {
             total_cap += v.capacity();
         }
 
-        debug!(
+        trace!(
             "| cactus, cycle_map, inner | {} | {} |",
-            total_vals, total_cap
+            total_vals,
+            total_cap
         );
 
-        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
-        debug!("building inverse projection map");
+        trace!("building inverse projection map");
         let t = std::time::Instant::now();
         projection.build_inverse();
-        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
-        debug!("  ~~~  cactus graph constructed  ~~~");
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("  ~~~  cactus graph constructed  ~~~");
 
         CactusGraph {
             original_graph: biedged_graph,
@@ -230,10 +234,10 @@ impl<'a> CactusGraph<'a> {
         {
             use indicatif::{ProgressBar, ProgressStyle};
 
-            debug!("calculating gray edge count");
+            trace!("calculating gray edge count");
             let gray_edge_count = biedged.gray_edge_count();
             let p_bar = ProgressBar::new(gray_edge_count as u64);
-            debug!("contracting {} gray edges", gray_edge_count);
+            trace!("contracting {} gray edges", gray_edge_count);
 
             p_bar.set_style(
                 ProgressStyle::default_bar()
@@ -241,14 +245,14 @@ impl<'a> CactusGraph<'a> {
                     .progress_chars("##-"),
             );
 
-            debug!("collecting gray edges");
+            trace!("collecting gray edges");
             let gray_edges = biedged
                 .gray_edges()
                 .map(|(a, b, _w)| (a, b))
                 .collect::<Vec<_>>();
-            debug!("collected gray edges");
+            trace!("collected gray edges");
 
-            debug!(
+            trace!(
                 "gray_edges len: {}, capacity: {}",
                 gray_edges.len(),
                 gray_edges.capacity()
@@ -276,16 +280,16 @@ impl<'a> CactusGraph<'a> {
 
         #[cfg(not(feature = "progress_bars"))]
         {
-            debug!("calculating gray edge count");
+            trace!("calculating gray edge count");
             let gray_edge_count = biedged.gray_edge_count();
-            debug!("contracting {} gray edges", gray_edge_count);
+            trace!("contracting {} gray edges", gray_edge_count);
 
-            debug!("collecting gray edges");
+            trace!("collecting gray edges");
             let gray_edges = biedged
                 .gray_edges()
                 .map(|(a, b, _w)| (a, b))
                 .collect::<Vec<_>>();
-            debug!("collected gray edges");
+            trace!("collected gray edges");
 
             for (from, to) in gray_edges {
                 let from_ = projection.find(from);
@@ -463,20 +467,22 @@ impl<'a> BiedgedWrapper for CactusTree<'a> {
 
 impl<'a> CactusTree<'a> {
     pub fn from_cactus_graph(cactus_graph: &'a CactusGraph<'a>) -> Self {
-        debug!("  ~~~  building cactus tree  ~~~");
+        trace!("  ~~~  building cactus tree  ~~~");
         // let mut graph = cactus_graph.graph.clone();
         let mut graph = cactus_graph.graph.shrink_clone();
 
         let (node_count, node_cap) = graph.node_count_capacity();
         let (edge_count, edge_cap) = graph.edge_count_capacity();
 
-        debug!(
+        trace!(
             " | cactus tree, start, nodes | {} | {} |",
-            node_count, node_cap
+            node_count,
+            node_cap
         );
-        debug!(
+        trace!(
             " | cactus tree, start, edges | {} | {} |",
-            edge_count, edge_cap
+            edge_count,
+            edge_cap
         );
 
         let cycles = cactus_graph.cycles.clone();
@@ -489,14 +495,15 @@ impl<'a> CactusTree<'a> {
             total_cap += cycle.capacity();
         }
 
-        debug!(
+        trace!(
             "| cactus tree, cycles, outer | {} | {} |",
             cycles.len(),
             cycles.capacity()
         );
-        debug!(
+        trace!(
             " | cactus tree, cycles, inner | {} | {} |",
-            total_vals, total_cap
+            total_vals,
+            total_cap
         );
 
         let (mut cycle_chain_map, mut chain_vertices) =
@@ -505,12 +512,12 @@ impl<'a> CactusTree<'a> {
         cycle_chain_map.shrink_to_fit();
         chain_vertices.shrink_to_fit();
 
-        debug!(
+        trace!(
             " | cactus tree, chain_map | {} | {} |",
             cycle_chain_map.len(),
             cycle_chain_map.capacity()
         );
-        debug!(
+        trace!(
             " | cactus tree, chain vertices | {} | {} |",
             chain_vertices.len(),
             chain_vertices.capacity()
@@ -521,16 +528,18 @@ impl<'a> CactusTree<'a> {
         let (node_count, node_cap) = graph.node_count_capacity();
         let (edge_count, edge_cap) = graph.edge_count_capacity();
 
-        debug!(
+        trace!(
             " | cactus tree, end, nodes | {} | {} |",
-            node_count, node_cap
+            node_count,
+            node_cap
         );
-        debug!(
+        trace!(
             " | cactus tree, end, edges | {} | {} |",
-            edge_count, edge_cap
+            edge_count,
+            edge_cap
         );
 
-        debug!("  ~~~  cactus tree constructed  ~~~");
+        trace!("  ~~~  cactus tree constructed  ~~~");
 
         Self {
             original_graph: cactus_graph.original_graph,
@@ -608,7 +617,7 @@ impl<'a> CactusTree<'a> {
 
         chain_pairs.shrink_to_fit();
 
-        debug!(
+        trace!(
             "chain_pairs len: {}, capacity: {}",
             chain_pairs.len(),
             chain_pairs.capacity()
@@ -837,7 +846,7 @@ impl<'a> CactusTree<'a> {
         // let (node_count, node_cap) = graph.node_count_capacity();
         // let (edge_count, edge_cap) = graph.edge_count_capacity();
 
-        // debug!("net_graph node count & capacity: ({}, {}); edges: ({}, {})",
+        // trace!("net_graph node count & capacity: ({}, {}); edges: ({}, {})",
         //        node_count, node_cap, edge_count, edge_cap);
 
         let net_graph = BiedgedGraph {
@@ -978,59 +987,63 @@ impl_biedged_wrapper!(BridgeForest<'a>);
 
 impl<'a> BridgeForest<'a> {
     pub fn from_cactus_graph(cactus_graph: &'_ CactusGraph<'a>) -> Self {
-        debug!("  ~~~  building bridge forest  ~~~");
-        debug!("cloning cactus graph");
+        trace!("  ~~~  building bridge forest  ~~~");
+        trace!("cloning cactus graph");
         let t = std::time::Instant::now();
         // let mut graph = cactus_graph.graph.clone();
         let mut graph = cactus_graph.graph.shrink_clone();
-        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         let (node_count, node_cap) = graph.node_count_capacity();
         let (edge_count, edge_cap) = graph.edge_count_capacity();
 
-        debug!(
+        trace!(
             " | bridge forest, start, nodes | {} | {} |",
-            node_count, node_cap
+            node_count,
+            node_cap
         );
-        debug!(
+        trace!(
             " | bridge forest, start, edges | {} | {} |",
-            edge_count, edge_cap
+            edge_count,
+            edge_cap
         );
 
-        debug!("cloning projection");
+        trace!("cloning projection");
         let t = std::time::Instant::now();
         let mut projection = cactus_graph.projection.copy_without_inverse();
-        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
-        debug!("contracting {} cycles", cactus_graph.cycles.len());
+        trace!("contracting {} cycles", cactus_graph.cycles.len());
         let t = std::time::Instant::now();
         Self::contract_cycles(
             &mut graph,
             &cactus_graph.cycles,
             &mut projection,
         );
-        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
-        debug!("building inverse projection map");
+        trace!("building inverse projection map");
         let t = std::time::Instant::now();
         projection.build_inverse();
-        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         graph.shrink_to_fit();
 
         let (node_count, node_cap) = graph.node_count_capacity();
         let (edge_count, edge_cap) = graph.edge_count_capacity();
 
-        debug!(
+        trace!(
             " | bridge forest, end, nodes | {} | {} |",
-            node_count, node_cap
+            node_count,
+            node_cap
         );
-        debug!(
+        trace!(
             " | bridge forest, end, edges | {} | {} |",
-            edge_count, edge_cap
+            edge_count,
+            edge_cap
         );
 
-        debug!("  ~~~  bridge forest constructed  ~~~");
+        trace!("  ~~~  bridge forest constructed  ~~~");
 
         Self {
             original_graph: cactus_graph.original_graph,
@@ -1141,12 +1154,12 @@ impl<'a> BridgeForest<'a> {
 
         bridge_pairs.shrink_to_fit();
 
-        debug!(
+        trace!(
             "bridge_pairs len: {}, capacity: {}",
             bridge_pairs.len(),
             bridge_pairs.capacity()
         );
-        debug!(" ~~~ find_bridge_pairs() done ~~~ ");
+        trace!(" ~~~ find_bridge_pairs() done ~~~ ");
 
         bridge_pairs
     }
@@ -1175,12 +1188,12 @@ pub fn chain_pair_ultrabubble_labels(
     cactus_tree: &CactusTree<'_>,
     chain_pairs: &FxHashSet<ChainPair>,
 ) -> FxHashMap<(u64, u64), bool> {
-    debug!(" ~~~ in chain_pair_ultrabubble_labels ~~~ ");
+    trace!(" ~~~ in chain_pair_ultrabubble_labels ~~~ ");
     let mut chain_edges = chain_edges(chain_pairs, cactus_tree);
 
     chain_edges.shrink_to_fit();
 
-    debug!(
+    trace!(
         "chain_edges len: {}, capacity: {}",
         chain_edges.len(),
         chain_edges.capacity()
@@ -1201,10 +1214,7 @@ pub fn chain_pair_ultrabubble_labels(
         iter = chain_edges.par_iter();
     }
 
-    // let mut total_len = 0;
-    // let mut total_cap = 0;
-
-    debug!("labeling chain edges using net graphs");
+    trace!("labeling chain edges using net graphs");
     chain_edge_labels.par_extend(iter.map(|(&(net, chain), &(x, y))| {
         let net_graph = cactus_tree.build_net_graph(x, y);
         let result = net_graph.is_ultrabubble();
@@ -1213,13 +1223,13 @@ pub fn chain_pair_ultrabubble_labels(
 
     chain_edge_labels.shrink_to_fit();
 
-    debug!(
+    trace!(
         "chain_edge_labels len: {}, capacity: {}",
         chain_edge_labels.len(),
         chain_edge_labels.capacity()
     );
 
-    debug!(" ~~~ chain_pair_ultrabubble_labels done ~~~ ");
+    trace!(" ~~~ chain_pair_ultrabubble_labels done ~~~ ");
     chain_edge_labels
 }
 
@@ -1232,7 +1242,7 @@ pub fn chain_pair_contained_ultrabubbles(
     chain_pairs: &FxHashSet<ChainPair>,
     chain_edge_labels: &mut FxHashMap<(u64, u64), bool>,
 ) -> FxHashMap<(u64, u64), Vec<(u64, u64)>> {
-    debug!(" ~~~ in chain_pair_contained_ultrabubbles ~~~ ");
+    trace!(" ~~~ in chain_pair_contained_ultrabubbles ~~~ ");
     let mut chain_pair_ultrabubbles = FxHashMap::default();
 
     for &snarl in chain_pairs.iter() {
@@ -1249,13 +1259,13 @@ pub fn chain_pair_contained_ultrabubbles(
 
     chain_pair_ultrabubbles.shrink_to_fit();
 
-    debug!(
+    trace!(
         "chain_pair_ultrabubbles len: {}, capacity: {}",
         chain_pair_ultrabubbles.len(),
         chain_pair_ultrabubbles.capacity()
     );
 
-    debug!(" ~~~ chain_pair_contained_ultrabubbles done ~~~ ");
+    trace!(" ~~~ chain_pair_contained_ultrabubbles done ~~~ ");
     chain_pair_ultrabubbles
 }
 
@@ -1266,13 +1276,13 @@ pub fn bridge_pair_ultrabubbles(
     bridge_pairs: &FxHashSet<BridgePair>,
     chain_edge_labels: &FxHashMap<(u64, u64), bool>,
 ) -> FxHashMap<(u64, u64), Vec<(u64, u64)>> {
-    debug!(" ~~~ in bridge_pair_ultrabubbles ~~~ ");
+    trace!(" ~~~ in bridge_pair_ultrabubbles ~~~ ");
     let mut bridge_pair_ultrabubbles = FxHashMap::default();
 
     let mut bridge_pair_labels: FxHashMap<(u64, u64), Vec<u64>> =
         FxHashMap::default();
 
-    debug!("Bridge pairs - checking net graphs");
+    trace!("Bridge pairs - checking net graphs");
     let bridge_pair_iter;
     #[cfg(feature = "progress_bars")]
     {
@@ -1298,7 +1308,7 @@ pub fn bridge_pair_ultrabubbles(
 
     bridge_pair_labels.shrink_to_fit();
 
-    debug!("Bridge pairs - checking contained");
+    trace!("Bridge pairs - checking contained");
 
     let label_iter;
     #[cfg(feature = "progress_bars")]
@@ -1327,13 +1337,13 @@ pub fn bridge_pair_ultrabubbles(
 
     bridge_pair_ultrabubbles.shrink_to_fit();
 
-    debug!(
+    trace!(
         "bridge_pair_ultrabubbles len: {}, capacity: {}",
         bridge_pair_ultrabubbles.len(),
         bridge_pair_ultrabubbles.capacity()
     );
 
-    debug!(" ~~~ bridge_pair_ultrabubbles done ~~~ ");
+    trace!(" ~~~ bridge_pair_ultrabubbles done ~~~ ");
 
     bridge_pair_ultrabubbles
 }
