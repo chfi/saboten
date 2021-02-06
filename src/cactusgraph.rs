@@ -1086,89 +1086,31 @@ impl<'a> BridgeForest<'a> {
         }
     }
 
-    pub fn find_bridge_pair_candidates(&self) -> Vec<(u64, Vec<u64>)> {
-        debug!(" ~~~ in find_bridge_pair_candidates() ~~~ ");
-
-        let proj_inv = self.projection.get_inverse().unwrap();
-
-        let mut candidates = Vec::new();
-
-        for (_ix, p_x) in self.base_graph().nodes().enumerate() {
-            let neighbors =
-                self.base_graph().neighbors(p_x).collect::<Vec<_>>();
-
-            if neighbors.len() == 2 {
-                let mut all_neighbors: Vec<u64> = Vec::new();
-                for n in neighbors {
-                    let filtered = proj_inv
-                        .get(&n)
-                        .unwrap()
-                        .iter()
-                        .filter(|&b_n| {
-                            let bn_n_ = opposite_vertex(*b_n);
-                            let pn_n_ = self.projected_node(bn_n_);
-                            pn_n_ == p_x
-                        })
-                        .copied();
-                    all_neighbors.extend(filtered);
-                }
-
-                all_neighbors.shrink_to_fit();
-                candidates.push((p_x, all_neighbors));
-            }
-        }
-
-        candidates.shrink_to_fit();
-
-        debug!(" ~~~ find_bridge_pair_candidates() done ~~~ ");
-
-        candidates
-    }
-
     /// Find the bridge pairs in the graph, returning them as a set of
     /// snarls.
     pub fn find_bridge_pairs(&self) -> FxHashSet<BridgePair> {
-        debug!(" ~~~ in find_bridge_pairs() ~~~ ");
+        trace!(" ~~~ in find_bridge_pairs() ~~~ ");
 
         let mut bridge_pairs: FxHashSet<BridgePair> = FxHashSet::default();
 
-        debug!(" getting inverse projection ");
+        trace!(" getting inverse projection ");
         let proj_inv = self.projection.get_inverse().unwrap();
 
         use std::time::Instant;
         let mut last_t = Instant::now();
-        debug!(" iterating {} nodes", self.base_graph().node_count());
         for (ix, p_x) in self.base_graph().nodes().enumerate() {
             let mut log_now = false;
-            if last_t.elapsed().as_millis() > 100 {
-                log_now = true;
-                last_t = Instant::now();
-                debug!(
-                    "loop {} in bridge_pairs, len: {} , capacity: {}",
-                    ix,
-                    bridge_pairs.len(),
-                    bridge_pairs.capacity()
-                );
-            }
 
-            let neighbors =
-                self.base_graph().neighbors(p_x).collect::<Vec<_>>();
-
-            if log_now {
-                debug!(
-                    "  neighbors len: {}, capacity: {}",
-                    neighbors.len(),
-                    neighbors.capacity()
-                );
-            }
+            let neighbors = self
+                .base_graph()
+                .neighbors(p_x)
+                .filter(|&n| n != p_x)
+                .collect::<Vec<_>>();
 
             if neighbors.len() == 2 {
                 let mut all_neighbors: Vec<u64> = Vec::new();
-                for n in neighbors {
-                    if log_now {
-                        debug!(" extending all_neighbors ");
-                    }
 
+                for &n in neighbors.iter() {
                     let filtered = proj_inv
                         .get(&n)
                         .unwrap()
@@ -1180,68 +1122,20 @@ impl<'a> BridgeForest<'a> {
                         })
                         .copied();
                     all_neighbors.extend(filtered);
-
-                    if log_now {
-                        debug!(
-                            " all_neighbors now {} long, {} cap",
-                            all_neighbors.len(),
-                            all_neighbors.capacity()
-                        );
-                    }
                 }
 
-                debug!(
-                    "  all_neighbors len: {}, capacity: {}",
-                    all_neighbors.len(),
-                    all_neighbors.capacity()
-                );
-
-                if log_now || all_neighbors.len() > 10000 {
-                    let n = all_neighbors.len();
-                    debug!("  iterating {} * {} = {} neighbors", n, n, n * n);
-                }
-
-                let mut insertions = 0;
-                let mut duplicates = 0;
                 for &a in all_neighbors.iter() {
-                    if log_now {
-                        debug!("outer iteration {}", a);
-                    }
                     for &b in all_neighbors.iter() {
-                        if log_now {
-                            debug!("iteration {}, {}", a, b);
-                        }
                         let x = a.min(b);
                         let y = a.max(b);
                         if x != y {
                             let x_ = opposite_vertex(x);
                             let y_ = opposite_vertex(y);
 
-                            if bridge_pairs
-                                .contains(&BridgePair { x: x_, y: y_ })
-                            {
-                                duplicates += 1;
-                            }
-                            insertions += 1;
-
-                            if insertions % 10000 == 0 {
-                                debug!(
-                                    "insertions: {}\tduplicates: {}",
-                                    insertions, duplicates
-                                );
-                            }
                             bridge_pairs.insert(BridgePair { x: x_, y: y_ });
                         }
                     }
                 }
-
-                if log_now {
-                    debug!("done with all_neighbors");
-                }
-            }
-
-            if log_now {
-                debug!("end of loop {}", ix);
             }
         }
 
@@ -1365,113 +1259,6 @@ pub fn chain_pair_contained_ultrabubbles(
     chain_pair_ultrabubbles
 }
 
-pub fn bridge_pair_candidates_ultrabubbles(
-    cactus_tree: &CactusTree<'_>,
-    bridge_pair_candidates: &Vec<(u64, Vec<u64>)>,
-    chain_edge_labels: &FxHashMap<(u64, u64), bool>,
-) -> FxHashMap<(u64, u64), Vec<(u64, u64)>> {
-    debug!(" ~~~ in bridge_pair_ultrabubbles ~~~ ");
-    let mut bridge_pair_ultrabubbles = FxHashMap::default();
-
-    let mut bridge_pair_labels: FxHashMap<(u64, u64), Vec<u64>> =
-        FxHashMap::default();
-
-    debug!("Bridge pairs - checking net graphs");
-    let bridge_pair_iter;
-    #[cfg(feature = "progress_bars")]
-    {
-        use indicatif::{ProgressBar, ProgressStyle};
-        // bridge_pair_iter = bridge_pair_candidates
-        //     .par_iter()
-        //     .progress_with(progress_bar(bridge_pair_candidates.len(), true));
-        // let p_bar = ProgressBar::
-        // let p_bar = ProgressBar::new(len);
-
-        // bridge_pair_iter = bridge_pair_candidates
-        //     .par_iter()
-        //     .progress_with(progress_bar(bridge_pair_candidates.len(), true));
-        bridge_pair_iter = bridge_pair_candidates
-            .par_iter()
-            .progress_with(progress_bar(bridge_pair_candidates.len(), true));
-    }
-    #[cfg(not(feature = "progress_bars"))]
-    {
-        bridge_pair_iter = bridge_pair_candidates.par_iter();
-    }
-
-    bridge_pair_labels.par_extend(bridge_pair_iter.flat_map(
-        |(p_x, all_neighbors)| {
-            let mut bridge_pairs: FxHashMap<(u64, u64), Vec<u64>> =
-                FxHashMap::default();
-
-            for (ix, &a) in all_neighbors.iter().enumerate() {
-                if ix + 1 < all_neighbors.len() {
-                    for &b in &all_neighbors[ix + 1..] {
-                        let x = a.min(b);
-                        let y = a.max(b);
-                        if x != y {
-                            let x_ = opposite_vertex(x);
-                            let y_ = opposite_vertex(y);
-
-                            if !bridge_pairs.contains_key(&(x_, y_)) {
-                                let net_graph =
-                                    cactus_tree.build_net_graph(x_, y_);
-                                if net_graph.is_ultrabubble() {
-                                    bridge_pairs
-                                        .insert((x_, y_), net_graph.path);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            bridge_pairs
-        },
-    ));
-
-    bridge_pair_labels.shrink_to_fit();
-
-    debug!("Bridge pairs - checking contained");
-
-    let label_iter;
-    #[cfg(feature = "progress_bars")]
-    {
-        label_iter = bridge_pair_labels
-            .par_iter()
-            .progress_with(progress_bar(bridge_pair_labels.len(), true));
-    }
-    #[cfg(not(feature = "progress_bars"))]
-    {
-        label_iter = bridge_pair_labels.par_iter();
-    }
-
-    bridge_pair_ultrabubbles.par_extend(label_iter.filter_map(
-        |(&(x, y), path)| {
-            let contained_chain_pairs = cactus_tree.is_bridge_pair_ultrabubble(
-                &chain_edge_labels,
-                x,
-                y,
-                path,
-            );
-
-            contained_chain_pairs.map(|c| ((x, y), c))
-        },
-    ));
-
-    bridge_pair_ultrabubbles.shrink_to_fit();
-
-    debug!(
-        "bridge_pair_ultrabubbles len: {}, capacity: {}",
-        bridge_pair_ultrabubbles.len(),
-        bridge_pair_ultrabubbles.capacity()
-    );
-
-    debug!(" ~~~ bridge_pair_ultrabubbles done ~~~ ");
-
-    bridge_pair_ultrabubbles
-}
-
 /// Using the provided chain edge labels, returns a map from bridge
 /// pairs to their contained ultrabubbles. Runs in parallel.
 pub fn bridge_pair_ultrabubbles(
@@ -1562,13 +1349,9 @@ pub fn find_ultrabubbles(
     let chain_pairs = cactus_tree.find_chain_pairs();
     debug!("Found {} chain pairs", chain_pairs.len());
 
-    // debug!("Finding bridge pairs");
-    // let bridge_pairs = bridge_forest.find_bridge_pairs();
-    // debug!("Found {} bridge pairs", bridge_pairs.len());
-
-    debug!("Finding bridge pair candidates");
-    let bridge_pairs = bridge_forest.find_bridge_pair_candidates();
-    debug!("Found {} bridge pair candidates", bridge_pairs.len());
+    debug!("Finding bridge pairs");
+    let bridge_pairs = bridge_forest.find_bridge_pairs();
+    debug!("Found {} bridge pairs", bridge_pairs.len());
 
     debug!("Labeling chain edges");
     let mut chain_edge_labels =
@@ -1581,19 +1364,12 @@ pub fn find_ultrabubbles(
         &mut chain_edge_labels,
     );
 
-    debug!("Checking bridge candidates");
-    let bridge_ultrabubbles = bridge_pair_candidates_ultrabubbles(
+    debug!("Checking bridge pairs");
+    let bridge_ultrabubbles = bridge_pair_ultrabubbles(
         cactus_tree,
         &bridge_pairs,
         &chain_edge_labels,
     );
-
-    // debug!("Checking bridge pairs");
-    // let bridge_ultrabubbles = bridge_pair_ultrabubbles(
-    //     cactus_tree,
-    //     &bridge_pairs,
-    //     &chain_edge_labels,
-    // );
 
     let chain_edges_map = chain_edges(&chain_pairs, &cactus_tree);
 
