@@ -5,7 +5,7 @@ use gfa::gfa::{Orientation, GFA};
 
 use crate::projection::{id_to_black_edge, Projection};
 
-use log::debug;
+use log::{debug, trace};
 
 /// To make a petgraph Graph(Map) into a multigraph, we track the
 /// number of black and gray edges between two nodes by using this
@@ -110,13 +110,15 @@ impl BiedgedGraph {
             return;
         }
 
-        debug!(
+        trace!(
             "shrink_to_fit - node count & cap: {} | {}",
-            node_count, node_cap
+            node_count,
+            node_cap
         );
-        debug!(
+        trace!(
             "shrink_to_fit - edge count & cap: {} | {}",
-            edge_count, edge_cap
+            edge_count,
+            edge_cap
         );
 
         let mut new_graph: UnGraphMap<u64, BiedgedWeight> =
@@ -130,13 +132,15 @@ impl BiedgedGraph {
         let edge_count = new_graph.edge_count();
         let (node_cap, edge_cap) = new_graph.capacity();
 
-        debug!(
+        trace!(
             "shrink_to_fit - new node count & cap: {} | {}",
-            node_count, node_cap
+            node_count,
+            node_cap
         );
-        debug!(
+        trace!(
             "shrink_to_fit - new edge count & cap: {} | {}",
-            edge_count, edge_cap
+            edge_count,
+            edge_cap
         );
 
         std::mem::swap(&mut self.graph, &mut new_graph);

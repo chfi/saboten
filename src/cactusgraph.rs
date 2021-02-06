@@ -96,13 +96,13 @@ impl<'a> CactusGraph<'a> {
     /// input graph before mutating, and keeps a reference to the
     /// original.
     pub fn from_biedged_graph(biedged_graph: &'a BiedgedGraph) -> Self {
-        trace!("  ~~~  building cactus graph  ~~~");
-        trace!("cloning biedged graph");
+        debug!("  ~~~  building cactus graph  ~~~");
+        debug!("cloning biedged graph");
         let t = std::time::Instant::now();
         // let mut graph = biedged_graph.clone();
 
         let mut graph = biedged_graph.shrink_clone();
-        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         let (node_count, node_cap) = graph.node_count_capacity();
         let (edge_count, edge_cap) = graph.edge_count_capacity();
@@ -115,20 +115,20 @@ impl<'a> CactusGraph<'a> {
         let mut projection = Projection::new_for_biedged_graph(&graph);
         trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
-        trace!("contracting gray edges");
+        debug!("contracting gray edges");
         let t = std::time::Instant::now();
         Self::contract_all_gray_edges(&mut graph, &mut projection);
-        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
-        trace!("finding 3-edge-connected components");
+        debug!("finding 3-edge-connected components");
         let t = std::time::Instant::now();
         let components = Self::find_3_edge_connected_components(&graph);
-        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
-        trace!("merging 3-edge-connected components");
+        debug!("merging 3-edge-connected components");
         let t = std::time::Instant::now();
         Self::merge_components(&mut graph, components, &mut projection);
-        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         graph.shrink_to_fit();
 
@@ -146,7 +146,7 @@ impl<'a> CactusGraph<'a> {
             edge_cap
         );
 
-        trace!("finding cycles");
+        debug!("finding cycles");
         let t = std::time::Instant::now();
         let mut cycles = Self::find_cycles(&graph);
         trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
@@ -215,7 +215,7 @@ impl<'a> CactusGraph<'a> {
         let t = std::time::Instant::now();
         projection.build_inverse();
         trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
-        trace!("  ~~~  cactus graph constructed  ~~~");
+        debug!("  ~~~  cactus graph constructed  ~~~");
 
         CactusGraph {
             original_graph: biedged_graph,
@@ -453,7 +453,7 @@ impl<'a> BiedgedWrapper for CactusTree<'a> {
 
 impl<'a> CactusTree<'a> {
     pub fn from_cactus_graph(cactus_graph: &'a CactusGraph<'a>) -> Self {
-        trace!("  ~~~  building cactus tree  ~~~");
+        debug!("  ~~~  building cactus tree  ~~~");
         // let mut graph = cactus_graph.graph.clone();
         let mut graph = cactus_graph.graph.shrink_clone();
 
@@ -492,6 +492,7 @@ impl<'a> CactusTree<'a> {
             total_cap
         );
 
+        debug!("constructing chain vertices");
         let (mut cycle_chain_map, mut chain_vertices) =
             Self::construct_chain_vertices(&mut graph, &cycles);
 
@@ -525,7 +526,7 @@ impl<'a> CactusTree<'a> {
             edge_cap
         );
 
-        trace!("  ~~~  cactus tree constructed  ~~~");
+        debug!("  ~~~  cactus tree constructed  ~~~");
 
         Self {
             original_graph: cactus_graph.original_graph,
@@ -973,7 +974,7 @@ impl_biedged_wrapper!(BridgeForest<'a>);
 
 impl<'a> BridgeForest<'a> {
     pub fn from_cactus_graph(cactus_graph: &'_ CactusGraph<'a>) -> Self {
-        trace!("  ~~~  building bridge forest  ~~~");
+        debug!("  ~~~  building bridge forest  ~~~");
         trace!("cloning cactus graph");
         let t = std::time::Instant::now();
         // let mut graph = cactus_graph.graph.clone();
@@ -999,14 +1000,14 @@ impl<'a> BridgeForest<'a> {
         let mut projection = cactus_graph.projection.copy_without_inverse();
         trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
-        trace!("contracting {} cycles", cactus_graph.cycles.len());
+        debug!("contracting {} cycles", cactus_graph.cycles.len());
         let t = std::time::Instant::now();
         Self::contract_cycles(
             &mut graph,
             &cactus_graph.cycles,
             &mut projection,
         );
-        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         trace!("building inverse projection map");
         let t = std::time::Instant::now();
@@ -1029,7 +1030,7 @@ impl<'a> BridgeForest<'a> {
             edge_cap
         );
 
-        trace!("  ~~~  bridge forest constructed  ~~~");
+        debug!("  ~~~  bridge forest constructed  ~~~");
 
         Self {
             original_graph: cactus_graph.original_graph,
