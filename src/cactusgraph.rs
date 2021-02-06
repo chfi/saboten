@@ -230,82 +230,68 @@ impl<'a> CactusGraph<'a> {
         biedged: &mut BiedgedGraph,
         projection: &mut Projection,
     ) {
+        let _p_bar;
+
+        #[cfg(not(feature = "progress_bars"))]
+        {
+            _p_bar = ();
+        }
+
+        trace!("calculating gray edge count");
+        let t = std::time::Instant::now();
+        let gray_edge_count = biedged.gray_edge_count();
+        trace!(
+            " gray edge count took {:.3} ms",
+            t.elapsed().as_secs_f64() * 1000.0
+        );
+        trace!("contracting {} gray edges", gray_edge_count);
+
         #[cfg(feature = "progress_bars")]
         {
             use indicatif::{ProgressBar, ProgressStyle};
-
-            trace!("calculating gray edge count");
-            let gray_edge_count = biedged.gray_edge_count();
-            let p_bar = ProgressBar::new(gray_edge_count as u64);
-            trace!("contracting {} gray edges", gray_edge_count);
-
-            p_bar.set_style(
+            _p_bar = ProgressBar::new(gray_edge_count as u64);
+            _p_bar.set_style(
                 ProgressStyle::default_bar()
                     .template("[{elapsed_precise}] {bar:40} {pos:>10}/{len:10}")
                     .progress_chars("##-"),
             );
-
-            trace!("collecting gray edges");
-            let gray_edges = biedged
-                .gray_edges()
-                .map(|(a, b, _w)| (a, b))
-                .collect::<Vec<_>>();
-            trace!("collected gray edges");
-
-            trace!(
-                "gray_edges len: {}, capacity: {}",
-                gray_edges.len(),
-                gray_edges.capacity()
-            );
-
-            for (from, to) in gray_edges {
-                let from_ = projection.find(from);
-                let to_ = projection.find(to);
-                let edge = biedged.graph.edge_weight(from_, to_).copied();
-                if let Some(w) = edge {
-                    if w.gray > 0 {
-                        let _proj_from = biedged
-                            .contract_edge(from_, to_, projection)
-                            .unwrap();
-                    }
-                }
-                p_bar.inc(1);
-            }
-
-            let gray_edge_count = biedged.gray_edge_count();
-            assert_eq!(gray_edge_count, 0);
-
-            p_bar.finish();
         }
 
-        #[cfg(not(feature = "progress_bars"))]
-        {
-            trace!("calculating gray edge count");
-            let gray_edge_count = biedged.gray_edge_count();
-            trace!("contracting {} gray edges", gray_edge_count);
+        trace!("collecting gray edges");
+        let t = std::time::Instant::now();
+        let gray_edges = biedged
+            .gray_edges()
+            .map(|(a, b, _w)| (a, b))
+            .collect::<Vec<_>>();
+        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        trace!("collected gray edges");
 
-            trace!("collecting gray edges");
-            let gray_edges = biedged
-                .gray_edges()
-                .map(|(a, b, _w)| (a, b))
-                .collect::<Vec<_>>();
-            trace!("collected gray edges");
+        trace!(
+            "gray_edges len: {}, capacity: {}",
+            gray_edges.len(),
+            gray_edges.capacity()
+        );
 
-            for (from, to) in gray_edges {
-                let from_ = projection.find(from);
-                let to_ = projection.find(to);
-                let edge = biedged.graph.edge_weight(from_, to_).copied();
-                if let Some(w) = edge {
-                    if w.gray > 0 {
-                        let _proj_from = biedged
-                            .contract_edge(from_, to_, projection)
-                            .unwrap();
-                    }
+        for (from, to) in gray_edges {
+            let from_ = projection.find(from);
+            let to_ = projection.find(to);
+            let edge = biedged.graph.edge_weight(from_, to_).copied();
+            if let Some(w) = edge {
+                if w.gray > 0 {
+                    let _proj_from =
+                        biedged.contract_edge(from_, to_, projection).unwrap();
                 }
             }
 
-            let gray_edge_count = biedged.gray_edge_count();
-            assert_eq!(gray_edge_count, 0);
+            #[cfg(feature = "progress_bars")]
+            {
+                _p_bar.inc(1);
+            }
+        }
+
+        #[cfg(feature = "progress_bars")]
+        {
+            _p_bar.finish();
         }
     }
 
@@ -1059,43 +1045,43 @@ impl<'a> BridgeForest<'a> {
         cycles: &[Vec<(u64, u64)>],
         projection: &mut Projection,
     ) {
+        let _p_bar;
+
+        #[cfg(not(feature = "progress_bars"))]
+        {
+            _p_bar = ();
+        }
+
         #[cfg(feature = "progress_bars")]
         {
             use indicatif::{ProgressBar, ProgressStyle};
-            let p_bar = ProgressBar::new(cycles.len() as u64);
-            p_bar.set_style(
+            _p_bar = ProgressBar::new(cycles.len() as u64);
+            _p_bar.set_style(
                 ProgressStyle::default_bar()
                     .template("[{elapsed_precise}] {bar:40} {pos:>10}/{len:10}")
                     .progress_chars("##-"),
             );
-            for cycle in cycles {
-                for &(from, to) in cycle {
-                    let from = projection.find(from);
-                    let to = projection.find(to);
-
-                    if from != to {
-                        biedged.merge_vertices(from, to, projection);
-                    }
-                }
-
-                p_bar.inc(1);
-            }
-
-            p_bar.finish();
         }
 
-        #[cfg(not(feature = "progress_bars"))]
-        {
-            for cycle in cycles {
-                for &(from, to) in cycle {
-                    let from = projection.find(from);
-                    let to = projection.find(to);
+        for cycle in cycles {
+            for &(from, to) in cycle {
+                let from = projection.find(from);
+                let to = projection.find(to);
 
-                    if from != to {
-                        biedged.merge_vertices(from, to, projection);
-                    }
+                if from != to {
+                    biedged.merge_vertices(from, to, projection);
                 }
             }
+
+            #[cfg(feature = "progress_bars")]
+            {
+                _p_bar.inc(1);
+            }
+        }
+
+        #[cfg(feature = "progress_bars")]
+        {
+            _p_bar.finish();
         }
     }
 
@@ -1109,11 +1095,7 @@ impl<'a> BridgeForest<'a> {
         trace!(" getting inverse projection ");
         let proj_inv = self.projection.get_inverse().unwrap();
 
-        use std::time::Instant;
-        let mut last_t = Instant::now();
-        for (ix, p_x) in self.base_graph().nodes().enumerate() {
-            let mut log_now = false;
-
+        for p_x in self.base_graph().nodes() {
             let neighbors = self
                 .base_graph()
                 .neighbors(p_x)
