@@ -151,6 +151,11 @@ impl Projection {
     }
 }
 
+#[inline]
+pub fn canonical_id(n: u64) -> u64 {
+    n ^ 1
+}
+
 /// Maps a vertex ID in the original (non-biedged) graph to its black
 /// edge vertices in the corresponding biedged graph.
 #[inline]

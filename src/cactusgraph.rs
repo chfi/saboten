@@ -7,7 +7,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::{
     biedgedgraph::{BiedgedGraph, BiedgedWeight},
     netgraph::NetGraph,
-    projection::{end_to_black_edge, opposite_vertex, Projection},
+    projection::{
+        canonical_id, end_to_black_edge, opposite_vertex, Projection,
+    },
     ultrabubble::{BridgePair, ChainPair},
 };
 
@@ -87,6 +89,7 @@ pub struct CactusGraph<'a> {
     pub projection: Projection,
     pub cycles: Vec<Vec<(u64, u64)>>,
     pub cycle_map: FxHashMap<(u64, u64), Vec<usize>>,
+    pub black_edge_cycle_map: FxHashMap<u64, usize>,
 }
 
 impl_biedged_wrapper!(CactusGraph<'a>);
@@ -151,19 +154,57 @@ impl<'a> CactusGraph<'a> {
         let mut cycles = Self::find_cycles(&graph);
         trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
+        debug!("building inverse projection map");
+        let t = std::time::Instant::now();
+        projection.build_inverse();
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+
         let mut cycle_map: FxHashMap<(u64, u64), Vec<usize>> =
             FxHashMap::default();
 
-        trace!("building cycle map using {} cycles", cycles.len());
+        let mut black_edge_cycle_map: FxHashMap<u64, usize> =
+            FxHashMap::default();
+
+        debug!("building cycle map using {} cycles", cycles.len());
         let t = std::time::Instant::now();
 
         let mut total_vals = 0;
         let mut total_cap = 0;
 
+        let inv_proj = projection.get_inverse().unwrap();
+
         for (i, cycle) in cycles.iter_mut().enumerate() {
             total_vals += cycle.len();
             total_cap += cycle.capacity();
             for &(a, b) in cycle.iter() {
+                let a_set = inv_proj
+                    .get(&a)
+                    .unwrap()
+                    .iter()
+                    .copied()
+                    .collect::<FxHashSet<_>>();
+                let b_set = inv_proj
+                    .get(&b)
+                    .unwrap()
+                    .iter()
+                    .copied()
+                    .collect::<FxHashSet<_>>();
+
+                let black_ = a_set.iter().filter(|&&n| {
+                    let opp_n = opposite_vertex(n);
+                    let can_n = canonical_id(n);
+                    b_set.contains(&opp_n)
+                        && !black_edge_cycle_map.contains_key(&can_n)
+                });
+
+                let black_canonical = canonical_id(black_);
+
+                black_edge_cycle_map.insert(black_canonical, i);
+
+                // assert_eq!(black_left.len(), 1);
+                // let black_right = black_left.into_iter().next().unwrap();
+                // let black_right = opposite_vertex(black_right);
+
                 let l = a.min(b);
                 let r = a.max(b);
                 cycle_map.entry((l, r)).or_default().push(i);
@@ -210,11 +251,7 @@ impl<'a> CactusGraph<'a> {
         );
 
         trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
-
-        trace!("building inverse projection map");
-        let t = std::time::Instant::now();
-        projection.build_inverse();
-        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
         debug!("  ~~~  cactus graph constructed  ~~~");
 
         CactusGraph {
@@ -223,6 +260,7 @@ impl<'a> CactusGraph<'a> {
             projection,
             cycles,
             cycle_map,
+            black_edge_cycle_map,
         }
     }
 
