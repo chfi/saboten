@@ -605,17 +605,42 @@ impl<'a> CactusTree<'a> {
         for n in self.base_graph().nodes() {
             if self.graph.is_net_vertex(n) {
                 let b_ns = cactus_graph_inverse.get(&n).unwrap();
-                for &a in b_ns.iter() {
-                    for &b in b_ns.iter() {
-                        if a != b && opposite_vertex(a) != b {
-                            let c_a = self.cactus_graph.black_edge_cycle(a);
-                            let c_b = self.cactus_graph.black_edge_cycle(b);
-                            if c_a.is_some() && c_a == c_b {
-                                let a_ = a.min(b);
-                                let b_ = a.max(b);
-                                chain_pairs.insert(ChainPair { x: a_, y: b_ });
-                            }
-                        }
+
+                let vertex_inv_proj = cactus_graph_inverse.get(&n).unwrap();
+
+                let vertex_inv_proj_set =
+                    vertex_inv_proj.iter().copied().collect::<FxHashSet<_>>();
+
+                let iter_nodes = vertex_inv_proj
+                    .iter()
+                    .filter(|&&n| {
+                        let opposite = opposite_vertex(n);
+                        vertex_inv_proj_set.contains(&opposite)
+                    })
+                    .collect::<Vec<_>>();
+
+                if iter_nodes.len() > 100 {
+                    debug!(
+                        "b_ns len: {}\tset len: {}",
+                        b_ns.len(),
+                        iter_nodes.len()
+                    );
+                    debug!("chain pairs len: {}", chain_pairs.len());
+                    debug!("");
+                }
+
+                for &a in iter_nodes.iter() {
+                    let a_ = *a;
+                    let a_o = opposite_vertex(a_);
+
+                    let x: u64 = a_.min(a_o);
+                    let y: u64 = a_.max(a_o);
+
+                    let c_a = self.cactus_graph.black_edge_cycle(x);
+                    let c_b = self.cactus_graph.black_edge_cycle(y);
+
+                    if c_a.is_some() && c_a == c_b {
+                        chain_pairs.insert(ChainPair { x, y });
                     }
                 }
             }
