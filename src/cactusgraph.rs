@@ -583,6 +583,25 @@ impl<'a> CactusTree<'a> {
         let cactus_graph_inverse =
             self.cactus_graph.projection.get_inverse().unwrap();
 
+        let _p_bar;
+
+        #[cfg(not(feature = "progress_bars"))]
+        {
+            _p_bar = ();
+        }
+
+        #[cfg(feature = "progress_bars")]
+        {
+            use indicatif::{ProgressBar, ProgressStyle};
+            _p_bar = ProgressBar::new(self.base_graph().node_count() as u64);
+            _p_bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("[{elapsed_precise}] {bar:40} {pos:>10}/{len:10}")
+                    .progress_chars("##-"),
+            );
+            _p_bar.enable_steady_tick(1000);
+        }
+
         for n in self.base_graph().nodes() {
             if self.graph.is_net_vertex(n) {
                 let b_ns = cactus_graph_inverse.get(&n).unwrap();
@@ -600,6 +619,16 @@ impl<'a> CactusTree<'a> {
                     }
                 }
             }
+
+            #[cfg(feature = "progress_bars")]
+            {
+                _p_bar.inc(1);
+            }
+        }
+
+        #[cfg(feature = "progress_bars")]
+        {
+            _p_bar.finish();
         }
 
         chain_pairs.shrink_to_fit();
