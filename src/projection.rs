@@ -151,9 +151,11 @@ impl Projection {
     }
 }
 
+/// Returns the "canonical" representation of the given node ID `id`,
+/// which is the left-hand vertex in the biedged graph.
 #[inline]
-pub fn canonical_id(n: u64) -> u64 {
-    n ^ 1
+pub fn canonical_id(id: u64) -> u64 {
+    id & !1
 }
 
 /// Maps a vertex ID in the original (non-biedged) graph to its black
