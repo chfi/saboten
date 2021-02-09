@@ -152,7 +152,7 @@ impl<'a> CactusGraph<'a> {
         debug!("finding cycles");
         let t = std::time::Instant::now();
         let mut cycles = Self::find_cycles(&graph);
-        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         debug!("building inverse projection map");
         let t = std::time::Instant::now();
@@ -308,7 +308,7 @@ impl<'a> CactusGraph<'a> {
             " gray edge count took {:.3} ms",
             t.elapsed().as_secs_f64() * 1000.0
         );
-        trace!("contracting {} gray edges", gray_edge_count);
+        debug!("contracting {} gray edges", gray_edge_count);
 
         #[cfg(feature = "progress_bars")]
         {
@@ -526,7 +526,11 @@ impl<'a> CactusTree<'a> {
     pub fn from_cactus_graph(cactus_graph: &'a CactusGraph<'a>) -> Self {
         debug!("  ~~~  building cactus tree  ~~~");
         // let mut graph = cactus_graph.graph.clone();
+
+        debug!("  cloning cactus graph");
+        let t = std::time::Instant::now();
         let mut graph = cactus_graph.graph.shrink_clone();
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         let (node_count, node_cap) = graph.node_count_capacity();
         let (edge_count, edge_cap) = graph.edge_count_capacity();
@@ -563,9 +567,11 @@ impl<'a> CactusTree<'a> {
             total_cap
         );
 
-        debug!("constructing chain vertices");
+        debug!("constructing chain vertices & cycle-chain map");
+        let t = std::time::Instant::now();
         let (mut cycle_chain_map, mut chain_vertices) =
             Self::construct_chain_vertices(&mut graph, &cycles);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         cycle_chain_map.shrink_to_fit();
         chain_vertices.shrink_to_fit();
@@ -581,7 +587,10 @@ impl<'a> CactusTree<'a> {
             chain_vertices.capacity()
         );
 
+        debug!("shrinking graph");
+        let t = std::time::Instant::now();
         graph.shrink_to_fit();
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         let (node_count, node_cap) = graph.node_count_capacity();
         let (edge_count, edge_cap) = graph.edge_count_capacity();
@@ -1082,11 +1091,11 @@ impl_biedged_wrapper!(BridgeForest<'a>);
 impl<'a> BridgeForest<'a> {
     pub fn from_cactus_graph(cactus_graph: &'_ CactusGraph<'a>) -> Self {
         debug!("  ~~~  building bridge forest  ~~~");
-        trace!("cloning cactus graph");
+        debug!("cloning cactus graph");
         let t = std::time::Instant::now();
         // let mut graph = cactus_graph.graph.clone();
         let mut graph = cactus_graph.graph.shrink_clone();
-        trace!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+        debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
         let (node_count, node_cap) = graph.node_count_capacity();
         let (edge_count, edge_cap) = graph.edge_count_capacity();
@@ -1304,7 +1313,7 @@ pub fn chain_pair_ultrabubble_labels(
         iter = chain_edges.par_iter();
     }
 
-    trace!("labeling chain edges using net graphs");
+    debug!("labeling chain edges using net graphs");
     chain_edge_labels.par_extend(iter.map(|(&(net, chain), &(x, y))| {
         let net_graph = cactus_tree.build_net_graph(x, y);
         let result = net_graph.is_ultrabubble();
@@ -1385,6 +1394,7 @@ pub fn bridge_pair_ultrabubbles(
         bridge_pair_iter = bridge_pairs.par_iter();
     }
 
+    let t = std::time::Instant::now();
     bridge_pair_labels.par_extend(bridge_pair_iter.filter_map(|&snarl| {
         let BridgePair { x, y } = snarl;
         let net_graph = cactus_tree.build_net_graph(x, y);
@@ -1395,10 +1405,11 @@ pub fn bridge_pair_ultrabubbles(
             None
         }
     }));
+    debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
     bridge_pair_labels.shrink_to_fit();
 
-    trace!("Bridge pairs - checking contained");
+    debug!("Bridge pairs - checking contained");
 
     let label_iter;
     #[cfg(feature = "progress_bars")]
@@ -1446,30 +1457,40 @@ pub fn find_ultrabubbles(
     bridge_forest: &BridgeForest<'_>,
 ) -> FxHashMap<(u64, u64), Vec<(u64, u64)>> {
     debug!("Finding chain pairs");
+    let t = std::time::Instant::now();
     let chain_pairs = cactus_tree.find_chain_pairs();
+    debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
     debug!("Found {} chain pairs", chain_pairs.len());
 
     debug!("Finding bridge pairs");
+    let t = std::time::Instant::now();
     let bridge_pairs = bridge_forest.find_bridge_pairs();
+    debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
     debug!("Found {} bridge pairs", bridge_pairs.len());
 
     debug!("Labeling chain edges");
+    let t = std::time::Instant::now();
     let mut chain_edge_labels =
         chain_pair_ultrabubble_labels(cactus_tree, &chain_pairs);
+    debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
     debug!("Checking nested chain pairs");
+    let t = std::time::Instant::now();
     let chain_ultrabubbles = chain_pair_contained_ultrabubbles(
         cactus_tree,
         &chain_pairs,
         &mut chain_edge_labels,
     );
+    debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
     debug!("Checking bridge pairs");
+    let t = std::time::Instant::now();
     let bridge_ultrabubbles = bridge_pair_ultrabubbles(
         cactus_tree,
         &bridge_pairs,
         &chain_edge_labels,
     );
+    debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
 
     let chain_edges_map = chain_edges(&chain_pairs, &cactus_tree);
 
