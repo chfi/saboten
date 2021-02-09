@@ -154,13 +154,15 @@ impl BiedgedGraph {
             return self;
         }
 
-        debug!(
+        trace!(
             "shrink_into - node count & cap: {} | {}",
-            node_count, node_cap
+            node_count,
+            node_cap
         );
-        debug!(
+        trace!(
             "shrink_into - edge count & cap: {} | {}",
-            edge_count, edge_cap
+            edge_count,
+            edge_cap
         );
 
         let mut new_graph: UnGraphMap<u64, BiedgedWeight> =
@@ -174,13 +176,15 @@ impl BiedgedGraph {
         let edge_count = new_graph.edge_count();
         let (node_cap, edge_cap) = new_graph.capacity();
 
-        debug!(
+        trace!(
             "shrink_into - new node count & cap: {} | {}",
-            node_count, node_cap
+            node_count,
+            node_cap
         );
-        debug!(
+        trace!(
             "shrink_into - new edge count & cap: {} | {}",
-            edge_count, edge_cap
+            edge_count,
+            edge_cap
         );
 
         BiedgedGraph {
@@ -197,13 +201,15 @@ impl BiedgedGraph {
             return self.clone();
         }
 
-        debug!(
+        trace!(
             "shrink_clone - node count & cap: {} | {}",
-            node_count, node_cap
+            node_count,
+            node_cap
         );
-        debug!(
+        trace!(
             "shrink_clone - edge count & cap: {} | {}",
-            edge_count, edge_cap
+            edge_count,
+            edge_cap
         );
 
         let mut new_graph: UnGraphMap<u64, BiedgedWeight> =
@@ -217,13 +223,15 @@ impl BiedgedGraph {
         let edge_count = new_graph.edge_count();
         let (node_cap, edge_cap) = new_graph.capacity();
 
-        debug!(
+        trace!(
             "shrink_clone - new node count & cap: {} | {}",
-            node_count, node_cap
+            node_count,
+            node_cap
         );
-        debug!(
+        trace!(
             "shrink_clone - new edge count & cap: {} | {}",
-            edge_count, edge_cap
+            edge_count,
+            edge_cap
         );
 
         BiedgedGraph {
@@ -393,7 +401,7 @@ impl BiedgedGraph {
 
         let (node_cap, edge_cap) = be_graph.capacity();
 
-        debug!("BiedgedGraph with {} nodes, {} edges, capacity: {} nodes, {} edges",
+        trace!("BiedgedGraph with {} nodes, {} edges, capacity: {} nodes, {} edges",
                be_graph.node_count(), be_graph.edge_count(), node_cap, edge_cap);
 
         BiedgedGraph {

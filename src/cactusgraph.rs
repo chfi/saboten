@@ -198,7 +198,6 @@ impl<'a> CactusGraph<'a> {
             total_cap += cycle.capacity();
             for &(a, b) in cycle.iter() {
                 let a_inv = inv_proj.get(&a).unwrap();
-                let b_inv = inv_proj.get(&b).unwrap();
 
                 let b_set = inv_proj
                     .get(&b)
