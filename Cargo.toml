@@ -18,7 +18,7 @@ progress_bars = ["indicatif"]
 [dependencies]
 gfa = "0.10"
 three-edge-connected = "0.2.1"
-petgraph = "0.5.0"
+petgraph = "0.5"
 rustc-hash = "1.1.0"
 fnv = "1.0"
 rayon = "1.4"

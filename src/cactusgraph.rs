@@ -171,6 +171,24 @@ impl<'a> CactusGraph<'a> {
         let mut total_vals = 0;
         let mut total_cap = 0;
 
+        let _p_bar;
+
+        #[cfg(not(feature = "progress_bars"))]
+        {
+            _p_bar = ();
+        }
+
+        #[cfg(feature = "progress_bars")]
+        {
+            use indicatif::{ProgressBar, ProgressStyle};
+            _p_bar = ProgressBar::new(cycles.len() as u64);
+            _p_bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("[{elapsed_precise}] {bar:40} {pos:>10}/{len:10}")
+                    .progress_chars("##-"),
+            );
+        }
+
         let inv_proj = projection.get_inverse().unwrap();
 
         let mut next_cycle_rank = 0;
@@ -179,12 +197,9 @@ impl<'a> CactusGraph<'a> {
             total_vals += cycle.len();
             total_cap += cycle.capacity();
             for &(a, b) in cycle.iter() {
-                let a_set = inv_proj
-                    .get(&a)
-                    .unwrap()
-                    .iter()
-                    .copied()
-                    .collect::<FxHashSet<_>>();
+                let a_inv = inv_proj.get(&a).unwrap();
+                let b_inv = inv_proj.get(&b).unwrap();
+
                 let b_set = inv_proj
                     .get(&b)
                     .unwrap()
@@ -192,17 +207,17 @@ impl<'a> CactusGraph<'a> {
                     .copied()
                     .collect::<FxHashSet<_>>();
 
-                let mut black_ = a_set.iter().filter(|&&n| {
+                let black_edge = a_inv.iter().find(|&&n| {
                     let opp_n = opposite_vertex(n);
                     let can_n = canonical_id(n);
+
                     b_set.contains(&opp_n)
                         && !black_edge_cycle_map.contains_key(&can_n)
                 });
 
-                if let Some(black_) = black_.next() {
-                    let black_canonical = canonical_id(*black_);
-                    black_edge_cycle_map
-                        .insert(black_canonical, next_cycle_rank);
+                if let Some(black_edge) = black_edge {
+                    let black_c_id = canonical_id(*black_edge);
+                    black_edge_cycle_map.insert(black_c_id, next_cycle_rank);
                     next_cycle_rank += 1;
                 }
 
@@ -211,6 +226,16 @@ impl<'a> CactusGraph<'a> {
                 cycle_map.entry((l, r)).or_default().push(i);
             }
             cycle.shrink_to_fit();
+
+            #[cfg(feature = "progress_bars")]
+            {
+                _p_bar.inc(1);
+            }
+        }
+
+        #[cfg(feature = "progress_bars")]
+        {
+            _p_bar.finish();
         }
 
         cycles.shrink_to_fit();
@@ -459,7 +484,7 @@ impl<'a> CactusGraph<'a> {
     }
 
     #[inline]
-    fn black_edge_cycle_fixed(&self, x: u64) -> Option<usize> {
+    fn black_edge_cycle_rank(&self, x: u64) -> Option<usize> {
         let canonical = canonical_id(x);
         let cycle = self.black_edge_cycle_map.get(&canonical)?;
         Some(*cycle)
@@ -659,9 +684,9 @@ impl<'a> CactusTree<'a> {
                             let y: u64 = a.max(b);
 
                             let c_a =
-                                self.cactus_graph.black_edge_cycle_fixed(x);
+                                self.cactus_graph.black_edge_cycle_rank(x);
                             let c_b =
-                                self.cactus_graph.black_edge_cycle_fixed(y);
+                                self.cactus_graph.black_edge_cycle_rank(y);
 
                             if let (Some(c_a), Some(c_b)) = (c_a, c_b) {
                                 if c_a == c_b {
