@@ -173,6 +173,8 @@ impl<'a> CactusGraph<'a> {
 
         let inv_proj = projection.get_inverse().unwrap();
 
+        let mut next_cycle_rank = 0;
+
         for (i, cycle) in cycles.iter_mut().enumerate() {
             total_vals += cycle.len();
             total_cap += cycle.capacity();
@@ -190,20 +192,19 @@ impl<'a> CactusGraph<'a> {
                     .copied()
                     .collect::<FxHashSet<_>>();
 
-                let black_ = a_set.iter().filter(|&&n| {
+                let mut black_ = a_set.iter().filter(|&&n| {
                     let opp_n = opposite_vertex(n);
                     let can_n = canonical_id(n);
                     b_set.contains(&opp_n)
                         && !black_edge_cycle_map.contains_key(&can_n)
                 });
 
-                let black_canonical = canonical_id(black_);
-
-                black_edge_cycle_map.insert(black_canonical, i);
-
-                // assert_eq!(black_left.len(), 1);
-                // let black_right = black_left.into_iter().next().unwrap();
-                // let black_right = opposite_vertex(black_right);
+                if let Some(black_) = black_.next() {
+                    let black_canonical = canonical_id(*black_);
+                    black_edge_cycle_map
+                        .insert(black_canonical, next_cycle_rank);
+                    next_cycle_rank += 1;
+                }
 
                 let l = a.min(b);
                 let r = a.max(b);
@@ -456,6 +457,13 @@ impl<'a> CactusGraph<'a> {
         let cycles = self.cycle_map.get(&edge)?;
         Some(&cycles)
     }
+
+    #[inline]
+    fn black_edge_cycle_fixed(&self, x: u64) -> Option<usize> {
+        let canonical = canonical_id(x);
+        let cycle = self.black_edge_cycle_map.get(&canonical)?;
+        Some(*cycle)
+    }
 }
 
 /// A cactus tree derived from a cactus graph. Like the CactusGraph
@@ -644,41 +652,23 @@ impl<'a> CactusTree<'a> {
             if self.graph.is_net_vertex(n) {
                 let b_ns = cactus_graph_inverse.get(&n).unwrap();
 
-                let vertex_inv_proj = cactus_graph_inverse.get(&n).unwrap();
+                for &a in b_ns.iter() {
+                    for &b in b_ns.iter() {
+                        if a != b {
+                            let x: u64 = a.min(b);
+                            let y: u64 = a.max(b);
 
-                let vertex_inv_proj_set =
-                    vertex_inv_proj.iter().copied().collect::<FxHashSet<_>>();
+                            let c_a =
+                                self.cactus_graph.black_edge_cycle_fixed(x);
+                            let c_b =
+                                self.cactus_graph.black_edge_cycle_fixed(y);
 
-                let iter_nodes = vertex_inv_proj
-                    .iter()
-                    .filter(|&&n| {
-                        let opposite = opposite_vertex(n);
-                        vertex_inv_proj_set.contains(&opposite)
-                    })
-                    .collect::<Vec<_>>();
-
-                if iter_nodes.len() > 100 {
-                    debug!(
-                        "b_ns len: {}\tset len: {}",
-                        b_ns.len(),
-                        iter_nodes.len()
-                    );
-                    debug!("chain pairs len: {}", chain_pairs.len());
-                    debug!("");
-                }
-
-                for &a in iter_nodes.iter() {
-                    let a_ = *a;
-                    let a_o = opposite_vertex(a_);
-
-                    let x: u64 = a_.min(a_o);
-                    let y: u64 = a_.max(a_o);
-
-                    let c_a = self.cactus_graph.black_edge_cycle(x);
-                    let c_b = self.cactus_graph.black_edge_cycle(y);
-
-                    if c_a.is_some() && c_a == c_b {
-                        chain_pairs.insert(ChainPair { x, y });
+                            if let (Some(c_a), Some(c_b)) = (c_a, c_b) {
+                                if c_a == c_b {
+                                    chain_pairs.insert(ChainPair { x, y });
+                                }
+                            }
+                        }
                     }
                 }
             }
