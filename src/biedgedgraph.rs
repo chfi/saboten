@@ -99,6 +99,7 @@ pub struct BiedgedGraph {
     pub graph: UnGraphMap<u64, BiedgedWeight>,
     pub max_net_vertex: u64,
     pub max_chain_vertex: u64,
+    pub id_offset: u64,
 }
 
 impl BiedgedGraph {
@@ -340,6 +341,7 @@ impl BiedgedGraph {
             graph,
             max_net_vertex,
             max_chain_vertex,
+            id_offset: 0,
         })
     }
 
@@ -359,14 +361,41 @@ impl BiedgedGraph {
 
         let mut max_seg_id = 0;
         let mut min_seg_id = std::usize::MAX;
+
+        let mut min_node_id = std::u64::MAX;
         let mut max_node_id = 0;
 
         for segment in gfa.segments.iter() {
-            let (left, right) = id_to_black_edge(segment.name as u64);
+            // let (left, right) = id_to_black_edge(segment.name as u64);
 
-            max_node_id = max_node_id.max(segment.name);
             max_seg_id = segment.name.max(max_seg_id);
             min_seg_id = segment.name.min(min_seg_id);
+
+            // be_graph.add_node(left);
+            // be_graph.add_node(right);
+            // be_graph.add_edge(left, right, BiedgedWeight::black(1));
+        }
+
+        // let id_offset = min_seg_id as u64;
+        let id_offset = if min_seg_id == 0 {
+            0
+        } else {
+            (min_seg_id - 1) as u64
+        };
+
+        for segment in gfa.segments.iter() {
+            let seg_id = segment.name - min_seg_id;
+            let (left, right) = id_to_black_edge(seg_id as u64);
+
+            // max_node_id = max_node_id.max(segment.name);
+            // max_seg_id = segment.name.max(max_seg_id);
+            // min_seg_id = segment.name.min(min_seg_id);
+
+            // let left = left - id_offset;
+            // let right = right - id_offset;
+
+            max_node_id = max_node_id.max(left).max(right);
+            min_node_id = min_node_id.min(left).min(right);
 
             be_graph.add_node(left);
             be_graph.add_node(right);
@@ -379,8 +408,14 @@ impl BiedgedGraph {
             let from_o = link.from_orient;
             let to_o = link.to_orient;
 
-            let from = id_to_black_edge(link.from_segment as u64);
-            let to = id_to_black_edge(link.to_segment as u64);
+            let from_seg = (link.from_segment as u64) - id_offset;
+            let to_seg = (link.to_segment as u64) - id_offset;
+
+            let from = id_to_black_edge(from_seg);
+            let to = id_to_black_edge(to_seg);
+
+            // let from = id_to_black_edge(link.from_segment as u64);
+            // let to = id_to_black_edge(link.to_segment as u64);
 
             let (left, right) = match (from_o, to_o) {
                 (Forward, Forward) => (from.1, to.0),
@@ -396,7 +431,13 @@ impl BiedgedGraph {
             }
         }
 
-        let max_net_vertex = ((max_node_id + 1) * 2) as u64;
+        // let max_node_id = max_node_id as u64;
+        let max_seg_id = max_seg_id as u64;
+        let min_seg_id = min_seg_id as u64;
+        let max_net_vertex = max_node_id - min_node_id;
+
+        println!("min_node_id: {}\tmax_node_id: {}", min_node_id, max_node_id);
+
         let max_chain_vertex = max_net_vertex;
 
         let (node_cap, edge_cap) = be_graph.capacity();
@@ -408,6 +449,7 @@ impl BiedgedGraph {
             graph: be_graph,
             max_net_vertex,
             max_chain_vertex,
+            id_offset,
         }
     }
 

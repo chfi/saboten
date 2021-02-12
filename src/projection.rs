@@ -35,7 +35,8 @@ impl Projection {
     /// one.
     #[inline]
     pub fn new_for_biedged_graph(graph: &BiedgedGraph) -> Self {
-        let size = (graph.max_net_vertex + 1) as usize;
+        // let size = ((graph.max_net_vertex + 1) - graph.id_offset) as usize;
+        let size = (graph.max_net_vertex) as usize;
         let union_find = UnionFind::new(size);
         let inverse = None;
         Self {

@@ -955,6 +955,7 @@ impl<'a> CactusTree<'a> {
             graph,
             max_net_vertex: self.original_graph.max_net_vertex,
             max_chain_vertex: self.original_graph.max_chain_vertex,
+            id_offset: self.original_graph.id_offset,
         };
 
         NetGraph {
@@ -1511,6 +1512,7 @@ pub fn find_ultrabubbles(
 /// node ID space of the graph used to construct the original biedged
 /// graph.
 pub fn inverse_map_ultrabubbles(
+    id_offset: u64,
     ultrabubbles: FxHashMap<(u64, u64), Vec<(u64, u64)>>,
 ) -> FxHashMap<(u64, u64), Vec<(u64, u64)>> {
     ultrabubbles
@@ -1521,7 +1523,12 @@ pub fn inverse_map_ultrabubbles(
             let y = id_from_black_edge(y);
             let contained = contained
                 .into_iter()
-                .map(|(a, b)| (id_from_black_edge(a), id_from_black_edge(b)))
+                .map(|(a, b)| {
+                    (
+                        id_from_black_edge(a) + id_offset,
+                        id_from_black_edge(b) + id_offset,
+                    )
+                })
                 .collect();
             ((x, y), contained)
         })
