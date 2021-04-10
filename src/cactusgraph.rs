@@ -633,9 +633,7 @@ impl<'a> CactusTree<'a> {
             let chain_vx = biedged.add_chain_vertex();
 
             for &(from, to) in cycle {
-                let l = from.min(to);
-                let r = from.max(to);
-                cycle_chain_map.insert((l, r), chain_vx);
+                cycle_chain_map.insert((from, to), chain_vx);
                 biedged.add_edge(to, chain_vx, BiedgedWeight::black(1));
                 biedged.remove_one_black_edge(from, to);
             }
@@ -698,6 +696,24 @@ impl<'a> CactusTree<'a> {
                                 self.cactus_graph.black_edge_cycle_rank(y);
 
                             if let (Some(c_a), Some(c_b)) = (c_a, c_b) {
+                                // if x == 21 && y == 44 {
+                                //     debug!("at 21, 44");
+
+                                // let x_ = x + 1;
+                                // let y_ = y + 1;
+                                use crate::projection::id_from_black_edge;
+
+                                let x_ = id_from_black_edge(x);
+                                let y_ = id_from_black_edge(y);
+
+                                if x_ == 21 && y_ == 44 {
+                                    debug!("chain pair:  at x == 21 && y == 44\t x: {}\ty: {}", x_, y_);
+                                }
+                                if x_ == 55 && y_ == 58 {
+                                    debug!(
+                                        "chain pair:  at x == 55 && y == 58\t x: {}\ty: {}", x_, y_
+                                    );
+                                }
                                 if c_a == c_b {
                                     chain_pairs.insert(ChainPair { x, y });
                                 }
@@ -824,19 +840,13 @@ impl<'a> CactusTree<'a> {
 
                 if current == start || current == adj_end {
                     for (_, n, w) in edges {
-                        if w.black > 0
-                            && !visited.contains(&n)
-                            && vertices.contains(&n)
-                        {
+                        if w.black > 0 && !visited.contains(&n) {
                             stack.push(n);
                         }
                     }
                 } else {
                     for (_, n, _) in edges {
-                        if !visited.contains(&n)
-                            && n != end
-                            && vertices.contains(&n)
-                        {
+                        if !visited.contains(&n) && n != end {
                             stack.push(n);
                         }
                     }
@@ -1240,9 +1250,26 @@ impl<'a> BridgeForest<'a> {
                     for &b in all_neighbors.iter() {
                         let x = a.min(b);
                         let y = a.max(b);
+
+                        // let x_ = x + 1;
+                        // let y_ = y + 1;
+                        use crate::projection::id_from_black_edge;
+
+                        let x__ = id_from_black_edge(x);
+                        let y__ = id_from_black_edge(y);
+
                         if x != y {
                             let x_ = opposite_vertex(x);
                             let y_ = opposite_vertex(y);
+
+                            if x__ == 21 && y__ == 44 {
+                                debug!("bridge pair: at x == 21 && y == 44\tx: {}\ty: {}", x__, y__);
+                                debug!("opposite vertices: {}, {}", x_, y_);
+                            }
+                            if x__ == 55 && y__ == 58 {
+                                debug!("bridge pair: at x == 55 && y == 58\tx: {}\ty: {}", x__, y__);
+                                debug!("opposite vertices: {}, {}", x_, y_);
+                            }
 
                             bridge_pairs.insert(BridgePair { x: x_, y: y_ });
                         }
@@ -1399,9 +1426,24 @@ pub fn bridge_pair_ultrabubbles(
         let BridgePair { x, y } = snarl;
         let net_graph = cactus_tree.build_net_graph(x, y);
 
+        let relevant = x == 43 && y == 88;
+
+        if relevant {
+            debug!("at snarl (21, 44)");
+            debug!("at snarl (21, 44)");
+        }
+
         if net_graph.is_ultrabubble() {
+            if relevant {
+                debug!("snarl (21, 44) passed ultrabubble test");
+                debug!("snarl (21, 44) passed ultrabubble test");
+            }
             Some(((x, y), net_graph.path))
         } else {
+            if relevant {
+                debug!("snarl (21, 44) failed ultrabubble test");
+                debug!("snarl (21, 44) failed ultrabubble test");
+            }
             None
         }
     }));
