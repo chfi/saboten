@@ -1132,7 +1132,8 @@ impl<'a> CactusTree<'a> {
             });
 
             for nx in net_neighbors {
-                let is_ultrabubble = labels.get(&(nx, cx))?;
+                let is_ultrabubble =
+                    labels.get(&(nx, cx)).copied().unwrap_or(true);
                 if !is_ultrabubble {
                     return None;
                 } else {
