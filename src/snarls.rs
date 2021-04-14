@@ -106,7 +106,10 @@ pub struct Snarl<T: Copy + Eq + Ord + std::hash::Hash> {
     data: T,
 }
 
-impl Snarl<()> {
+impl<T> Snarl<T>
+where
+    T: Default + Copy + Eq + Ord + std::hash::Hash,
+{
     pub fn chain_pair(x: Node<Biedged>, y: Node<Biedged>) -> Self {
         let left = x.min(y);
         let right = x.max(y);
@@ -115,7 +118,7 @@ impl Snarl<()> {
             left,
             right,
             ty: SnarlType::ChainPair,
-            data: (),
+            data: T::default(),
         }
     }
 
@@ -127,7 +130,7 @@ impl Snarl<()> {
             left,
             right,
             ty: SnarlType::BridgePair,
-            data: (),
+            data: T::default(),
         }
     }
 }
@@ -152,6 +155,38 @@ where
         self.data
     }
 
+    pub fn chain_pair_with(
+        x: Node<Biedged>,
+        y: Node<Biedged>,
+        data: T,
+    ) -> Self {
+        let left = x.min(y);
+        let right = x.max(y);
+
+        Snarl {
+            left,
+            right,
+            ty: SnarlType::ChainPair,
+            data,
+        }
+    }
+
+    pub fn bridge_pair_with(
+        x: Node<Biedged>,
+        y: Node<Biedged>,
+        data: T,
+    ) -> Self {
+        let left = x.min(y);
+        let right = x.max(y);
+
+        Snarl {
+            left,
+            right,
+            ty: SnarlType::BridgePair,
+            data,
+        }
+    }
+
     pub fn map_data<F, U>(&self, f: F) -> Snarl<U>
     where
         F: Fn(T) -> U,
@@ -163,5 +198,109 @@ where
             ty: self.ty,
             data: f(self.data),
         }
+    }
+}
+
+pub struct SnarlMap {
+    // Snarls indexed by left boundary
+    lefts: FxHashMap<Node<Biedged>, Vec<usize>>,
+    // Snarls indexed by right boundary
+    rights: FxHashMap<Node<Biedged>, Vec<usize>>,
+
+    // Snarls by rank
+    snarls: FxHashMap<usize, Snarl<()>>,
+
+    // Map of contained/not contained black edges for each snarl by rank
+    snarl_contains: FxHashMap<usize, FxHashMap<Node<Biedged>, bool>>,
+}
+
+pub struct SnarlMapIter<'a> {
+    lefts: Option<std::slice::Iter<'a, usize>>,
+    rights: Option<std::slice::Iter<'a, usize>>,
+
+    snarls: &'a FxHashMap<usize, Snarl<()>>,
+}
+
+impl<'a> SnarlMapIter<'a> {
+    fn new(snarl_map: &'a SnarlMap, x: Node<Biedged>) -> Self {
+        let lefts = snarl_map.lefts.get(&x).map(|lefts| lefts.iter());
+        let rights = snarl_map.rights.get(&x).map(|rights| rights.iter());
+
+        Self {
+            lefts,
+            rights,
+
+            snarls: &snarl_map.snarls,
+        }
+    }
+}
+
+impl<'a> Iterator for SnarlMapIter<'a> {
+    type Item = Snarl<()>;
+
+    fn next(&mut self) -> Option<Snarl<()>> {
+        if self.lefts.is_none() && self.rights.is_none() {
+            return None;
+        }
+
+        if let Some(lefts) = self.lefts.as_mut() {
+            if let Some(ix) = lefts.next() {
+                let v = *self.snarls.get(ix)?;
+                return Some(v);
+            } else {
+                self.lefts = None;
+            }
+        }
+
+        if let Some(rights) = self.rights.as_mut() {
+            if let Some(ix) = rights.next() {
+                let v = *self.snarls.get(ix)?;
+                return Some(v);
+            } else {
+                self.rights = None;
+            }
+        }
+
+        None
+    }
+}
+
+impl SnarlMap {
+    pub fn with_boundary(&self, x: Node<Biedged>) -> SnarlMapIter<'_> {
+        SnarlMapIter::new(self, x)
+    }
+
+    pub fn get_snarl_ix(
+        &self,
+        x: Node<Biedged>,
+        y: Node<Biedged>,
+    ) -> Option<usize> {
+        let left = x.min(y);
+        let right = x.max(y);
+
+        let lefts = self.lefts.get(&left)?.iter().collect::<FxHashSet<_>>();
+        let rights = self.rights.get(&right)?.iter().collect::<FxHashSet<_>>();
+
+        let mut intersection = lefts.intersection(&rights);
+
+        let snarl_ix = intersection.next()?;
+
+        Some(**snarl_ix)
+    }
+
+    pub fn get(&self, x: Node<Biedged>, y: Node<Biedged>) -> Option<Snarl<()>> {
+        let left = x.min(y);
+        let right = x.max(y);
+
+        let lefts = self.lefts.get(&left)?.iter().collect::<FxHashSet<_>>();
+        let rights = self.rights.get(&right)?.iter().collect::<FxHashSet<_>>();
+
+        let mut intersection = lefts.intersection(&rights);
+
+        let snarl_ix = intersection.next()?;
+
+        let snarl = self.snarls.get(snarl_ix)?;
+
+        Some(*snarl)
     }
 }
