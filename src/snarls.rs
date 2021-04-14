@@ -91,3 +91,77 @@ impl<G> Node<G> {
         self.id & 1 != 0
     }
 }
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SnarlType {
+    ChainPair,
+    BridgePair,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Snarl<T: Copy + Eq + Ord + std::hash::Hash> {
+    left: Node<Biedged>,
+    right: Node<Biedged>,
+    ty: SnarlType,
+    data: T,
+}
+
+impl Snarl<()> {
+    pub fn chain_pair(x: Node<Biedged>, y: Node<Biedged>) -> Self {
+        let left = x.min(y);
+        let right = x.max(y);
+
+        Snarl {
+            left,
+            right,
+            ty: SnarlType::ChainPair,
+            data: (),
+        }
+    }
+
+    pub fn bridge_pair(x: Node<Biedged>, y: Node<Biedged>) -> Self {
+        let left = x.min(y);
+        let right = x.max(y);
+
+        Snarl {
+            left,
+            right,
+            ty: SnarlType::BridgePair,
+            data: (),
+        }
+    }
+}
+
+impl<T> Snarl<T>
+where
+    T: Copy + Eq + Ord + std::hash::Hash,
+{
+    pub fn left(&self) -> Node<Biedged> {
+        self.left
+    }
+
+    pub fn right(&self) -> Node<Biedged> {
+        self.left
+    }
+
+    pub fn snarl_type(&self) -> SnarlType {
+        self.ty
+    }
+
+    pub fn data(&self) -> T {
+        self.data
+    }
+
+    pub fn map_data<F, U>(&self, f: F) -> Snarl<U>
+    where
+        F: Fn(T) -> U,
+        U: Copy + Eq + Ord + std::hash::Hash,
+    {
+        Snarl {
+            left: self.left,
+            right: self.right,
+            ty: self.ty,
+            data: f(self.data),
+        }
+    }
+}
