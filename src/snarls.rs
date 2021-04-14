@@ -72,6 +72,22 @@ impl<G> Node<G> {
         (Self::new(left), Self::new(right))
     }
 
+    /// Return the left-hand side of the node
+    pub fn left(&self) -> Self {
+        Self {
+            id: self.id & !1,
+            ..*self
+        }
+    }
+
+    /// Return the right-hand side of the node
+    pub fn right(&self) -> Self {
+        Self {
+            id: self.id | 1,
+            ..*self
+        }
+    }
+
     /// Return the opposite node
     #[inline]
     pub fn opposite(&self) -> Self {
@@ -302,5 +318,33 @@ impl SnarlMap {
         let snarl = self.snarls.get(snarl_ix)?;
 
         Some(*snarl)
+    }
+
+    pub fn mark_snarl(
+        &mut self,
+        x: Node<Biedged>,
+        y: Node<Biedged>,
+        bridge: Node<Biedged>,
+        contains: bool,
+    ) -> Option<()> {
+        let snarl_ix = self.get_snarl_ix(x, y)?;
+
+        let snarl_contains = self.snarl_contains.get_mut(&snarl_ix)?;
+
+        let bridge_canonical = bridge.left();
+
+        snarl_contains.insert(bridge_canonical, contains);
+
+        Some(())
+    }
+
+    pub fn snarl_contains(
+        &self,
+        x: Node<Biedged>,
+        y: Node<Biedged>,
+    ) -> Option<&FxHashMap<Node<Biedged>, bool>> {
+        let snarl_ix = self.get_snarl_ix(x, y)?;
+
+        self.snarl_contains.get(&snarl_ix)
     }
 }
