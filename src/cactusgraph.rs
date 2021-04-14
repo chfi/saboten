@@ -696,84 +696,16 @@ impl<'a> CactusTree<'a> {
                                 let x: u64 = a.min(b);
                                 let y: u64 = a.max(b);
 
-                                let c_a =
-                                    self.cactus_graph.black_edge_cycle_rank(x);
-                                let c_b =
-                                    self.cactus_graph.black_edge_cycle_rank(y);
+                                let opp_a = opposite_vertex(a);
+                                let opp_b = opposite_vertex(b);
 
-                                if let (Some(c_a), Some(c_b)) = (c_a, c_b) {
-                                    // if x == 21 && y == 44 {
-                                    //     debug!("at 21, 44");
+                                let proj_opp_a = self.projected_node(opp_a);
+                                let proj_opp_b = self.projected_node(opp_b);
 
-                                    // let x_ = x + 1;
-                                    // let y_ = y + 1;
-                                    use crate::projection::id_from_black_edge;
-
-                                    let x_ = id_from_black_edge(x);
-                                    let y_ = id_from_black_edge(y);
-
-                                    // if x_ == 21 && y_ == 44 {
-                                    //     debug!("chain pair:  at x == 21 && y == 44\t x: {}\ty: {}", x_, y_);
-                                    // }
-                                    // if x_ == 55 && y_ == 58 {
-                                    //     debug!(
-                                    //     "chain pair:  at x == 55 && y == 58\t x: {}\ty: {}", x_, y_
-                                    // );
-                                    // }
-                                    if c_a == c_b {
-                                        chain_pairs.insert(ChainPair { x, y });
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            #[cfg(feature = "progress_bars")]
-            {
-                _p_bar.inc(1);
-            }
-        }
-
-        /*
-        for n in self.base_graph().nodes() {
-            if self.graph.is_net_vertex(n) {
-                let b_ns = cactus_graph_inverse.get(&n).unwrap();
-
-                for &a in b_ns.iter() {
-                    for &b in b_ns.iter() {
-                        if a != b {
-                            let x: u64 = a.min(b);
-                            let y: u64 = a.max(b);
-
-                            let c_a =
-                                self.cactus_graph.black_edge_cycle_rank(x);
-                            let c_b =
-                                self.cactus_graph.black_edge_cycle_rank(y);
-
-                            if let (Some(c_a), Some(c_b)) = (c_a, c_b) {
-                                // if x == 21 && y == 44 {
-                                //     debug!("at 21, 44");
-
-                                // let x_ = x + 1;
-                                // let y_ = y + 1;
-                                use crate::projection::id_from_black_edge;
-
-                                let x_ = id_from_black_edge(x);
-                                let y_ = id_from_black_edge(y);
-
-                                if x_ == 21 && y_ == 44 {
-                                    debug!("chain pair:  at x == 21 && y == 44\t x: {}\ty: {}", x_, y_);
-                                }
-                                if x_ == 55 && y_ == 58 {
-                                    debug!(
-                                        "chain pair:  at x == 55 && y == 58\t x: {}\ty: {}", x_, y_
-                                    );
-                                }
-                                if c_a == c_b {
+                                if b_ns.contains(&proj_opp_a) && b_ns.contains(&proj_opp_b) {
                                     chain_pairs.insert(ChainPair { x, y });
                                 }
+
                             }
                         }
                     }
@@ -785,7 +717,6 @@ impl<'a> CactusTree<'a> {
                 _p_bar.inc(1);
             }
         }
-        */
 
         #[cfg(feature = "progress_bars")]
         {
