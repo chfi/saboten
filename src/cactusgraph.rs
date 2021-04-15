@@ -1308,6 +1308,113 @@ impl<'a> BridgeForest<'a> {
 
         res
     }
+
+    pub fn snarl_family(&self, snarl_map: &mut SnarlMap) {
+        use std::collections::VecDeque;
+
+        let black_bridge_edges = self.black_bridge_edges();
+
+        let mut queue: VecDeque<Node<Biedged>> = VecDeque::new();
+
+        let mut visited: FxHashSet<Node<Biedged>> = FxHashSet::default();
+
+        let mut snarls: Vec<Snarl<()>> = Vec::new();
+
+        for left in black_bridge_edges {
+            snarls.clear();
+
+            let right = left.right();
+
+            queue.push_back(left);
+            queue.push_back(right);
+
+            snarls.extend(snarl_map.with_boundary(left));
+            snarls.extend(snarl_map.with_boundary(right));
+
+            for &snarl in snarls.iter() {
+                snarl_map.mark_snarl(snarl.left(), snarl.right(), left, false);
+            }
+
+            while let Some(node) = queue.pop_front() {
+                visited.insert(node);
+
+                snarls.clear();
+
+                snarls.extend(snarl_map.with_boundary(node));
+
+                for &snarl in snarls.iter() {
+                    if snarl.left() == node {
+                        if !visited.contains(&node.right())
+                            || !visited.contains(&snarl.left().opposite())
+                            || !visited.contains(&snarl.right().opposite())
+                        {
+                            snarl_map.mark_snarl(
+                                snarl.left(),
+                                snarl.right(),
+                                node.left(),
+                                true,
+                            );
+                        }
+                    } else if snarl.right() == node {
+                        if !visited.contains(&node.left())
+                            || !visited.contains(&snarl.left().opposite())
+                            || !visited.contains(&snarl.right().opposite())
+                        {
+                            snarl_map.mark_snarl(
+                                snarl.left(),
+                                snarl.right(),
+                                node.left(),
+                                true,
+                            );
+                        }
+                    }
+                }
+
+                let node_opp = node.opposite();
+
+                snarls.clear();
+
+                snarls.extend(snarl_map.with_boundary(node_opp));
+
+                for &snarl in snarls.iter() {
+                    if snarl.left() == node_opp {
+                        if !visited.contains(&node_opp.right())
+                            || !visited.contains(&snarl.left().opposite())
+                            || !visited.contains(&snarl.right().opposite())
+                        {
+                            snarl_map.mark_snarl(
+                                snarl.left(),
+                                snarl.right(),
+                                node.left(),
+                                false,
+                            );
+                        }
+                    } else if snarl.right() == node_opp {
+                        if !visited.contains(&node_opp.left())
+                            || !visited.contains(&snarl.left().opposite())
+                            || !visited.contains(&snarl.right().opposite())
+                        {
+                            snarl_map.mark_snarl(
+                                snarl.left(),
+                                snarl.right(),
+                                node.left(),
+                                false,
+                            );
+                        }
+                    }
+                }
+
+                let neighbors = self.graph.graph.neighbors(node.id);
+
+                for other in neighbors {
+                    let other = Node::<Biedged>::new(other);
+                    if !visited.contains(&other) {
+                        queue.push_back(other);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Return the chain edges in the cactus tree as a map from pairs of

@@ -19,7 +19,7 @@ impl GraphType for Bridge {}
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Node<G> {
     _graph: std::marker::PhantomData<G>,
-    id: u64,
+    pub id: u64,
 }
 
 impl<G> Node<G> {
