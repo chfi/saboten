@@ -10,6 +10,7 @@ use crate::{
     projection::{
         canonical_id, end_to_black_edge, opposite_vertex, Projection,
     },
+    snarls::{Biedged, Node, Snarl, SnarlMap, SnarlMapIter, SnarlType},
     ultrabubble::{BridgePair, ChainPair},
 };
 
@@ -702,10 +703,11 @@ impl<'a> CactusTree<'a> {
                                 let proj_opp_a = self.projected_node(opp_a);
                                 let proj_opp_b = self.projected_node(opp_b);
 
-                                if b_ns.contains(&proj_opp_a) && b_ns.contains(&proj_opp_b) {
+                                if b_ns.contains(&proj_opp_a)
+                                    && b_ns.contains(&proj_opp_b)
+                                {
                                     chain_pairs.insert(ChainPair { x, y });
                                 }
-
                             }
                         }
                     }
@@ -1278,6 +1280,33 @@ impl<'a> BridgeForest<'a> {
         trace!(" ~~~ find_bridge_pairs() done ~~~ ");
 
         bridge_pairs
+    }
+
+    pub fn black_bridge_edges(&self) -> Vec<Node<Biedged>> {
+        let mut res = Vec::new();
+
+        let inv_map = self.projection.get_inverse().unwrap();
+
+        for (x, y, _) in self.graph.graph.all_edges() {
+            let x_inv = inv_map.get(&x).unwrap();
+
+            let y_inv: FxHashSet<Node<Biedged>> = inv_map
+                .get(&y)
+                .unwrap()
+                .into_iter()
+                .map(|&n| Node::<Biedged>::new(n))
+                .collect::<FxHashSet<_>>();
+
+            for &node in x_inv {
+                let node = Node::<Biedged>::new(node);
+
+                if y_inv.contains(&node.opposite()) {
+                    res.push(node.left());
+                }
+            }
+        }
+
+        res
     }
 }
 

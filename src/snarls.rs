@@ -24,14 +24,6 @@ pub struct Node<G> {
 
 impl<G> Node<G> {
     #[inline]
-    pub fn new_for<H>(id: u64) -> Node<H> {
-        Node {
-            _graph: std::marker::PhantomData,
-            id,
-        }
-    }
-
-    #[inline]
     pub fn new(id: u64) -> Self {
         Node {
             _graph: std::marker::PhantomData,
@@ -217,6 +209,7 @@ where
     }
 }
 
+#[derive(Default, Clone)]
 pub struct SnarlMap {
     // Snarls indexed by left boundary
     lefts: FxHashMap<Node<Biedged>, Vec<usize>>,
@@ -282,6 +275,19 @@ impl<'a> Iterator for SnarlMapIter<'a> {
 }
 
 impl SnarlMap {
+    pub fn insert(&mut self, snarl: Snarl<()>) {
+        if self.get_snarl_ix(snarl.left, snarl.right).is_some() {
+            return;
+        }
+
+        let ix = self.snarls.len();
+
+        self.snarls.insert(ix, snarl);
+
+        self.lefts.entry(snarl.left()).or_default().push(ix);
+        self.rights.entry(snarl.right()).or_default().push(ix);
+    }
+
     pub fn with_boundary(&self, x: Node<Biedged>) -> SnarlMapIter<'_> {
         SnarlMapIter::new(self, x)
     }
