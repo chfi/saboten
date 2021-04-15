@@ -4,6 +4,7 @@ use std::ops::{Add, AddAssign, Sub, SubAssign};
 use gfa::gfa::{Orientation, GFA};
 
 use crate::projection::{id_to_black_edge, Projection};
+use crate::snarls::{Biedged, Node};
 
 use log::{debug, trace};
 
@@ -294,18 +295,18 @@ impl BiedgedGraph {
         let mut graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
 
         for (a, a_o, b, b_o) in i {
+            let (a_l, a_r) = Node::<Biedged>::from_gfa_id(a);
+            let (b_l, b_r) = Node::<Biedged>::from_gfa_id(b);
+
             min_node_id = min_node_id.min(a.min(b));
             max_node_id = max_node_id.max(a.max(b));
 
-            let (a_l, a_r) = id_to_black_edge(a);
-            let (b_l, b_r) = id_to_black_edge(b);
-
-            if !graph.contains_edge(a_l, a_r) {
-                graph.add_edge(a_l, a_r, BiedgedWeight::black(1));
+            if !graph.contains_edge(a_l.id, a_r.id) {
+                graph.add_edge(a_l.id, a_r.id, BiedgedWeight::black(1));
             }
 
-            if !graph.contains_edge(b_l, b_r) {
-                graph.add_edge(b_l, b_r, BiedgedWeight::black(1));
+            if !graph.contains_edge(b_l.id, b_r.id) {
+                graph.add_edge(b_l.id, b_r.id, BiedgedWeight::black(1));
             }
 
             let (left, right) = match (a_o, b_o) {
@@ -315,10 +316,10 @@ impl BiedgedGraph {
                 (Backward, Forward) => (a_l, b_l),
             };
 
-            if let Some(w) = graph.edge_weight_mut(left, right) {
+            if let Some(w) = graph.edge_weight_mut(left.id, right.id) {
                 *w += BiedgedWeight::gray(1);
             } else {
-                graph.add_edge(left, right, BiedgedWeight::gray(1));
+                graph.add_edge(left.id, right.id, BiedgedWeight::gray(1));
             }
         }
 
@@ -354,15 +355,16 @@ impl BiedgedGraph {
         let mut max_node_id = 0;
 
         for segment in gfa.segments.iter() {
-            let (left, right) = id_to_black_edge(segment.name as u64);
+            let (left, right) =
+                Node::<Biedged>::from_gfa_id(segment.name as u64);
 
             max_node_id = max_node_id.max(segment.name);
             max_seg_id = segment.name.max(max_seg_id);
             min_seg_id = segment.name.min(min_seg_id);
 
-            be_graph.add_node(left);
-            be_graph.add_node(right);
-            be_graph.add_edge(left, right, BiedgedWeight::black(1));
+            be_graph.add_node(left.id);
+            be_graph.add_node(right.id);
+            be_graph.add_edge(left.id, right.id, BiedgedWeight::black(1));
         }
 
         use Orientation::*;
@@ -371,8 +373,8 @@ impl BiedgedGraph {
             let from_o = link.from_orient;
             let to_o = link.to_orient;
 
-            let from = id_to_black_edge(link.from_segment as u64);
-            let to = id_to_black_edge(link.to_segment as u64);
+            let from = Node::<Biedged>::from_gfa_id(link.from_segment as u64);
+            let to = Node::<Biedged>::from_gfa_id(link.to_segment as u64);
 
             let (left, right) = match (from_o, to_o) {
                 (Forward, Forward) => (from.1, to.0),
@@ -381,10 +383,10 @@ impl BiedgedGraph {
                 (Backward, Forward) => (from.0, to.0),
             };
 
-            if let Some(w) = be_graph.edge_weight_mut(left, right) {
+            if let Some(w) = be_graph.edge_weight_mut(left.id, right.id) {
                 *w += BiedgedWeight::gray(1);
             } else {
-                be_graph.add_edge(left, right, BiedgedWeight::gray(1));
+                be_graph.add_edge(left.id, right.id, BiedgedWeight::gray(1));
             }
         }
 
