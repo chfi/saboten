@@ -34,7 +34,7 @@ impl Projection {
     /// must have its vertex IDs tightly packed, starting from zero or
     /// one.
     #[inline]
-    pub fn new_for_biedged_graph(graph: &BiedgedGraph) -> Self {
+    pub fn new_for_biedged_graph<G>(graph: &BiedgedGraph<G>) -> Self {
         let size = (graph.max_net_vertex + 1) as usize;
         let union_find = UnionFind::new(size);
         let inverse = None;

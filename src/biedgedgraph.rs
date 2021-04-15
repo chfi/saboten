@@ -96,13 +96,13 @@ impl SubAssign for BiedgedWeight {
 /// higher than the original vertices. This also makes it easier to
 /// track the projections.
 #[derive(Default, Clone)]
-pub struct BiedgedGraph {
-    pub graph: UnGraphMap<u64, BiedgedWeight>,
-    pub max_net_vertex: u64,
-    pub max_chain_vertex: u64,
+pub struct BiedgedGraph<G> {
+    pub graph: UnGraphMap<Node<G>, BiedgedWeight>,
+    pub max_net_vertex: Node<G>,
+    pub max_chain_vertex: Node<G>,
 }
 
-impl BiedgedGraph {
+impl<G> BiedgedGraph<G> {
     pub fn shrink_to_fit(&mut self) {
         let (node_count, node_cap) = self.node_count_capacity();
         let (edge_count, edge_cap) = self.edge_count_capacity();
@@ -122,7 +122,7 @@ impl BiedgedGraph {
             edge_cap
         );
 
-        let mut new_graph: UnGraphMap<u64, BiedgedWeight> =
+        let mut new_graph: UnGraphMap<Node<G>, BiedgedWeight> =
             UnGraphMap::with_capacity(node_count, edge_count);
 
         for (a, b, &w) in self.graph.all_edges() {
@@ -147,7 +147,7 @@ impl BiedgedGraph {
         std::mem::swap(&mut self.graph, &mut new_graph);
     }
 
-    pub fn shrink_into(self) -> BiedgedGraph {
+    pub fn shrink_into(self) -> Self {
         let (node_count, node_cap) = self.node_count_capacity();
         let (edge_count, edge_cap) = self.edge_count_capacity();
 
@@ -164,7 +164,7 @@ impl BiedgedGraph {
             edge_count, edge_cap
         );
 
-        let mut new_graph: UnGraphMap<u64, BiedgedWeight> =
+        let mut new_graph: UnGraphMap<Node<G>, BiedgedWeight> =
             UnGraphMap::with_capacity(node_count, edge_count);
 
         for (a, b, &w) in self.graph.all_edges() {
@@ -190,7 +190,7 @@ impl BiedgedGraph {
         }
     }
 
-    pub fn shrink_clone(&self) -> BiedgedGraph {
+    pub fn shrink_clone(&self) -> Self {
         let (node_count, node_cap) = self.node_count_capacity();
         let (edge_count, edge_cap) = self.edge_count_capacity();
 
@@ -207,7 +207,7 @@ impl BiedgedGraph {
             edge_count, edge_cap
         );
 
-        let mut new_graph: UnGraphMap<u64, BiedgedWeight> =
+        let mut new_graph: UnGraphMap<Node<G>, BiedgedWeight> =
             UnGraphMap::with_capacity(node_count, edge_count);
 
         for (a, b, &w) in self.graph.all_edges() {
@@ -235,15 +235,15 @@ impl BiedgedGraph {
 
     /// Create an empty biedged graph
     #[inline]
-    pub fn new() -> BiedgedGraph {
+    pub fn new() -> Self {
         Default::default()
     }
 
     /// Adds a chain vertex, ensuring that it has an index higher than
     /// any net vertex. Returns the new vertex identifier.
     #[inline]
-    pub fn add_chain_vertex(&mut self) -> u64 {
-        self.max_chain_vertex += 1;
+    pub fn add_chain_vertex(&mut self) -> Node<G> {
+        self.max_chain_vertex.id_mut() += 1;
         let id = self.max_chain_vertex;
         self.graph.add_node(id);
         id
@@ -270,7 +270,7 @@ impl BiedgedGraph {
         }
     }
 
-    pub fn from_directed_edges<I>(i: I) -> Option<BiedgedGraph>
+    pub fn from_directed_edges<I>(i: I) -> Option<Self>
     where
         I: IntoIterator<Item = (u64, u64)>,
     {
@@ -283,7 +283,7 @@ impl BiedgedGraph {
     /// graph. The edges should be tuples of the form (from, to),
     /// where the elements are node IDs, and each node ID must be in
     /// the range 0..N, where N is the number of nodes.
-    pub fn from_bidirected_edges<I>(i: I) -> Option<BiedgedGraph>
+    pub fn from_bidirected_edges<I>(i: I) -> Option<Self>
     where
         I: IntoIterator<Item = (u64, Orientation, u64, Orientation)>,
     {
@@ -337,7 +337,7 @@ impl BiedgedGraph {
     }
 
     /// Construct a biedged graph from a GFA.
-    pub fn from_gfa(gfa: &GFA<usize, ()>) -> BiedgedGraph {
+    pub fn from_gfa(gfa: &GFA<usize, ()>) -> Self {
         debug!(
             "building BiedgedGraph from GFA with {} nodes, {} edges",
             gfa.segments.len(),
@@ -589,7 +589,7 @@ mod tests {
     use super::*;
 
     #[allow(dead_code)]
-    fn example_graph_2() -> BiedgedGraph {
+    fn example_graph_2() -> BiedgedGraph<Node<Biedged>> {
         let edges = vec![
             (0, 1),
             (0, 13),

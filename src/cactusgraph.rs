@@ -10,7 +10,9 @@ use crate::{
     projection::{
         canonical_id, end_to_black_edge, opposite_vertex, Projection,
     },
-    snarls::{Biedged, Node, Snarl, SnarlMap, SnarlMapIter, SnarlType},
+    snarls::{
+        Biedged, Bridge, Cactus, Node, Snarl, SnarlMap, SnarlMapIter, SnarlType,
+    },
     ultrabubble::{BridgePair, ChainPair},
 };
 
@@ -34,15 +36,17 @@ fn progress_bar(len: usize, steady: bool) -> indicatif::ProgressBar {
 }
 
 macro_rules! impl_biedged_wrapper {
-    ($for:ty) => {
+    ($for:ty, $stage:ty) => {
         impl<'a> BiedgedWrapper for $for {
+            type Stage = $stage;
+
             #[inline]
             fn base_graph(&self) -> &UnGraphMap<u64, BiedgedWeight> {
                 &self.graph.graph
             }
 
             #[inline]
-            fn biedged_graph(&self) -> &BiedgedGraph {
+            fn biedged_graph(&self) -> &BiedgedGraph<$stage> {
                 &self.graph
             }
 
@@ -57,9 +61,11 @@ macro_rules! impl_biedged_wrapper {
 /// Convenience trait for providing a unified interface when accessing
 /// the underlying graph structure across the various graph types.
 pub trait BiedgedWrapper {
+    type Stage: Copy + Eq + Ord + std::hash::Hash;
+
     fn base_graph(&self) -> &UnGraphMap<u64, BiedgedWeight>;
 
-    fn biedged_graph(&self) -> &BiedgedGraph;
+    fn biedged_graph(&self) -> &BiedgedGraph<Self::Stage>;
 
     fn projection(&self) -> &Projection;
 
@@ -85,21 +91,23 @@ pub trait BiedgedWrapper {
 /// the embedded `Projection` struct.
 #[derive(Clone)]
 pub struct CactusGraph<'a> {
-    pub original_graph: &'a BiedgedGraph,
-    pub graph: BiedgedGraph,
+    pub original_graph: &'a BiedgedGraph<Biedged>,
+    pub graph: BiedgedGraph<Cactus>,
     pub projection: Projection,
     pub cycles: Vec<Vec<(u64, u64)>>,
     pub cycle_map: FxHashMap<(u64, u64), Vec<usize>>,
     pub black_edge_cycle_map: FxHashMap<u64, usize>,
 }
 
-impl_biedged_wrapper!(CactusGraph<'a>);
+impl_biedged_wrapper!(CactusGraph<'a>, Cactus);
 
 impl<'a> CactusGraph<'a> {
     /// Construct a cactus graph from a biedged graph. Clones the
     /// input graph before mutating, and keeps a reference to the
     /// original.
-    pub fn from_biedged_graph(biedged_graph: &'a BiedgedGraph) -> Self {
+    pub fn from_biedged_graph(
+        biedged_graph: &'a BiedgedGraph<Biedged>,
+    ) -> Self {
         debug!("  ~~~  building cactus graph  ~~~");
         debug!("cloning biedged graph");
         let t = std::time::Instant::now();
@@ -292,7 +300,7 @@ impl<'a> CactusGraph<'a> {
     }
 
     pub fn contract_all_gray_edges(
-        biedged: &mut BiedgedGraph,
+        biedged: &mut BiedgedGraph<Cactus>,
         projection: &mut Projection,
     ) {
         let _p_bar;
@@ -361,7 +369,7 @@ impl<'a> CactusGraph<'a> {
     }
 
     pub fn find_3_edge_connected_components(
-        biedged: &BiedgedGraph,
+        biedged: &BiedgedGraph<Cactus>,
     ) -> Vec<Vec<usize>> {
         let edges = biedged.graph.all_edges().flat_map(|(a, b, w)| {
             std::iter::repeat((a as usize, b as usize)).take(w.black)
@@ -382,7 +390,7 @@ impl<'a> CactusGraph<'a> {
     }
 
     pub fn merge_components(
-        biedged: &mut BiedgedGraph,
+        biedged: &mut BiedgedGraph<Cactus>,
         components: Vec<Vec<usize>>,
         projection: &mut Projection,
     ) {
@@ -407,7 +415,7 @@ impl<'a> CactusGraph<'a> {
     /// Find the simple cycles in a cactus graph and return them. A
     /// cycle is represented as a vector of vertices, with the same
     /// start and end vertex.
-    fn find_cycles(biedged: &BiedgedGraph) -> Vec<Vec<(u64, u64)>> {
+    fn find_cycles(biedged: &BiedgedGraph<Cactus>) -> Vec<Vec<(u64, u64)>> {
         let graph = &biedged.graph;
 
         let mut visited: FxHashSet<u64> = FxHashSet::default();
@@ -499,21 +507,23 @@ impl<'a> CactusGraph<'a> {
 /// adds chain vertices, and only removes edges, no vertices, there's
 /// no need to track vertex projections.
 pub struct CactusTree<'a> {
-    pub original_graph: &'a BiedgedGraph,
+    pub original_graph: &'a BiedgedGraph<Biedged>,
     pub cactus_graph: &'a CactusGraph<'a>,
-    pub graph: BiedgedGraph,
+    pub graph: BiedgedGraph<Cactus>,
     pub chain_vertices: FxHashSet<u64>,
     pub cycle_chain_map: FxHashMap<(u64, u64), u64>,
 }
 
 impl<'a> BiedgedWrapper for CactusTree<'a> {
+    type Stage = Cactus;
+
     #[inline]
     fn base_graph(&self) -> &UnGraphMap<u64, BiedgedWeight> {
         &self.graph.graph
     }
 
     #[inline]
-    fn biedged_graph(&self) -> &BiedgedGraph {
+    fn biedged_graph(&self) -> &BiedgedGraph<Cactus> {
         &self.graph
     }
 
@@ -624,7 +634,7 @@ impl<'a> CactusTree<'a> {
     /// vertex ID in the graph, and the second element is the index of the
     /// corresponding cycle in the provided cycles vector.
     fn construct_chain_vertices(
-        biedged: &mut BiedgedGraph,
+        biedged: &mut BiedgedGraph<Cactus>,
         cycles: &[Vec<(u64, u64)>],
     ) -> (FxHashMap<(u64, u64), u64>, FxHashSet<u64>) {
         let mut cycle_chain_map = FxHashMap::default();
@@ -806,7 +816,7 @@ impl<'a> CactusTree<'a> {
 
     fn net_graph_black_edge_walk(
         vertices: &FxHashSet<u64>,
-        biedged: &BiedgedGraph,
+        biedged: &BiedgedGraph<Cactus>,
         x: u64,
         y: u64,
     ) -> bool {
@@ -1083,12 +1093,12 @@ impl<'a> CactusTree<'a> {
 /// the original biedged graph used to build the cactus graph, and
 /// tracks the vertex projections from the original graph.
 pub struct BridgeForest<'a> {
-    pub original_graph: &'a BiedgedGraph,
-    pub graph: BiedgedGraph,
+    pub original_graph: &'a BiedgedGraph<Biedged>,
+    pub graph: BiedgedGraph<Bridge>,
     pub projection: Projection,
 }
 
-impl_biedged_wrapper!(BridgeForest<'a>);
+impl_biedged_wrapper!(BridgeForest<'a>, Bridge);
 
 impl<'a> BridgeForest<'a> {
     pub fn from_cactus_graph(cactus_graph: &'_ CactusGraph<'a>) -> Self {
@@ -1160,7 +1170,7 @@ impl<'a> BridgeForest<'a> {
     /// Contracts each cycle into a single vertex, updating the projection
     /// map accordingly.
     pub fn contract_cycles(
-        biedged: &mut BiedgedGraph,
+        biedged: &mut BiedgedGraph<Bridge>,
         cycles: &[Vec<(u64, u64)>],
         projection: &mut Projection,
     ) {
@@ -1700,7 +1710,7 @@ pub fn inverse_map_ultrabubbles(
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn graph_from_paper() -> BiedgedGraph {
+    fn graph_from_paper() -> BiedgedGraph<Biedged> {
         let edges = vec![
             (0, 1),
             (0, 2),
@@ -1731,7 +1741,7 @@ mod tests {
         BiedgedGraph::from_directed_edges(edges).unwrap()
     }
 
-    fn example_graph() -> BiedgedGraph {
+    fn example_graph() -> BiedgedGraph<Biedged> {
         /*               -i
                  &     &/
         a--b==c--e==f--h--j

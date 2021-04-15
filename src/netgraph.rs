@@ -4,7 +4,7 @@ use crate::biedgedgraph::BiedgedGraph;
 
 #[derive(Clone)]
 pub struct NetGraph {
-    pub graph: BiedgedGraph,
+    pub graph: BiedgedGraph<Biedged>,
     pub x: u64,
     pub y: u64,
     pub path: Vec<u64>,

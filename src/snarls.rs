@@ -16,7 +16,7 @@ impl GraphType for Cactus {}
 impl GraphType for Bridge {}
 
 /// A node index for a biedged graph of the specified type
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Node<G> {
     _graph: std::marker::PhantomData<G>,
     pub id: u64,
@@ -37,6 +37,11 @@ impl<G> Node<G> {
             _graph: std::marker::PhantomData,
             id: self.id,
         }
+    }
+
+    #[inline]
+    pub fn id_mut(&mut self) -> &mut u64 {
+        &mut self.id
     }
 
     /// Derive the node IDs for a black edge in a biedged graph, given
