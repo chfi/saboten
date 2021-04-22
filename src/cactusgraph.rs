@@ -1686,6 +1686,43 @@ pub fn find_ultrabubbles(
         .collect()
 }
 
+pub fn build_snarl_family(
+    cactus_tree: &CactusTree<'_>,
+    bridge_forest: &BridgeForest<'_>,
+) -> SnarlMap {
+    debug!("Finding chain pairs");
+    let t = std::time::Instant::now();
+    let chain_pairs = cactus_tree.find_chain_pairs();
+    debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+    debug!("Found {} chain pairs", chain_pairs.len());
+
+    debug!("Finding bridge pairs");
+    let t = std::time::Instant::now();
+    let bridge_pairs = bridge_forest.find_bridge_pairs();
+    debug!("  took {:.3} ms", t.elapsed().as_secs_f64() * 1000.0);
+    debug!("Found {} bridge pairs", bridge_pairs.len());
+
+    let mut snarl_map = SnarlMap::default();
+
+    for &bp in bridge_pairs.iter() {
+        snarl_map.insert(Snarl::<()>::bridge_pair(
+            Node::<Biedged>::new(bp.x),
+            Node::<Biedged>::new(bp.y),
+        ));
+    }
+
+    for &cp in chain_pairs.iter() {
+        snarl_map.insert(Snarl::<()>::chain_pair(
+            Node::<Biedged>::new(cp.x),
+            Node::<Biedged>::new(cp.y),
+        ));
+    }
+
+    bridge_forest.snarl_family(&mut snarl_map);
+
+    snarl_map
+}
+
 /// Inverses the vertex projection of the provided ultrabubbles to the
 /// node ID space of the graph used to construct the original biedged
 /// graph.
