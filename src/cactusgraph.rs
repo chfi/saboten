@@ -685,7 +685,18 @@ impl<'a> CactusTree<'a> {
             _p_bar = ();
         }
 
-        /*
+        #[cfg(feature = "progress_bars")]
+        {
+            use indicatif::{ProgressBar, ProgressStyle};
+            _p_bar = ProgressBar::new(self.base_graph().node_count() as u64);
+            _p_bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("[{elapsed_precise}] {bar:40} {pos:>10}/{len:10}")
+                    .progress_chars("##-"),
+            );
+            _p_bar.enable_steady_tick(1000);
+        }
+
         for n in self.base_graph().nodes() {
             if self.graph.is_net_vertex(n) {
                 let b_ns = cactus_graph_inverse.get(&n.id).unwrap();
@@ -711,8 +722,8 @@ impl<'a> CactusTree<'a> {
                 _p_bar.inc(1);
             }
         }
-        */
 
+        /*
         let mut neighbors = Vec::new();
 
         let chain_vertices = self
@@ -759,7 +770,6 @@ impl<'a> CactusTree<'a> {
 
                                 if b_ns.contains(&proj_opp_a.id)
                                     && b_ns.contains(&proj_opp_b.id)
-                                    && proj_opp_a != proj_opp_b
                                 {
                                     chain_pairs.insert(ChainPair { x, y });
                                 }
@@ -774,6 +784,7 @@ impl<'a> CactusTree<'a> {
                 _p_bar.inc(1);
             }
         }
+        */
 
         #[cfg(feature = "progress_bars")]
         {
@@ -1724,13 +1735,21 @@ pub fn build_snarl_family(
     debug!("Found {} bridge pairs", bridge_pairs.len());
 
     let mut snarl_map = SnarlMap::default();
+    trace!(
+        "Adding {} + {} = {} snarls",
+        bridge_pairs.len(),
+        chain_pairs.len(),
+        bridge_pairs.len() + chain_pairs.len()
+    );
 
     for &bp in bridge_pairs.iter() {
+        trace!("Bridge pair  ({}, {})", bp.x, bp.y);
         snarl_map
             .insert(Snarl::<()>::bridge_pair(Node::new(bp.x), Node::new(bp.y)));
     }
 
     for &cp in chain_pairs.iter() {
+        trace!("Chain pair   ({}, {})", cp.x, cp.y);
         snarl_map
             .insert(Snarl::<()>::chain_pair(Node::new(cp.x), Node::new(cp.y)));
     }

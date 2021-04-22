@@ -99,9 +99,9 @@ pub enum SnarlType {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Snarl<T: Copy + Eq + Ord + std::hash::Hash> {
-    left: Node,
-    right: Node,
-    ty: SnarlType,
+    pub left: Node,
+    pub right: Node,
+    pub ty: SnarlType,
     data: T,
 }
 
@@ -143,7 +143,7 @@ where
     }
 
     pub fn right(&self) -> Node {
-        self.left
+        self.right
     }
 
     pub fn snarl_type(&self) -> SnarlType {
