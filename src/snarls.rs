@@ -195,15 +195,15 @@ where
 #[derive(Default, Clone)]
 pub struct SnarlMap {
     // Snarls indexed by left boundary
-    lefts: FxHashMap<Node, Vec<usize>>,
+    pub lefts: FxHashMap<Node, Vec<usize>>,
     // Snarls indexed by right boundary
-    rights: FxHashMap<Node, Vec<usize>>,
+    pub rights: FxHashMap<Node, Vec<usize>>,
 
     // Snarls by rank
-    snarls: FxHashMap<usize, Snarl<()>>,
+    pub snarls: FxHashMap<usize, Snarl<()>>,
 
     // Map of contained/not contained black edges for each snarl by rank
-    snarl_contains: FxHashMap<usize, FxHashMap<Node, bool>>,
+    pub snarl_contains: FxHashMap<usize, FxHashMap<Node, bool>>,
 }
 
 pub struct SnarlMapIter<'a> {
@@ -314,7 +314,7 @@ impl SnarlMap {
     ) -> Option<()> {
         let snarl_ix = self.get_snarl_ix(x, y)?;
 
-        let snarl_contains = self.snarl_contains.get_mut(&snarl_ix)?;
+        let snarl_contains = self.snarl_contains.entry(snarl_ix).or_default();
 
         let bridge_canonical = bridge.left();
 
@@ -331,5 +331,22 @@ impl SnarlMap {
         let snarl_ix = self.get_snarl_ix(x, y)?;
 
         self.snarl_contains.get(&snarl_ix)
+    }
+
+    /// Returns a map from black bridge edges to snarls containing the edge
+    pub fn invert_contains(&self) -> FxHashMap<Node, FxHashSet<Snarl<()>>> {
+        let mut res: FxHashMap<Node, FxHashSet<Snarl<()>>> = Default::default();
+
+        for (&snarl_ix, contained) in self.snarl_contains.iter() {
+            let snarl = *self.snarls.get(&snarl_ix).unwrap();
+
+            for (&bridge, &contains) in contained.iter() {
+                if contains {
+                    res.entry(bridge).or_default().insert(snarl);
+                }
+            }
+        }
+
+        res
     }
 }

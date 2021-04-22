@@ -734,22 +734,22 @@ impl<'a> CactusTree<'a> {
         }
 
         for cx in chain_vertices {
-            // for cx in self.base_graph().nodes() {
-            if self.graph.is_chain_vertex(cx) {
-                neighbors.clear();
-                neighbors.extend(self.base_graph().neighbors(cx));
+            neighbors.clear();
+            neighbors.extend(self.base_graph().neighbors(cx));
 
-                for &nx in neighbors.iter() {
-                    let b_ns = cactus_graph_inverse.get(&nx.id).unwrap();
+            for &nx in neighbors.iter() {
+                let b_ns: &[u64] = cactus_graph_inverse.get(&nx.id).unwrap();
+                let b_ns = b_ns.into_iter().copied().collect::<FxHashSet<_>>();
 
-                    for &a in b_ns.iter() {
-                        let opp_a = opposite_vertex(a);
+                for &a in b_ns.iter() {
+                    let opp_a = opposite_vertex(a);
 
-                        for &b in b_ns.iter() {
-                            if a != b && b != opp_a {
-                                let x: u64 = a.min(b);
-                                let y: u64 = a.max(b);
+                    for &b in b_ns.iter() {
+                        if a != b && b != opp_a {
+                            let x: u64 = a.min(b);
+                            let y: u64 = a.max(b);
 
+                            if !chain_pairs.contains(&ChainPair { x, y }) {
                                 let opp_b = opposite_vertex(b);
 
                                 let proj_opp_a =
@@ -759,6 +759,7 @@ impl<'a> CactusTree<'a> {
 
                                 if b_ns.contains(&proj_opp_a.id)
                                     && b_ns.contains(&proj_opp_b.id)
+                                    && proj_opp_a != proj_opp_b
                                 {
                                     chain_pairs.insert(ChainPair { x, y });
                                 }
