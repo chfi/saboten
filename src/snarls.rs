@@ -2,11 +2,11 @@ use log::{debug, trace};
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Biedged {}
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Cactus {}
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Bridge {}
 
 pub trait GraphType {}
@@ -17,26 +17,21 @@ impl GraphType for Bridge {}
 
 /// A node index for a biedged graph of the specified type
 #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Node<G> {
-    _graph: std::marker::PhantomData<G>,
+pub struct Node {
     pub id: u64,
 }
 
-impl<G> Node<G> {
+impl From<u64> for Node {
+    #[inline]
+    fn from(id: u64) -> Self {
+        Self { id }
+    }
+}
+
+impl Node {
     #[inline]
     pub fn new(id: u64) -> Self {
-        Node {
-            _graph: std::marker::PhantomData,
-            id,
-        }
-    }
-
-    #[inline]
-    pub fn map_graph_type<H>(&self) -> Node<H> {
-        Node {
-            _graph: std::marker::PhantomData,
-            id: self.id,
-        }
+        Node { id }
     }
 
     #[inline]
@@ -71,27 +66,18 @@ impl<G> Node<G> {
 
     /// Return the left-hand side of the node
     pub fn left(&self) -> Self {
-        Self {
-            id: self.id & !1,
-            ..*self
-        }
+        Self { id: self.id & !1 }
     }
 
     /// Return the right-hand side of the node
     pub fn right(&self) -> Self {
-        Self {
-            id: self.id | 1,
-            ..*self
-        }
+        Self { id: self.id | 1 }
     }
 
     /// Return the opposite node
     #[inline]
     pub fn opposite(&self) -> Self {
-        Self {
-            id: self.id ^ 1,
-            ..*self
-        }
+        Self { id: self.id ^ 1 }
     }
 
     #[inline]
@@ -113,8 +99,8 @@ pub enum SnarlType {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Snarl<T: Copy + Eq + Ord + std::hash::Hash> {
-    left: Node<Biedged>,
-    right: Node<Biedged>,
+    left: Node,
+    right: Node,
     ty: SnarlType,
     data: T,
 }
@@ -123,7 +109,7 @@ impl<T> Snarl<T>
 where
     T: Default + Copy + Eq + Ord + std::hash::Hash,
 {
-    pub fn chain_pair(x: Node<Biedged>, y: Node<Biedged>) -> Self {
+    pub fn chain_pair(x: Node, y: Node) -> Self {
         let left = x.min(y);
         let right = x.max(y);
 
@@ -135,7 +121,7 @@ where
         }
     }
 
-    pub fn bridge_pair(x: Node<Biedged>, y: Node<Biedged>) -> Self {
+    pub fn bridge_pair(x: Node, y: Node) -> Self {
         let left = x.min(y);
         let right = x.max(y);
 
@@ -152,11 +138,11 @@ impl<T> Snarl<T>
 where
     T: Copy + Eq + Ord + std::hash::Hash,
 {
-    pub fn left(&self) -> Node<Biedged> {
+    pub fn left(&self) -> Node {
         self.left
     }
 
-    pub fn right(&self) -> Node<Biedged> {
+    pub fn right(&self) -> Node {
         self.left
     }
 
@@ -168,11 +154,7 @@ where
         self.data
     }
 
-    pub fn chain_pair_with(
-        x: Node<Biedged>,
-        y: Node<Biedged>,
-        data: T,
-    ) -> Self {
+    pub fn chain_pair_with(x: Node, y: Node, data: T) -> Self {
         let left = x.min(y);
         let right = x.max(y);
 
@@ -184,11 +166,7 @@ where
         }
     }
 
-    pub fn bridge_pair_with(
-        x: Node<Biedged>,
-        y: Node<Biedged>,
-        data: T,
-    ) -> Self {
+    pub fn bridge_pair_with(x: Node, y: Node, data: T) -> Self {
         let left = x.min(y);
         let right = x.max(y);
 
@@ -217,15 +195,15 @@ where
 #[derive(Default, Clone)]
 pub struct SnarlMap {
     // Snarls indexed by left boundary
-    lefts: FxHashMap<Node<Biedged>, Vec<usize>>,
+    lefts: FxHashMap<Node, Vec<usize>>,
     // Snarls indexed by right boundary
-    rights: FxHashMap<Node<Biedged>, Vec<usize>>,
+    rights: FxHashMap<Node, Vec<usize>>,
 
     // Snarls by rank
     snarls: FxHashMap<usize, Snarl<()>>,
 
     // Map of contained/not contained black edges for each snarl by rank
-    snarl_contains: FxHashMap<usize, FxHashMap<Node<Biedged>, bool>>,
+    snarl_contains: FxHashMap<usize, FxHashMap<Node, bool>>,
 }
 
 pub struct SnarlMapIter<'a> {
@@ -236,7 +214,7 @@ pub struct SnarlMapIter<'a> {
 }
 
 impl<'a> SnarlMapIter<'a> {
-    fn new(snarl_map: &'a SnarlMap, x: Node<Biedged>) -> Self {
+    fn new(snarl_map: &'a SnarlMap, x: Node) -> Self {
         let lefts = snarl_map.lefts.get(&x).map(|lefts| lefts.iter());
         let rights = snarl_map.rights.get(&x).map(|rights| rights.iter());
 
@@ -293,15 +271,11 @@ impl SnarlMap {
         self.rights.entry(snarl.right()).or_default().push(ix);
     }
 
-    pub fn with_boundary(&self, x: Node<Biedged>) -> SnarlMapIter<'_> {
+    pub fn with_boundary(&self, x: Node) -> SnarlMapIter<'_> {
         SnarlMapIter::new(self, x)
     }
 
-    pub fn get_snarl_ix(
-        &self,
-        x: Node<Biedged>,
-        y: Node<Biedged>,
-    ) -> Option<usize> {
+    pub fn get_snarl_ix(&self, x: Node, y: Node) -> Option<usize> {
         let left = x.min(y);
         let right = x.max(y);
 
@@ -315,7 +289,7 @@ impl SnarlMap {
         Some(**snarl_ix)
     }
 
-    pub fn get(&self, x: Node<Biedged>, y: Node<Biedged>) -> Option<Snarl<()>> {
+    pub fn get(&self, x: Node, y: Node) -> Option<Snarl<()>> {
         let left = x.min(y);
         let right = x.max(y);
 
@@ -333,9 +307,9 @@ impl SnarlMap {
 
     pub fn mark_snarl(
         &mut self,
-        x: Node<Biedged>,
-        y: Node<Biedged>,
-        bridge: Node<Biedged>,
+        x: Node,
+        y: Node,
+        bridge: Node,
         contains: bool,
     ) -> Option<()> {
         let snarl_ix = self.get_snarl_ix(x, y)?;
@@ -351,9 +325,9 @@ impl SnarlMap {
 
     pub fn snarl_contains(
         &self,
-        x: Node<Biedged>,
-        y: Node<Biedged>,
-    ) -> Option<&FxHashMap<Node<Biedged>, bool>> {
+        x: Node,
+        y: Node,
+    ) -> Option<&FxHashMap<Node, bool>> {
         let snarl_ix = self.get_snarl_ix(x, y)?;
 
         self.snarl_contains.get(&snarl_ix)

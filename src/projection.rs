@@ -1,5 +1,7 @@
 use crate::biedgedgraph::BiedgedGraph;
 
+use crate::snarls::Node;
+
 use petgraph::unionfind::UnionFind;
 
 use rustc_hash::FxHashMap;
@@ -35,7 +37,7 @@ impl Projection {
     /// one.
     #[inline]
     pub fn new_for_biedged_graph<G>(graph: &BiedgedGraph<G>) -> Self {
-        let size = (graph.max_net_vertex + 1) as usize;
+        let size = (graph.max_net_vertex.id + 1) as usize;
         let union_find = UnionFind::new(size);
         let inverse = None;
         Self {
@@ -46,39 +48,39 @@ impl Projection {
     }
 
     #[inline]
-    pub fn find(&self, x: u64) -> u64 {
-        let x = x as usize;
-        self.union_find.find(x) as u64
+    pub fn find(&self, x: Node) -> Node {
+        let x = x.id as usize;
+        Node::from(self.union_find.find(x) as u64)
     }
 
     #[inline]
-    pub fn find_mut(&mut self, x: u64) -> u64 {
-        let x = x as usize;
-        self.union_find.find_mut(x) as u64
+    pub fn find_mut(&mut self, x: Node) -> Node {
+        let x = x.id as usize;
+        Node::from(self.union_find.find_mut(x) as u64)
     }
 
     #[inline]
-    pub fn find_edge(&self, x: u64, y: u64) -> (u64, u64) {
-        let x = self.union_find.find(x as usize);
-        let y = self.union_find.find(y as usize);
-        (x as u64, y as u64)
+    pub fn find_edge(&self, x: Node, y: Node) -> (Node, Node) {
+        let x = self.union_find.find(x.id as usize);
+        let y = self.union_find.find(y.id as usize);
+        (Node::from(x as u64), Node::from(y as u64))
     }
 
     #[inline]
-    pub fn find_edge_mut(&mut self, x: u64, y: u64) -> (u64, u64) {
-        let x = self.union_find.find_mut(x as usize);
-        let y = self.union_find.find_mut(y as usize);
-        (x as u64, y as u64)
+    pub fn find_edge_mut(&mut self, x: Node, y: Node) -> (Node, Node) {
+        let x = self.union_find.find_mut(x.id as usize);
+        let y = self.union_find.find_mut(y.id as usize);
+        (Node::from(x as u64), Node::from(y as u64))
     }
 
     #[inline]
-    pub fn union(&mut self, x: u64, y: u64) -> bool {
-        self.union_find.union(x as usize, y as usize)
+    pub fn union(&mut self, x: Node, y: Node) -> bool {
+        self.union_find.union(x.id as usize, y.id as usize)
     }
 
     #[inline]
-    pub fn equiv(&self, x: u64, y: u64) -> bool {
-        self.union_find.equiv(x as usize, y as usize)
+    pub fn equiv(&self, x: Node, y: Node) -> bool {
+        self.union_find.equiv(x.id as usize, y.id as usize)
     }
 
     /// Given a pair of vertices, return a corresponding pair with one
@@ -86,12 +88,12 @@ impl Projection {
     /// guaranteed to be the representative of the union, so it's safe
     /// to use as an ID in the graph.
     #[inline]
-    pub fn kept_pair(&mut self, x: u64, y: u64) -> (u64, u64) {
-        let union = self.union_find.find_mut(x as usize) as u64;
-        if union == x {
-            (union, y)
+    pub fn kept_pair(&mut self, x: Node, y: Node) -> (Node, Node) {
+        let union = self.union_find.find_mut(x.id as usize) as u64;
+        if union == x.id {
+            (union.into(), y.into())
         } else {
-            (union, x)
+            (union.into(), x.into())
         }
     }
 

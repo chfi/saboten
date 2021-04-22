@@ -1,13 +1,14 @@
 use rustc_hash::FxHashSet;
 
 use crate::biedgedgraph::BiedgedGraph;
+use crate::snarls::{Biedged, Node};
 
 #[derive(Clone)]
 pub struct NetGraph {
     pub graph: BiedgedGraph<Biedged>,
-    pub x: u64,
-    pub y: u64,
-    pub path: Vec<u64>,
+    pub x: Node,
+    pub y: Node,
+    pub path: Vec<Node>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -29,9 +30,9 @@ impl NetGraph {
     pub fn is_acyclic(&self) -> bool {
         let graph = &self.graph.graph;
 
-        let mut visited: FxHashSet<u64> = FxHashSet::default();
-        let mut in_path: FxHashSet<u64> = FxHashSet::default();
-        let mut stack: Vec<(Color, u64)> = Vec::new();
+        let mut visited: FxHashSet<Node> = FxHashSet::default();
+        let mut in_path: FxHashSet<Node> = FxHashSet::default();
+        let mut stack: Vec<(Color, Node)> = Vec::new();
 
         let mut acyclic = true;
 

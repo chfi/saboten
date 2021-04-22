@@ -95,14 +95,29 @@ impl SubAssign for BiedgedWeight {
 /// vertices in the cactus graph, all chain vertices have an index
 /// higher than the original vertices. This also makes it easier to
 /// track the projections.
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct BiedgedGraph<G> {
-    pub graph: UnGraphMap<Node<G>, BiedgedWeight>,
-    pub max_net_vertex: Node<G>,
-    pub max_chain_vertex: Node<G>,
+    pub graph: UnGraphMap<Node, BiedgedWeight>,
+    pub max_net_vertex: Node,
+    pub max_chain_vertex: Node,
+    pub _graph: std::marker::PhantomData<G>,
 }
 
-impl<G> BiedgedGraph<G> {
+impl<G> std::default::Default for BiedgedGraph<G> {
+    fn default() -> Self {
+        Self {
+            graph: Default::default(),
+            max_net_vertex: Default::default(),
+            max_chain_vertex: Default::default(),
+            _graph: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<G> BiedgedGraph<G>
+where
+    G: Copy,
+{
     pub fn shrink_to_fit(&mut self) {
         let (node_count, node_cap) = self.node_count_capacity();
         let (edge_count, edge_cap) = self.edge_count_capacity();
@@ -122,7 +137,7 @@ impl<G> BiedgedGraph<G> {
             edge_cap
         );
 
-        let mut new_graph: UnGraphMap<Node<G>, BiedgedWeight> =
+        let mut new_graph: UnGraphMap<Node, BiedgedWeight> =
             UnGraphMap::with_capacity(node_count, edge_count);
 
         for (a, b, &w) in self.graph.all_edges() {
@@ -147,6 +162,15 @@ impl<G> BiedgedGraph<G> {
         std::mem::swap(&mut self.graph, &mut new_graph);
     }
 
+    pub fn set_graph_type<H>(mut self) -> BiedgedGraph<H> {
+        BiedgedGraph {
+            graph: std::mem::take(&mut self.graph),
+            max_net_vertex: self.max_net_vertex,
+            max_chain_vertex: self.max_chain_vertex,
+            _graph: std::marker::PhantomData::<H>,
+        }
+    }
+
     pub fn shrink_into(self) -> Self {
         let (node_count, node_cap) = self.node_count_capacity();
         let (edge_count, edge_cap) = self.edge_count_capacity();
@@ -164,7 +188,7 @@ impl<G> BiedgedGraph<G> {
             edge_count, edge_cap
         );
 
-        let mut new_graph: UnGraphMap<Node<G>, BiedgedWeight> =
+        let mut new_graph: UnGraphMap<Node, BiedgedWeight> =
             UnGraphMap::with_capacity(node_count, edge_count);
 
         for (a, b, &w) in self.graph.all_edges() {
@@ -207,7 +231,7 @@ impl<G> BiedgedGraph<G> {
             edge_count, edge_cap
         );
 
-        let mut new_graph: UnGraphMap<Node<G>, BiedgedWeight> =
+        let mut new_graph: UnGraphMap<Node, BiedgedWeight> =
             UnGraphMap::with_capacity(node_count, edge_count);
 
         for (a, b, &w) in self.graph.all_edges() {
@@ -233,36 +257,30 @@ impl<G> BiedgedGraph<G> {
         }
     }
 
-    /// Create an empty biedged graph
-    #[inline]
-    pub fn new() -> Self {
-        Default::default()
-    }
-
     /// Adds a chain vertex, ensuring that it has an index higher than
     /// any net vertex. Returns the new vertex identifier.
     #[inline]
-    pub fn add_chain_vertex(&mut self) -> Node<G> {
-        self.max_chain_vertex.id_mut() += 1;
+    pub fn add_chain_vertex(&mut self) -> Node {
+        *self.max_chain_vertex.id_mut() += 1;
         let id = self.max_chain_vertex;
         self.graph.add_node(id);
         id
     }
 
     #[inline]
-    pub fn is_chain_vertex(&self, n: u64) -> bool {
+    pub fn is_chain_vertex(&self, n: Node) -> bool {
         n > self.max_net_vertex
     }
 
     #[inline]
-    pub fn is_net_vertex(&self, n: u64) -> bool {
+    pub fn is_net_vertex(&self, n: Node) -> bool {
         n <= self.max_net_vertex
     }
 
     /// Convenience method for getting the projection of a node,
     /// taking the possibility of chain vertices into account
     #[inline]
-    pub fn projected_node(&self, projection: &Projection, n: u64) -> u64 {
+    pub fn projected_node(&self, projection: &Projection, n: Node) -> Node {
         if n <= self.max_net_vertex {
             projection.find(n)
         } else {
@@ -292,21 +310,21 @@ impl<G> BiedgedGraph<G> {
         let mut min_node_id = std::u64::MAX;
         let mut max_node_id = std::u64::MIN;
 
-        let mut graph: UnGraphMap<u64, BiedgedWeight> = UnGraphMap::new();
+        let mut graph: UnGraphMap<Node, BiedgedWeight> = UnGraphMap::new();
 
         for (a, a_o, b, b_o) in i {
-            let (a_l, a_r) = Node::<Biedged>::from_gfa_id(a);
-            let (b_l, b_r) = Node::<Biedged>::from_gfa_id(b);
+            let (a_l, a_r) = Node::from_gfa_id(a);
+            let (b_l, b_r) = Node::from_gfa_id(b);
 
             min_node_id = min_node_id.min(a.min(b));
             max_node_id = max_node_id.max(a.max(b));
 
-            if !graph.contains_edge(a_l.id, a_r.id) {
-                graph.add_edge(a_l.id, a_r.id, BiedgedWeight::black(1));
+            if !graph.contains_edge(a_l, a_r) {
+                graph.add_edge(a_l, a_r, BiedgedWeight::black(1));
             }
 
-            if !graph.contains_edge(b_l.id, b_r.id) {
-                graph.add_edge(b_l.id, b_r.id, BiedgedWeight::black(1));
+            if !graph.contains_edge(b_l, b_r) {
+                graph.add_edge(b_l, b_r, BiedgedWeight::black(1));
             }
 
             let (left, right) = match (a_o, b_o) {
@@ -316,10 +334,10 @@ impl<G> BiedgedGraph<G> {
                 (Backward, Forward) => (a_l, b_l),
             };
 
-            if let Some(w) = graph.edge_weight_mut(left.id, right.id) {
+            if let Some(w) = graph.edge_weight_mut(left, right) {
                 *w += BiedgedWeight::gray(1);
             } else {
-                graph.add_edge(left.id, right.id, BiedgedWeight::gray(1));
+                graph.add_edge(left, right, BiedgedWeight::gray(1));
             }
         }
 
@@ -331,8 +349,9 @@ impl<G> BiedgedGraph<G> {
 
         Some(BiedgedGraph {
             graph,
-            max_net_vertex,
-            max_chain_vertex,
+            max_net_vertex: Node::from(max_net_vertex),
+            max_chain_vertex: Node::from(max_chain_vertex),
+            _graph: std::marker::PhantomData,
         })
     }
 
@@ -347,7 +366,7 @@ impl<G> BiedgedGraph<G> {
         let segs_len = gfa.segments.len();
         let links_len = gfa.links.len();
 
-        let mut be_graph: UnGraphMap<u64, BiedgedWeight> =
+        let mut be_graph: UnGraphMap<Node, BiedgedWeight> =
             UnGraphMap::with_capacity(segs_len * 2, segs_len + links_len);
 
         let mut max_seg_id = 0;
@@ -355,16 +374,15 @@ impl<G> BiedgedGraph<G> {
         let mut max_node_id = 0;
 
         for segment in gfa.segments.iter() {
-            let (left, right) =
-                Node::<Biedged>::from_gfa_id(segment.name as u64);
+            let (left, right) = Node::from_gfa_id(segment.name as u64);
 
             max_node_id = max_node_id.max(segment.name);
             max_seg_id = segment.name.max(max_seg_id);
             min_seg_id = segment.name.min(min_seg_id);
 
-            be_graph.add_node(left.id);
-            be_graph.add_node(right.id);
-            be_graph.add_edge(left.id, right.id, BiedgedWeight::black(1));
+            be_graph.add_node(left);
+            be_graph.add_node(right);
+            be_graph.add_edge(left, right, BiedgedWeight::black(1));
         }
 
         use Orientation::*;
@@ -373,8 +391,8 @@ impl<G> BiedgedGraph<G> {
             let from_o = link.from_orient;
             let to_o = link.to_orient;
 
-            let from = Node::<Biedged>::from_gfa_id(link.from_segment as u64);
-            let to = Node::<Biedged>::from_gfa_id(link.to_segment as u64);
+            let from = Node::from_gfa_id(link.from_segment as u64);
+            let to = Node::from_gfa_id(link.to_segment as u64);
 
             let (left, right) = match (from_o, to_o) {
                 (Forward, Forward) => (from.1, to.0),
@@ -383,10 +401,10 @@ impl<G> BiedgedGraph<G> {
                 (Backward, Forward) => (from.0, to.0),
             };
 
-            if let Some(w) = be_graph.edge_weight_mut(left.id, right.id) {
+            if let Some(w) = be_graph.edge_weight_mut(left, right) {
                 *w += BiedgedWeight::gray(1);
             } else {
-                be_graph.add_edge(left.id, right.id, BiedgedWeight::gray(1));
+                be_graph.add_edge(left, right, BiedgedWeight::gray(1));
             }
         }
 
@@ -400,21 +418,22 @@ impl<G> BiedgedGraph<G> {
 
         BiedgedGraph {
             graph: be_graph,
-            max_net_vertex,
-            max_chain_vertex,
+            max_net_vertex: max_net_vertex.into(),
+            max_chain_vertex: max_chain_vertex.into(),
+            _graph: std::marker::PhantomData,
         }
     }
 
     /// Add the node with the given id to the graph
     #[inline]
-    pub fn add_node(&mut self, id: u64) -> u64 {
-        self.graph.add_node(id)
+    pub fn add_node(&mut self, id: u64) -> Node {
+        self.graph.add_node(Node::from(id))
     }
 
     /// Add an edge with the provided edge weight. If a corresponding
     /// edge already exists in the graph, the edge weights are added.
     #[inline]
-    pub fn add_edge(&mut self, from: u64, to: u64, weight: BiedgedWeight) {
+    pub fn add_edge(&mut self, from: Node, to: Node, weight: BiedgedWeight) {
         if let Some(old) = self.graph.edge_weight_mut(from, to) {
             *old += weight;
         } else {
@@ -429,14 +448,14 @@ impl<G> BiedgedGraph<G> {
     #[inline]
     pub fn gray_edges(
         &self,
-    ) -> impl Iterator<Item = (u64, u64, &BiedgedWeight)> {
+    ) -> impl Iterator<Item = (Node, Node, &BiedgedWeight)> {
         self.graph.all_edges().filter(|(_, _, w)| w.gray > 0)
     }
 
     /// Convenience method for looping through all gray edges while
     /// mutating the graph
     #[inline]
-    pub fn next_gray_edge(&self) -> Option<(u64, u64)> {
+    pub fn next_gray_edge(&self) -> Option<(Node, Node)> {
         self.graph
             .all_edges()
             .find(|(_, _, w)| w.gray > 0)
@@ -450,7 +469,7 @@ impl<G> BiedgedGraph<G> {
     #[inline]
     pub fn black_edges(
         &self,
-    ) -> impl Iterator<Item = (u64, u64, &BiedgedWeight)> {
+    ) -> impl Iterator<Item = (Node, Node, &BiedgedWeight)> {
         self.graph.all_edges().filter(|(_, _, w)| w.black > 0)
     }
 
@@ -473,7 +492,7 @@ impl<G> BiedgedGraph<G> {
     /// corresponding edge weight is decremented, but they will still
     /// have an edge in the graph.
     #[inline]
-    pub fn remove_one_black_edge(&mut self, a: u64, b: u64) -> Option<usize> {
+    pub fn remove_one_black_edge(&mut self, a: Node, b: Node) -> Option<usize> {
         use std::cmp::Ordering;
 
         let weight = self.graph.edge_weight_mut(a, b)?;
@@ -500,10 +519,10 @@ impl<G> BiedgedGraph<G> {
     #[inline]
     pub fn merge_vertices(
         &mut self,
-        from: u64,
-        to: u64,
+        from: Node,
+        to: Node,
         projection: &mut Projection,
-    ) -> Option<u64> {
+    ) -> Option<Node> {
         projection.union(from, to);
         let (from, to) = projection.kept_pair(from, to);
         if !self.graph.contains_node(from) || !self.graph.contains_node(to) {
@@ -511,7 +530,7 @@ impl<G> BiedgedGraph<G> {
         }
 
         // Retrieve the edges of the node we're removing
-        let to_edges: Vec<(u64, u64, BiedgedWeight)> = self
+        let to_edges: Vec<(Node, Node, BiedgedWeight)> = self
             .graph
             .edges(to)
             .filter(|(_, node, _)| node != &from && node != &to)
@@ -532,10 +551,10 @@ impl<G> BiedgedGraph<G> {
     #[inline]
     pub fn contract_edge(
         &mut self,
-        left: u64,
-        right: u64,
+        left: Node,
+        right: Node,
         projection: &mut Projection,
-    ) -> Option<u64> {
+    ) -> Option<Node> {
         projection.union(left, right);
         let (from, to) = projection.kept_pair(left, right);
 
@@ -543,7 +562,7 @@ impl<G> BiedgedGraph<G> {
         let other_self_weight = self.graph.edge_weight(to, to).copied();
 
         // Retrieve the edges of the node we're removing
-        let to_edges: Vec<(u64, u64, BiedgedWeight)> = self
+        let to_edges: Vec<(Node, Node, BiedgedWeight)> = self
             .graph
             .edges(to)
             .filter(|(_, node, _)| node != &from && node != &to)
