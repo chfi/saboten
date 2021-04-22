@@ -685,10 +685,46 @@ impl<'a> CactusTree<'a> {
             _p_bar = ();
         }
 
+        /*
+        for n in self.base_graph().nodes() {
+            if self.graph.is_net_vertex(n) {
+                let b_ns = cactus_graph_inverse.get(&n.id).unwrap();
+                for &a in b_ns.iter() {
+                    for &b in b_ns.iter() {
+                        if a != b && opposite_vertex(a) != b {
+                            let c_a =
+                                self.cactus_graph.black_edge_cycle(a.into());
+                            let c_b =
+                                self.cactus_graph.black_edge_cycle(b.into());
+                            if c_a.is_some() && c_a == c_b {
+                                let a_ = a.min(b);
+                                let b_ = a.max(b);
+                                chain_pairs.insert(ChainPair { x: a_, y: b_ });
+                            }
+                        }
+                    }
+                }
+            }
+
+            #[cfg(feature = "progress_bars")]
+            {
+                _p_bar.inc(1);
+            }
+        }
+        */
+
+        let mut neighbors = Vec::new();
+
+        let chain_vertices = self
+            .base_graph()
+            .nodes()
+            .filter(|cx| self.graph.is_chain_vertex(*cx))
+            .collect::<Vec<_>>();
+
         #[cfg(feature = "progress_bars")]
         {
             use indicatif::{ProgressBar, ProgressStyle};
-            _p_bar = ProgressBar::new(self.base_graph().node_count() as u64);
+            _p_bar = ProgressBar::new(chain_vertices.len() as u64);
             _p_bar.set_style(
                 ProgressStyle::default_bar()
                     .template("[{elapsed_precise}] {bar:40} {pos:>10}/{len:10}")
@@ -697,9 +733,8 @@ impl<'a> CactusTree<'a> {
             _p_bar.enable_steady_tick(1000);
         }
 
-        let mut neighbors = Vec::new();
-
-        for cx in self.base_graph().nodes() {
+        for cx in chain_vertices {
+            // for cx in self.base_graph().nodes() {
             if self.graph.is_chain_vertex(cx) {
                 neighbors.clear();
                 neighbors.extend(self.base_graph().neighbors(cx));
@@ -708,12 +743,13 @@ impl<'a> CactusTree<'a> {
                     let b_ns = cactus_graph_inverse.get(&nx.id).unwrap();
 
                     for &a in b_ns.iter() {
+                        let opp_a = opposite_vertex(a);
+
                         for &b in b_ns.iter() {
-                            if a != b {
+                            if a != b && b != opp_a {
                                 let x: u64 = a.min(b);
                                 let y: u64 = a.max(b);
 
-                                let opp_a = opposite_vertex(a);
                                 let opp_b = opposite_vertex(b);
 
                                 let proj_opp_a =
