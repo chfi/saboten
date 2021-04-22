@@ -206,6 +206,57 @@ pub struct SnarlMap {
     pub snarl_contains: FxHashMap<usize, FxHashMap<Node, bool>>,
 }
 
+pub struct SnarlTree {
+    map: SnarlMap,
+
+    tree: FxHashMap<usize, FxHashSet<usize>>,
+}
+
+impl SnarlTree {
+    pub fn from_snarl_map(snarl_map: SnarlMap) -> Self {
+        let mut contains_by_size: Vec<(usize, FxHashSet<Node>)> = snarl_map
+            .snarl_contains
+            .iter()
+            .map(|(&k, v)| {
+                let bridges = v
+                    .iter()
+                    .filter_map(
+                        |(&b, &contains)| {
+                            if contains {
+                                Some(b)
+                            } else {
+                                None
+                            }
+                        },
+                    )
+                    .collect::<FxHashSet<_>>();
+
+                (k, bridges)
+            })
+            .collect();
+
+        contains_by_size.sort_by_key(|(_, bridges)| bridges.len());
+
+        let mut bridge_snarls: FxHashMap<Node, FxHashSet<usize>> =
+            Default::default();
+
+        for (&snarl_ix, contained) in snarl_map.snarl_contains.iter() {
+            for (&bridge, &contains) in contained.iter() {
+                if contains {
+                    bridge_snarls.entry(bridge).or_default().insert(snarl_ix);
+                }
+            }
+        }
+
+        let mut tree: FxHashMap<usize, FxHashSet<usize>> = Default::default();
+
+        Self {
+            map: snarl_map,
+            tree,
+        }
+    }
+}
+
 pub struct SnarlMapIter<'a> {
     lefts: Option<std::slice::Iter<'a, usize>>,
     rights: Option<std::slice::Iter<'a, usize>>,
