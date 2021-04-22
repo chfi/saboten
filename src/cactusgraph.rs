@@ -1380,6 +1380,8 @@ impl<'a> BridgeForest<'a> {
         let mut snarls: Vec<Snarl<()>> = Vec::new();
 
         for left in black_bridge_edges {
+            visited.clear();
+
             snarls.clear();
 
             let right = left.right();
@@ -1402,30 +1404,20 @@ impl<'a> BridgeForest<'a> {
                 snarls.extend(snarl_map.with_boundary(node));
 
                 for &snarl in snarls.iter() {
-                    if snarl.left() == node {
-                        if !visited.contains(&node.right())
-                            || !visited.contains(&snarl.left().opposite())
-                            || !visited.contains(&snarl.right().opposite())
-                        {
-                            snarl_map.mark_snarl(
-                                snarl.left(),
-                                snarl.right(),
-                                node.left(),
-                                true,
-                            );
-                        }
-                    } else if snarl.right() == node {
-                        if !visited.contains(&node.left())
-                            || !visited.contains(&snarl.left().opposite())
-                            || !visited.contains(&snarl.right().opposite())
-                        {
-                            snarl_map.mark_snarl(
-                                snarl.left(),
-                                snarl.right(),
-                                node.left(),
-                                true,
-                            );
-                        }
+                    let (x, y) = if snarl.left() == node {
+                        (snarl.left(), snarl.right())
+                    } else {
+                        (snarl.right(), snarl.left())
+                    };
+
+                    let x_opp = x.opposite();
+                    let y_opp = y.opposite();
+
+                    if !visited.contains(&y)
+                        || !visited.contains(&x_opp)
+                        || !visited.contains(&y_opp)
+                    {
+                        snarl_map.mark_snarl(x, y, node.left(), true);
                     }
                 }
 
@@ -1436,30 +1428,19 @@ impl<'a> BridgeForest<'a> {
                 snarls.extend(snarl_map.with_boundary(node_opp));
 
                 for &snarl in snarls.iter() {
-                    if snarl.left() == node_opp {
-                        if !visited.contains(&node_opp.right())
-                            || !visited.contains(&snarl.left().opposite())
-                            || !visited.contains(&snarl.right().opposite())
-                        {
-                            snarl_map.mark_snarl(
-                                snarl.left(),
-                                snarl.right(),
-                                node.left(),
-                                false,
-                            );
-                        }
-                    } else if snarl.right() == node_opp {
-                        if !visited.contains(&node_opp.left())
-                            || !visited.contains(&snarl.left().opposite())
-                            || !visited.contains(&snarl.right().opposite())
-                        {
-                            snarl_map.mark_snarl(
-                                snarl.left(),
-                                snarl.right(),
-                                node.left(),
-                                false,
-                            );
-                        }
+                    let (x, y) = if snarl.left() == node_opp {
+                        (snarl.left(), snarl.right())
+                    } else {
+                        (snarl.right(), snarl.left())
+                    };
+
+                    let y_opp = y.opposite();
+
+                    if !visited.contains(&y_opp)
+                        || !visited.contains(&x)
+                        || !visited.contains(&y)
+                    {
+                        snarl_map.mark_snarl(x, y, node.left(), false);
                     }
                 }
 
