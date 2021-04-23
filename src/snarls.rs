@@ -213,6 +213,22 @@ pub struct SnarlTree {
 }
 
 impl SnarlTree {
+    pub fn contained(
+        &self,
+        snarl_ix: usize,
+    ) -> Option<FxHashSet<(usize, Snarl<()>)>> {
+        let child_ixs = self.tree.get(&snarl_ix)?;
+        let children = child_ixs
+            .iter()
+            .filter_map(|ix| {
+                let snarl = self.map.snarls.get(ix)?;
+                Some((*ix, *snarl))
+            })
+            .collect::<FxHashSet<(usize, Snarl<()>)>>();
+
+        Some(children)
+    }
+
     pub fn from_snarl_map(snarl_map: SnarlMap) -> Self {
         let mut contains_by_size: Vec<(usize, FxHashSet<Node>)> = snarl_map
             .snarl_contains
@@ -249,6 +265,17 @@ impl SnarlTree {
         }
 
         let mut tree: FxHashMap<usize, FxHashSet<usize>> = Default::default();
+
+        for (snarl_ix, bridges) in contains_by_size.iter() {
+            let snarls = bridges
+                .iter()
+                .filter_map(|bridge| bridge_snarls.get(bridge).cloned())
+                .flatten()
+                .filter(|&s_ix| s_ix != *snarl_ix)
+                .collect::<FxHashSet<_>>();
+
+            tree.insert(*snarl_ix, snarls);
+        }
 
         Self {
             map: snarl_map,
