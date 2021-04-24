@@ -231,8 +231,16 @@ impl SnarlTree {
             let children = contained_ixs
                 .iter()
                 .filter_map(|ix| {
+                    if ix == snarl_ix {
+                        return None;
+                    }
+
                     let snarl = self.map.snarls.get(ix)?;
-                    Some(snarl.clone())
+                    if snarl.is_chain_pair() {
+                        Some(snarl.clone())
+                    } else {
+                        None
+                    }
                 })
                 .collect::<FxHashSet<Snarl<()>>>();
 
@@ -379,6 +387,31 @@ impl<'a> Iterator for SnarlMapIter<'a> {
 }
 
 impl SnarlMap {
+    pub fn filter_snarls(&mut self) {
+        let mut to_delete: Vec<usize> = Vec::new();
+        let mut to_keep: FxHashSet<usize> = Default::default();
+
+        for (snarl_ix, bridges) in self.snarl_contains.iter() {
+            if bridges.iter().any(|(_, &b)| b) {
+                to_delete.push(*snarl_ix);
+            } else {
+                to_keep.insert(*snarl_ix);
+            }
+        }
+
+        for (_node, ixs) in self.lefts.iter_mut() {
+            ixs.retain(|ix| to_keep.contains(ix));
+        }
+
+        for (_node, ixs) in self.rights.iter_mut() {
+            ixs.retain(|ix| to_keep.contains(ix));
+        }
+
+        for snarl_ix in to_delete {
+            self.snarls.remove(&snarl_ix);
+        }
+    }
+
     pub fn insert(&mut self, snarl: Snarl<()>) {
         if self.get_snarl_ix(snarl.left, snarl.right).is_some() {
             return;
