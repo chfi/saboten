@@ -107,6 +107,19 @@ pub struct Snarl<T: Copy + Eq + Ord + std::hash::Hash> {
 
 impl<T> Snarl<T>
 where
+    T: Copy + Eq + Ord + std::hash::Hash,
+{
+    pub fn is_chain_pair(&self) -> bool {
+        self.ty == SnarlType::ChainPair
+    }
+
+    pub fn is_bridge_pair(&self) -> bool {
+        self.ty == SnarlType::BridgePair
+    }
+}
+
+impl<T> Snarl<T>
+where
     T: Default + Copy + Eq + Ord + std::hash::Hash,
 {
     pub fn chain_pair(x: Node, y: Node) -> Self {
@@ -131,14 +144,6 @@ where
             ty: SnarlType::BridgePair,
             data: T::default(),
         }
-    }
-
-    pub fn is_chain_pair(&self) -> bool {
-        self.ty == SnarlType::ChainPair
-    }
-
-    pub fn is_bridge_pair(&self) -> bool {
-        self.ty == SnarlType::BridgePair
     }
 }
 

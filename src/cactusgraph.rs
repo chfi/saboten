@@ -1467,6 +1467,65 @@ impl<'a> BridgeForest<'a> {
     }
 }
 
+pub struct ChainEdges {
+    biedged_to_chain: FxHashMap<(Node, Node), (Node, Node)>,
+    chain_to_biedged: FxHashMap<(Node, Node), FxHashSet<(Node, Node)>>,
+}
+
+impl ChainEdges {
+    pub fn from_chain_pairs<'a>(
+        chain_pairs: &'a FxHashSet<ChainPair>,
+        cactus_tree: &'a CactusTree<'a>,
+    ) -> Self {
+        let mut biedged_to_chain = FxHashMap::default();
+        let mut chain_to_biedged: FxHashMap<_, FxHashSet<_>> =
+            FxHashMap::default();
+
+        biedged_to_chain.reserve(chain_pairs.len());
+        chain_to_biedged.reserve(chain_pairs.len());
+
+        for &snarl in chain_pairs.iter() {
+            let ChainPair { x, y } = snarl;
+            let net = cactus_tree.projected_node(x.into());
+            let chain = cactus_tree.black_edge_chain_vertex(x.into()).unwrap();
+
+            let biedged: (Node, Node) = (x.into(), y.into());
+            let chain: (Node, Node) = (net, chain);
+
+            biedged_to_chain.insert(biedged, chain);
+            chain_to_biedged.entry(chain).or_default().insert(biedged);
+        }
+
+        Self {
+            biedged_to_chain,
+            chain_to_biedged,
+        }
+    }
+
+    pub fn biedged_to_chain<T: Copy + Eq + Ord + std::hash::Hash>(
+        &self,
+        snarl: &Snarl<T>,
+    ) -> Option<(Node, Node)> {
+        if snarl.is_bridge_pair() {
+            return None;
+        }
+
+        let x = snarl.left();
+        let y = snarl.right();
+
+        let chain = self.biedged_to_chain.get(&(x, y))?;
+        Some(*chain)
+    }
+
+    pub fn chain_to_biedged(
+        &self,
+        net: Node,
+        chain: Node,
+    ) -> Option<&FxHashSet<(Node, Node)>> {
+        self.chain_to_biedged.get(&(net, chain))
+    }
+}
+
 /// Return the chain edges in the cactus tree as a map from pairs of
 /// net and chain vertices to chain pair snarls.
 pub fn chain_edges<'a>(
