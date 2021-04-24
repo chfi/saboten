@@ -16,7 +16,7 @@ impl GraphType for Cactus {}
 impl GraphType for Bridge {}
 
 /// A node index for a biedged graph of the specified type
-#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Node {
     pub id: u64,
 }
@@ -132,6 +132,14 @@ where
             data: T::default(),
         }
     }
+
+    pub fn is_chain_pair(&self) -> bool {
+        self.ty == SnarlType::ChainPair
+    }
+
+    pub fn is_bridge_pair(&self) -> bool {
+        self.ty == SnarlType::BridgePair
+    }
 }
 
 impl<T> Snarl<T>
@@ -207,12 +215,33 @@ pub struct SnarlMap {
 }
 
 pub struct SnarlTree {
-    map: SnarlMap,
+    pub map: SnarlMap,
 
-    tree: FxHashMap<usize, FxHashSet<usize>>,
+    pub tree: FxHashMap<usize, FxHashSet<usize>>,
 }
 
 impl SnarlTree {
+    pub fn build_tree(&self) -> FxHashMap<Snarl<()>, FxHashSet<Snarl<()>>> {
+        let mut res: FxHashMap<Snarl<()>, FxHashSet<Snarl<()>>> =
+            Default::default();
+
+        for (snarl_ix, contained_ixs) in self.tree.iter() {
+            let parent = self.map.snarls.get(snarl_ix).unwrap();
+
+            let children = contained_ixs
+                .iter()
+                .filter_map(|ix| {
+                    let snarl = self.map.snarls.get(ix)?;
+                    Some(snarl.clone())
+                })
+                .collect::<FxHashSet<Snarl<()>>>();
+
+            res.insert(*parent, children);
+        }
+
+        res
+    }
+
     pub fn contained(
         &self,
         snarl_ix: usize,
@@ -230,6 +259,7 @@ impl SnarlTree {
     }
 
     pub fn from_snarl_map(snarl_map: SnarlMap) -> Self {
+        // SnarlIx -> Set<Bridges> contained in snarl
         let mut contains_by_size: Vec<(usize, FxHashSet<Node>)> = snarl_map
             .snarl_contains
             .iter()
@@ -253,6 +283,12 @@ impl SnarlTree {
 
         contains_by_size.sort_by_key(|(_, bridges)| bridges.len());
 
+        let snarl_bridges: FxHashMap<usize, FxHashSet<Node>> = contains_by_size
+            .iter()
+            .cloned()
+            .collect::<FxHashMap<_, _>>();
+
+        // Bridge -> Set<SnarlIx> snarls that include this bridge
         let mut bridge_snarls: FxHashMap<Node, FxHashSet<usize>> =
             Default::default();
 
@@ -264,6 +300,7 @@ impl SnarlTree {
             }
         }
 
+        // SnarlIx -> Set<SnarlIx> contained snarls
         let mut tree: FxHashMap<usize, FxHashSet<usize>> = Default::default();
 
         for (snarl_ix, bridges) in contains_by_size.iter() {
@@ -272,9 +309,15 @@ impl SnarlTree {
                 .filter_map(|bridge| bridge_snarls.get(bridge).cloned())
                 .flatten()
                 .filter(|&s_ix| s_ix != *snarl_ix)
-                .collect::<FxHashSet<_>>();
+                .collect::<FxHashSet<usize>>();
 
-            tree.insert(*snarl_ix, snarls);
+            for snarl_candidate in snarls {
+                let cand_bridges = snarl_bridges.get(&snarl_candidate).unwrap();
+
+                if cand_bridges.is_subset(bridges) {
+                    tree.entry(*snarl_ix).or_default().insert(snarl_candidate);
+                }
+            }
         }
 
         Self {
