@@ -406,15 +406,24 @@ impl SnarlMap {
 
         for (_node, ixs) in self.lefts.iter_mut() {
             ixs.retain(|ix| to_keep.contains(ix));
+            ixs.shrink_to_fit();
         }
 
         for (_node, ixs) in self.rights.iter_mut() {
             ixs.retain(|ix| to_keep.contains(ix));
+            ixs.shrink_to_fit();
         }
+
+        self.lefts.shrink_to_fit();
+        self.rights.shrink_to_fit();
 
         for snarl_ix in to_delete {
             self.snarls.remove(&snarl_ix);
+            self.snarl_contains.remove(&snarl_ix);
         }
+
+        self.snarls.shrink_to_fit();
+        self.snarl_contains.shrink_to_fit();
     }
 
     pub fn insert(&mut self, snarl: Snarl<()>) {
