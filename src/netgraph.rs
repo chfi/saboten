@@ -27,27 +27,110 @@ impl Color {
 }
 
 impl NetGraph {
+
+    pub fn chain_pair_dfs(&self,
+                          cactus_tree: &crate::cactusgraph::CactusTree,
+                          chain_edges: &crate::cactusgraph::ChainEdges,
+    ) -> Vec<Node> {
+        let (net, chain) = chain_edges
+            .biedged_to_chain(&Snarl::<()>::chain_pair(self.x, self.y))
+            .unwrap();
+
+        let mut visited: FxHashSet<Node> = FxHashSet::default();
+        visited.insert(net);
+
+        let neighbors = cactus_tree.graph.graph.neighbors(net);
+
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        struct Step {
+            parent: Node,
+            step: Node,
+        }
+
+        let mut stack: Vec<Step> = Vec::new();
+
+        let mut log: Vec<Step> = Vec::new();
+
+        let mut reachable_chain_pairs: FxHashSet<Snarl<()>> =
+            FxHashSet::default();
+
+        for other in neighbors {
+            if other != chain && cactus_tree.graph.is_chain_vertex(other) {
+                stack.push(Step { parent: net, step: other });
+                // stack.push(Step::Chain { chain: other });
+            }
+        }
+
+        for step in stack.pop() {
+
+            log.push(step);
+
+            visited.insert(step.step);
+
+            /*
+            if let Some(chain) = prev_chain {
+                if let Some(chain_pairs) =
+                    chain_edges.chain_to_biedged(net, chain)
+                {
+                    reachable_chain_pairs.extend(
+                        chain_pairs
+                            .iter()
+                            .map(|&(x, y)| Snarl::chain_pair(x, y)),
+                    );
+                }
+            }
+            */
+
+            let on_net = cactus_tree.graph.is_net_vertex(step.step);
+            let neighbors = cactus_tree.graph.graph.neighbors(step.step);
+
+            for other in neighbors {
+                if !visited.contains(&other) {
+                    if on_net {
+                        if cactus_tree.graph.is_chain_vertex(other) {
+                            stack.push(Step::Chain { chain: other });
+                        }
+                    } else {
+                        if cactus_tree.graph.is_net_vertex(other) {
+                            stack.push(Step::Net {
+                                chain: cur_node,
+                                net: other,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        reachable_chain_pairs
+
+    }
+
+
+    /*
     pub fn contained_chain_pairs(
         &self,
         cactus_tree: &crate::cactusgraph::CactusTree,
         chain_edges: &crate::cactusgraph::ChainEdges,
     ) -> FxHashSet<Snarl<()>> {
+
+
+        #[derive(Clone, Copy)]
+        enum Step {
+            Net { chain: Node, net: Node },
+            Chain { chain: Node },
+        }
+
         if self.path.len() == 1 {
             // chain pair
             let (net, chain) = chain_edges
-                .biedged_to_chain(&Snarl::chain_pair(self.x, self.y))
+                .biedged_to_chain(&Snarl::<()>::chain_pair(self.x, self.y))
                 .unwrap();
 
             let mut visited: FxHashSet<Node> = FxHashSet::default();
             visited.insert(net);
 
             let neighbors = cactus_tree.graph.graph.neighbors(net);
-
-            #[derive(Clone, Copy)]
-            enum Step {
-                Net { chain: Node, net: Node },
-                Chain { chain: Node },
-            };
 
             let mut stack: Vec<Step> = Vec::new();
 
@@ -104,7 +187,48 @@ impl NetGraph {
         } else {
             // bridge pair
 
+            let mut reachable_chain_pairs: FxHashSet<Snarl<()>> =
+                FxHashSet::default();
+
             let mut visited: FxHashSet<Node> = FxHashSet::default();
+
+            let mut parent: FxHashMap<Node, Node> = FxHashMap::default();
+
+            let mut path_set: FxHashSet<Node> = self.path.iter().copied().collect();
+
+            // avoid the snarl bridge edges too
+            path_set.insert(self.x.opposite());
+            path_set.insert(self.y.opposite());
+
+            let mut stack: Vec<Step> = Vec::new();
+
+
+            for &path_node in self.path.iter() {
+                visited.insert(path_node);
+
+                let neighbors = cactus_tree.graph.graph.neighbors(path_node).filter(|other| {
+                    !path_set.contains(other) && !visited.contains(other)
+                });
+
+                if cactus_tree.graph.is_net_vertex(path_node) {
+
+
+                    for other in neighbors {
+                        if cactus_tree.graph
+                    }
+                    /*
+                    stack.push(Step::Chain { chain: other });
+                    stack.push(Step::Net {
+                        chain: cur_node,
+                        net: other,
+                    });
+                    */
+
+                    // stack.push(value)
+                } else {
+                }
+
+            }
 
             // visited.insert(net);
 
@@ -113,6 +237,7 @@ impl NetGraph {
             unimplemented!();
         }
     }
+    */
 
     pub fn is_acyclic(&self) -> bool {
         let graph = &self.graph.graph;
