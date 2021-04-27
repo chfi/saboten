@@ -1393,6 +1393,27 @@ impl<'a> BridgeForest<'a> {
 
         let mut snarls: Vec<Snarl<()>> = Vec::new();
 
+        debug!("iterating {} black bridge edges", black_bridge_edges.len());
+
+        let _p_bar;
+
+        #[cfg(not(feature = "progress_bars"))]
+        {
+            _p_bar = ();
+        }
+
+        #[cfg(feature = "progress_bars")]
+        {
+            use indicatif::{ProgressBar, ProgressStyle};
+            _p_bar = ProgressBar::new(black_bridge_edges.len() as u64);
+            _p_bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("[{elapsed_precise}] {bar:40} {pos:>10}/{len:10}")
+                    .progress_chars("##-"),
+            );
+            _p_bar.enable_steady_tick(1000);
+        }
+
         for left in black_bridge_edges {
             visited.clear();
 
@@ -1465,6 +1486,11 @@ impl<'a> BridgeForest<'a> {
                         queue.push_back(other);
                     }
                 }
+            }
+
+            #[cfg(feature = "progress_bars")]
+            {
+                _p_bar.inc(1);
             }
         }
     }
@@ -1797,7 +1823,7 @@ pub fn build_snarl_family(
     debug!("Found {} bridge pairs", bridge_pairs.len());
 
     let mut snarl_map = SnarlMap::default();
-    trace!(
+    debug!(
         "Adding {} + {} = {} snarls",
         bridge_pairs.len(),
         chain_pairs.len(),
@@ -1816,6 +1842,7 @@ pub fn build_snarl_family(
             .insert(Snarl::<()>::chain_pair(Node::new(cp.x), Node::new(cp.y)));
     }
 
+    debug!("filtering compatible snarl family");
     bridge_forest.snarl_family(&mut snarl_map);
 
     snarl_map
