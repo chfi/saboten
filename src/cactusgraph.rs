@@ -856,9 +856,12 @@ impl<'a> CactusTree<'a> {
             let mut current = p_y;
             let mut path_ = vec![p_y];
             while current != p_x {
-                let parent = parents.get(&current)?;
-                path_.push(*parent);
-                current = *parent;
+                if let Some(parent) = parents.get(&current) {
+                    path_.push(*parent);
+                    current = *parent;
+                } else {
+                    break;
+                }
             }
 
             path_.reverse();
