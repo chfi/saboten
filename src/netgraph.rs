@@ -1,7 +1,8 @@
 use rustc_hash::FxHashSet;
 
 use crate::biedgedgraph::BiedgedGraph;
-use crate::snarls::{Biedged, Node, Snarl};
+use crate::cactusgraph::{CactusTree, ChainEdges};
+use crate::snarls::{Biedged, Node, Snarl, SnarlMap};
 
 #[derive(Clone)]
 pub struct NetGraph {
@@ -27,10 +28,47 @@ impl Color {
 }
 
 impl NetGraph {
+    pub fn contained_snarls(
+        &self,
+        cactus_tree: &CactusTree,
+        snarl_map: &SnarlMap,
+    ) -> FxHashSet<Snarl<()>> {
+        let mut res: FxHashSet<Snarl<()>> = FxHashSet::default();
 
-    pub fn chain_pair_dfs(&self,
-                          cactus_tree: &crate::cactusgraph::CactusTree,
-                          chain_edges: &crate::cactusgraph::ChainEdges,
+        for node in self.graph.graph.nodes() {
+            if node != self.x && node != self.y {
+                if let Some(lefts) = snarl_map.lefts.get(&node) {
+                    for &left_snarl_ix in lefts.iter() {
+                        let snarl =
+                            snarl_map.snarls.get(&left_snarl_ix).unwrap();
+
+                        if self.graph.graph.contains_node(snarl.right()) {
+                            res.insert(*snarl);
+                        }
+                    }
+                }
+
+                if let Some(rights) = snarl_map.rights.get(&node) {
+                    for &right_snarl_ix in rights.iter() {
+                        let snarl =
+                            snarl_map.snarls.get(&right_snarl_ix).unwrap();
+
+                        if self.graph.graph.contains_node(snarl.left()) {
+                            res.insert(*snarl);
+                        }
+                    }
+                }
+            }
+        }
+
+        res
+    }
+
+    /*
+    pub fn chain_pair_dfs(
+        &self,
+        cactus_tree: &CactusTree,
+        chain_edges: &ChainEdges,
     ) -> Vec<Node> {
         let (net, chain) = chain_edges
             .biedged_to_chain(&Snarl::<()>::chain_pair(self.x, self.y))
@@ -56,13 +94,15 @@ impl NetGraph {
 
         for other in neighbors {
             if other != chain && cactus_tree.graph.is_chain_vertex(other) {
-                stack.push(Step { parent: net, step: other });
+                stack.push(Step {
+                    parent: net,
+                    step: other,
+                });
                 // stack.push(Step::Chain { chain: other });
             }
         }
 
         for step in stack.pop() {
-
             log.push(step);
 
             visited.insert(step.step);
@@ -103,9 +143,8 @@ impl NetGraph {
         }
 
         reachable_chain_pairs
-
     }
-
+    */
 
     /*
     pub fn contained_chain_pairs(
