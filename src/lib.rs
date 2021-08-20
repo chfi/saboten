@@ -4,3 +4,5 @@ pub mod netgraph;
 pub mod projection;
 pub mod snarls;
 pub mod ultrabubble;
+
+pub mod projection_graph;

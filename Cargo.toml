@@ -17,11 +17,17 @@ progress_bars = ["indicatif"]
 
 [dependencies]
 gfa = "0.10"
+handlegraph = "0.7.0-alpha.7"
+
 three-edge-connected = "0.2.2"
 petgraph = "0.5"
+
 rustc-hash = "1.1.0"
 fnv = "1.0"
+
 rayon = "1.4"
+crossbeam = "0.8"
+
 log = "0.4"
 indicatif = { version = "0.15", features = ["rayon"], optional = true }
 
