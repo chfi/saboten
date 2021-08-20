@@ -1,10 +1,81 @@
-use handlegraph::{disjoint::*, handle::Handle, packedgraph::PackedGraph};
+use handlegraph::{
+    disjoint::*,
+    handle::{Edge, Handle},
+    handlegraph::{HandleGraph, IntoEdges, IntoHandles},
+    packedgraph::PackedGraph,
+};
 
 use std::sync::Arc;
 
-pub struct ProjectedPackedGraph {
+pub struct BiedgedGraph {
     graph: Arc<PackedGraph>,
     projection: Projection,
+
+    has_gray_edges: bool,
+}
+
+impl BiedgedGraph {
+    pub fn new(graph: PackedGraph) -> Self {
+        let graph = Arc::new(graph);
+        let projection = Projection::new(graph.node_count());
+
+        let has_gray_edges = true;
+
+        Self {
+            graph,
+            projection,
+            has_gray_edges,
+        }
+    }
+
+    pub fn black_edges_iter(&self) -> impl Iterator<Item = Handle> + '_ {
+        self.graph.handles()
+    }
+
+    pub fn gray_edges_iter(
+        &self,
+    ) -> Option<impl Iterator<Item = (BNode, BNode)> + '_> {
+        if self.has_gray_edges {
+            // TODO this has to be the correct mapping
+            let iter = self
+                .graph
+                .edges()
+                .map(|Edge(a, b)| (BNode::from(a), BNode::from(b)));
+            todo!();
+            Some(iter)
+        } else {
+            None
+        }
+    }
+
+    pub fn contract_gray_edges(&mut self) {
+        if self.has_gray_edges {
+            let gray_edges = self.gray_edges_iter().unwrap();
+
+            for (a, b) in gray_edges {
+                self.contract_gray_edge(a, b);
+            }
+
+            self.has_gray_edges = false;
+        }
+    }
+
+    fn contract_gray_edge(&self, x: BNode, y: BNode) {
+        self.projection.unite(x, y);
+    }
+
+    fn merge_vertices(&self, mut vertices: impl Iterator<Item = BNode>) {
+        let mut prev = if let Some(first) = vertices.next() {
+            first
+        } else {
+            return;
+        };
+
+        for cur in vertices {
+            self.projection.unite(prev, cur);
+            prev = cur;
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
