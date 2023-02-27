@@ -1,9 +1,9 @@
 [package]
 name = "saboten"
-version = "0.1.2-alpha.3"
+version = "0.2.0"
 authors = ["Christian Fischer <christian@chfi.se>"]
-description = "Provides biedged graphs, cactus graphs and trees, and an algorithm for finding ultrabubbles in variation graphs."
-edition = "2018"
+description = "Finds and produces snarls and ultrabubbles in variation graphs"
+edition = "2021"
 license = "MIT"
 repository = "https://github.com/chfi/saboten"
 readme = "readme.md"
@@ -27,3 +27,5 @@ waragraph-core = { path = "../waragraph/lib" }
 bytemuck = { version = "1.4", features = ["derive"] }
 roaring = "0.10"
 sprs = "0.11"
+
+three-edge-connected = "0.2"

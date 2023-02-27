@@ -6,9 +6,55 @@ use std::{
 };
 use waragraph_core::graph::{
     matrix::MatGraph,
-    spoke::hyper::{Cycle, HyperSpokeGraph, VertexId},
+    spoke::{
+        hyper::{Cycle, HyperSpokeGraph, VertexId},
+        HubId, SpokeGraph,
+    },
 };
 use waragraph_core::graph::{Edge, Node, OrientedNode};
+
+fn cactus_graph_from_edges(
+    node_count: usize,
+    edges: impl IntoIterator<Item = Edge>,
+) -> HyperSpokeGraph {
+    let graph = SpokeGraph::new(node_count, edges);
+
+    let inverted_comps = {
+        let seg_hubs = (0..node_count as u32)
+            .map(|i| {
+                let node = Node::from(i);
+                let left = graph.node_endpoint_hub(node.as_reverse());
+                let right = graph.node_endpoint_hub(node.as_forward());
+                (left, right)
+            })
+            .filter(|(a, b)| a != b)
+            .collect::<Vec<_>>();
+
+        let tec_graph = three_edge_connected::Graph::from_edges(
+            seg_hubs.into_iter().map(|(l, r)| (l.ix(), r.ix())),
+        );
+
+        let components =
+            three_edge_connected::find_components(&tec_graph.graph);
+
+        let inverted = tec_graph.invert_components(components);
+
+        inverted
+    };
+
+    let spoke_graph = Arc::new(graph);
+
+    let mut cactus_graph = HyperSpokeGraph::new(spoke_graph);
+
+    for comp in inverted_comps {
+        let hubs = comp.into_iter().map(|i| HubId(i as u32));
+        cactus_graph.merge_hub_partition(hubs);
+    }
+
+    cactus_graph.apply_deletions();
+
+    cactus_graph
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum CacTreeVx {
@@ -33,20 +79,29 @@ pub enum CacTreeEdge {
 
 #[derive(Debug, Clone)]
 pub struct CactusTree {
-    cactus_graph: HyperSpokeGraph,
-    graph: MatGraph<CacTreeVx, CacTreeEdge>,
+    pub cactus_graph: HyperSpokeGraph,
+    pub graph: MatGraph<CacTreeVx, CacTreeEdge>,
 
-    vertex_cycle_map: HashMap<VertexId, BTreeSet<usize>>,
-    cycles: Vec<Cycle>,
+    pub vertex_cycle_map: HashMap<VertexId, BTreeSet<usize>>,
+    pub cycles: Vec<Cycle>,
 
-    net_vertices: usize,
-    net_edges: usize,
+    pub net_vertices: usize,
+    pub net_edges: usize,
 
-    chain_vertices: usize,
-    chain_edges: usize,
+    pub chain_vertices: usize,
+    pub chain_edges: usize,
 }
 
 impl CactusTree {
+    /// constructs the cactus graph as well
+    pub fn from_edges(
+        node_count: usize,
+        edges: impl IntoIterator<Item = Edge>,
+    ) -> Self {
+        let cactus_graph = cactus_graph_from_edges(node_count, edges);
+        Self::from_cactus_graph(cactus_graph)
+    }
+
     pub fn from_cactus_graph(cactus: HyperSpokeGraph) -> Self {
         let cycles = find_cactus_graph_cycles(&cactus);
 
@@ -109,8 +164,6 @@ impl CactusTree {
                 from: from_vx,
                 to: to_vx,
             });
-
-            let c = ('a' as u8 + node.ix() as u8) as char;
         }
 
         let net_edges = edges.len();
@@ -219,7 +272,6 @@ impl CactusTree {
                         });
 
                     for vj in neighbors {
-                        println!("pushing ({vi} -> {vj})");
                         stack.push((Some(vi), vj));
                     }
                 }
@@ -283,46 +335,20 @@ impl CactusTree {
 
         let cycles = self.vertex_cycle_map.get(&net).unwrap();
 
-        fn print_step(step: OrientedNode) {
-            let c = ('a' as u8 + step.node().ix() as u8) as char;
-            let o = if step.is_reverse() { "-" } else { "+" };
-            print!("{c}{o}")
-        }
-
-        println!("----------------------");
-
-        println!("present endpoints:");
-        for &step in &endpoints {
-            print_step(step);
-            print!(", ");
-        }
-
-        println!("\n");
-
         for &cycle_ix in cycles {
-            println!("  ---- Cycle {cycle_ix} ----");
             let cycle = &self.cycles[cycle_ix];
 
             // start by "flattening" the cycle, so that both segment endpoints
             // are present. iterating the flattened cycle produces
 
             // e.g. [b+, c-] => [b-, b
-            let mut steps = cycle
+            let steps = cycle
                 .steps
                 .iter()
                 .flat_map(|s| [*s, s.flip()])
                 .filter(|s| endpoints.contains(s))
                 // .flat_map(|s| [s.flip(), *s])
                 .collect::<Vec<_>>();
-
-            println!("steps:");
-            for &step in &steps {
-                if endpoints.contains(&step) {
-                    print_step(step);
-                    print!(", ");
-                }
-            }
-            println!("\n");
 
             // if there's just two endpoints, there's just one step,
             // meaning one edge to add, so we're done
@@ -335,7 +361,6 @@ impl CactusTree {
                     && endpoints.contains(&b)
                     && !(a_chain || b_chain)
                 {
-                    println!("pushing segment");
                     black_edges.push((a, b));
                     continue;
                 }
@@ -347,18 +372,9 @@ impl CactusTree {
                 let a_in = endpoints.contains(&w[0]);
                 let b_in = endpoints.contains(&w[1]);
 
-                print!("  on step [");
-                print_step(w[0]);
-                print!(", ");
-                print_step(w[1]);
-                println!("]");
-
                 if w[0].node() == w[1].node() {
                     // traversing a segment
                     if edge_start.is_none() && a_in {
-                        print!(" >> opening black edge: ");
-                        print_step(w[0]);
-                        println!();
                         edge_start = Some(w[0]);
                     } else if let Some(start) = edge_start {
                         // the chain endpoints should have no black edges
@@ -415,16 +431,6 @@ impl CactusTree {
 
         let chain_range = 0..self.chain_edges;
 
-        // for (cycle_ix, cycle) in self.cycles.iter().enumerate() {
-        //
-        // }
-
-        fn print_step(step: OrientedNode) {
-            let c = ('a' as u8 + step.node().ix() as u8) as char;
-            let o = if step.is_reverse() { "-" } else { "+" };
-            print!("{c}{o}")
-        }
-
         for chain_ix in chain_range {
             let edge_ix = self.net_edges + chain_ix;
 
@@ -444,18 +450,6 @@ impl CactusTree {
             let this = steps[1];
 
             let cycle = &self.cycles[cycle_ix];
-
-            println!();
-            println!("_______________________");
-            print!("cycle!!  ");
-            for (i, step) in cycle.steps.iter().enumerate() {
-                if i > 0 {
-                    print!(", ");
-                }
-
-                print_step(*step);
-            }
-            println!();
 
             let net_spokes = self
                 .cactus_graph
@@ -502,25 +496,17 @@ pub fn find_cactus_graph_cycles(graph: &HyperSpokeGraph) -> Vec<Cycle> {
 
     let max_ix = (graph.spoke_graph.max_endpoint.ix() / 2) - 1;
     remaining_segments.insert_range(0..max_ix as u32);
-    println!("max_ix!!! {max_ix}");
-    println!("remaining segments: {}", remaining_segments.len());
-    dbg!(remaining_segments.max());
-    dbg!(remaining_segments.len());
 
     graph.dfs_preorder(None, |i, step, vertex| {
         vx_visit.insert(vertex, i);
         visit.push((i, step, vertex));
 
         if let Some((_parent, step)) = step {
-            dbg!(step);
             let seg = step.node();
             visited_segments.insert(seg);
             remaining_segments.remove(seg.ix() as u32);
         }
     });
-
-    dbg!(remaining_segments.max());
-    dbg!(remaining_segments.len());
 
     // the DFS produces a spanning tree; from this, we can start from any
     // of the remaining segments and use the tree to reconstruct the cycle
@@ -529,7 +515,6 @@ pub fn find_cactus_graph_cycles(graph: &HyperSpokeGraph) -> Vec<Cycle> {
     let mut cycles: Vec<Cycle> = Vec::new();
 
     for seg_ix in remaining_segments {
-        println!("seg_ix: {seg_ix}");
         let node = Node::from(seg_ix);
 
         let l = graph.endpoint_vertex(node.as_reverse());
@@ -609,8 +594,7 @@ mod tests {
 
     #[test]
     fn paper_fig3_cactus_tree() {
-        let cactus_graph = super::super::hyper::tests::paper_cactus_graph();
-        let edges = super::super::tests::example_graph_edges();
+        let cactus_graph = paper_fig3_cactus_graph();
 
         let cactus_tree = CactusTree::from_cactus_graph(cactus_graph);
 
@@ -720,8 +704,7 @@ mod tests {
 
     #[test]
     fn paper_fig5_cactus_tree() {
-        let cactus_graph = super::super::hyper::tests::alt_paper_cactus_graph();
-        let edges = super::super::tests::alt_paper_graph_edges();
+        let cactus_graph = paper_fig5_cactus_graph();
 
         println!("cactus graph vertex count: {}", cactus_graph.vertex_count());
 
@@ -764,8 +747,8 @@ mod tests {
 
     #[test]
     fn test_chain_pair_net_graph() {
-        let cactus_graph = super::super::hyper::tests::paper_cactus_graph();
-        let edges = super::super::tests::example_graph_edges();
+        let cactus_graph = paper_fig3_cactus_graph();
+        let edges = paper_fig3_graph_edges();
 
         let cactus_tree = CactusTree::from_cactus_graph(cactus_graph);
 
@@ -811,11 +794,12 @@ mod tests {
 
     #[test]
     fn test_rooted_forest() {
-        let graph_fig3 = super::super::hyper::tests::paper_cactus_graph();
+        let graph_fig3 = paper_fig3_cactus_graph();
+
         let tree_fig3 = CactusTree::from_cactus_graph(graph_fig3);
         let forest_fig3 = tree_fig3.rooted_cactus_forest();
 
-        let graph_fig5 = super::super::hyper::tests::alt_paper_cactus_graph();
+        let graph_fig5 = paper_fig5_cactus_graph();
         let tree_fig5 = CactusTree::from_cactus_graph(graph_fig5);
         let forest_fig5 = tree_fig5.rooted_cactus_forest();
 
@@ -885,5 +869,95 @@ mod tests {
 
         assert_eq!(edges.len(), 7);
         assert_eq!(missing.len(), 5);
+    }
+
+    fn paper_fig3_cactus_graph() -> HyperSpokeGraph {
+        let node_count = 18;
+        let edges = paper_fig3_graph_edges();
+        cactus_graph_from_edges(node_count, edges)
+    }
+
+    fn paper_fig5_cactus_graph() -> HyperSpokeGraph {
+        let node_count = 14;
+        let edges = paper_fig5_graph_edges();
+        cactus_graph_from_edges(node_count, edges)
+    }
+
+    fn paper_fig3_graph_edges() -> Vec<Edge> {
+        let oriented_node = |c: char, rev: bool| -> OrientedNode {
+            let node = (c as u32) - 'a' as u32;
+            OrientedNode::new(node, rev)
+        };
+
+        let edge = |a: char, a_r: bool, b: char, b_r: bool| -> Edge {
+            let a = oriented_node(a, a_r);
+            let b = oriented_node(b, b_r);
+            Edge::new(a, b)
+        };
+
+        let edges = [
+            ('a', 'b'),
+            ('a', 'c'),
+            ('b', 'd'),
+            ('c', 'd'),
+            ('d', 'e'),
+            ('d', 'f'),
+            ('e', 'g'),
+            ('f', 'g'),
+            ('f', 'h'),
+            ('g', 'k'),
+            ('g', 'l'),
+            ('h', 'i'),
+            ('h', 'j'),
+            ('i', 'j'),
+            ('j', 'l'),
+            ('k', 'l'),
+            ('l', 'm'),
+            ('m', 'n'),
+            ('m', 'o'),
+            ('n', 'p'),
+            ('o', 'p'),
+            ('p', 'm'),
+            ('p', 'q'),
+            ('p', 'r'),
+        ]
+        .into_iter()
+        .map(|(a, b)| edge(a, false, b, false))
+        .collect::<Vec<_>>();
+
+        edges
+    }
+
+    // corresponds to the graph in fig 5A in the paper
+    fn paper_fig5_graph_edges() -> Vec<Edge> {
+        let oriented_node = |c: char, rev: bool| -> OrientedNode {
+            let node = (c as u32) - 'a' as u32;
+            OrientedNode::new(node, rev)
+        };
+
+        let edge = |s: &str| -> Edge {
+            let chars = s.chars().collect::<Vec<_>>();
+            let a = chars[0];
+            let a_rev = chars[1] == '-';
+            let b = chars[2];
+            let b_rev = chars[3] == '-';
+
+            Edge::new(oriented_node(a, a_rev), oriented_node(b, b_rev))
+        };
+
+        let edges = [
+            "a+n+", //
+            "a+b+", //
+            "b+c+", "b+d+", "c+e+", "d+e+", //
+            "e+f+", "e+g+", "f+h+", "g+h+", //
+            "h+m+", "h+i+", //
+            "i+j+", "i+k+", "j+l+", "k+l+", //
+            "l+m+", //
+            "m+n+",
+        ]
+        .into_iter()
+        .map(edge)
+        .collect::<Vec<_>>();
+        edges
     }
 }
