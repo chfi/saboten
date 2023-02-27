@@ -12,31 +12,18 @@ categories = ["science"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[features]
-progress_bars = ["indicatif"]
-
 [dependencies]
-gfa = "0.10"
-three-edge-connected = "0.2.2"
-petgraph = "0.5"
-rustc-hash = "1.1.0"
-fnv = "1.0"
-rayon = "1.4"
-log = "0.4"
-indicatif = { version = "0.15", features = ["rayon"], optional = true }
+# gfa = "0.10"
+# three-edge-connected = "0.2.2"
+# petgraph = "0.5"
+# rustc-hash = "1.1.0"
+# fnv = "1.0"
+# rayon = "1.4"
+# log = "0.4"
+# indicatif = { version = "0.15", features = ["rayon"], optional = true }
 
-[dev-dependencies]
-criterion = "0.3"
+waragraph-core = { path = "../waragraph/lib" }
 
-[lib]
-bench = false
-
-[[bench]]
-name = "saboten_benches"
-harness = false
-
-[profile.bench]
-debug = true
-
-[profile.release]
-debug = true
+bytemuck = { version = "1.4", features = ["derive"] }
+roaring = "0.10"
+sprs = "0.11"
