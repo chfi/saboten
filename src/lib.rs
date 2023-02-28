@@ -45,26 +45,33 @@ impl Saboten {
 
         let chain_pairs = cactus_tree.enumerate_chain_pairs();
 
-        let mut chain_edge_labels: HashMap<usize, bool> = HashMap::new();
+        // let mut chain_edge_labels: HashMap<usize, bool> = HashMap::new();
 
-        // let adj = cactus_tree.
-
-        // let mut snarl_ultrabubble: HashMap<
+        // (ChainVx, NetVx) -> bool
+        let mut chain_edge_labels: HashMap<(usize, usize), bool> =
+            HashMap::new();
 
         for &((a, b), chain_ix) in chain_pairs.iter() {
+            let chain_edge = if let CacTreeEdge::Chain { net, cycle, .. } =
+                cactus_tree.graph.edge[cactus_tree.net_edges + chain_ix]
+            {
+                (net.ix(), cactus_tree.net_vertices + cycle)
+            } else {
+                unreachable!();
+            };
+
             if let Some(net_graph) =
                 cactus_tree.chain_edge_net_graph(&vg_adj, (a, b), chain_ix)
             {
                 // the net graph method returns None if the graph has a bridge
-
-                // check acyclic
-                let is_acyclic = todo!();
-
-                chain_edge_labels.insert(chain_ix, is_acyclic);
+                let is_acyclic = net_graph_is_acyclic(a, &net_graph);
+                chain_edge_labels.insert(chain_edge, is_acyclic);
             } else {
-                chain_edge_labels.insert(chain_ix, false);
+                chain_edge_labels.insert(chain_edge, false);
             }
         }
+
+        // DFS from each chain edge to check the contained chain pairs
 
         // let chain_edges = Vec::new();
         // let bridge_edges = Vec::new();
@@ -304,6 +311,38 @@ impl CactusTree {
 }
 
 impl CactusTree {
+    pub fn dfs(
+        &self,
+        first_step: (usize, usize),
+        mut chain_edge_f: impl FnMut(usize, usize),
+    ) {
+        let mut visited: HashSet<usize> = HashSet::new();
+        visited.insert(first_step.0);
+
+        let mut stack: Vec<(usize, usize)> = vec![first_step];
+
+        while let Some((from, to)) = stack.pop() {
+            if !visited.contains(&to) {
+                visited.insert(to);
+
+                let from_is_chain = from >= self.net_vertices;
+                let to_is_net = to < self.net_vertices;
+
+                if from_is_chain && to_is_net {
+                    chain_edge_f(from, to);
+                }
+
+                let neighbors = self.graph.adj.outer_view(to).unwrap();
+
+                for &other in neighbors.indices().iter() {
+                    if !visited.contains(&other) {
+                        stack.push((to, other));
+                    }
+                }
+            }
+        }
+    }
+
     /// returns (parent, node) traversal pairs
     pub fn rooted_cactus_forest(&self) -> Vec<Vec<(usize, usize)>> {
         let mut forest = Vec::new();
