@@ -55,11 +55,14 @@ impl Saboten {
             if let Some(net_graph) =
                 cactus_tree.chain_edge_net_graph(&vg_adj, (a, b), chain_ix)
             {
-                // check bridgeless
-                // the net graph is bridgeless if only `a` and `b` have no
-                // incident black edge
+                // the net graph method returns None if the graph has a bridge
 
                 // check acyclic
+                let is_acyclic = todo!();
+
+                chain_edge_labels.insert(chain_ix, is_acyclic);
+            } else {
+                chain_edge_labels.insert(chain_ix, false);
             }
         }
 
@@ -354,6 +357,8 @@ impl CactusTree {
     // vg_adj is an 2Nx2N adjacency matrix where N is the number of
     // segments in the variation graph; it lacks the connectivity
     // "within" segments (the black edges in the biedged repr.)
+    //
+    // Returns `None` if the net graph contains a bridge.
     fn chain_edge_net_graph(
         &self,
         vg_adj: &CsMat<u8>,
@@ -462,8 +467,19 @@ impl CactusTree {
             return None;
         }
 
+        let mut endpoints = endpoints;
+
         for (a, b) in black_edges {
+            endpoints.remove(&a);
+            endpoints.remove(&b);
             net_adj.add_triplet(b.ix(), a.ix(), 1);
+        }
+
+        // if there's more than two endpoints left at this point,
+        // that means there's at least one vertex lacking an incident
+        // black edge, meaning this net graph has a bridge
+        if endpoints.len() > 2 {
+            return None;
         }
 
         Some(net_adj.to_csc())
@@ -643,6 +659,49 @@ pub fn find_cactus_graph_cycles(graph: &HyperSpokeGraph) -> Vec<Cycle> {
     cycles.sort_by_key(|c| c.steps.len());
 
     cycles
+}
+
+fn net_graph_is_acyclic(start: OrientedNode, graph: &CsMat<u8>) -> bool {
+    let mut visited: HashSet<OrientedNode> = HashSet::new();
+    let mut in_path: HashSet<OrientedNode> = HashSet::new();
+
+    enum Inst {
+        Push(OrientedNode),
+        Pop(OrientedNode),
+    }
+
+    let mut stack: Vec<Inst> = vec![Inst::Push(start)];
+
+    while let Some(inst) = stack.pop() {
+        match inst {
+            Inst::Push(vx) => {
+                visited.insert(vx);
+                in_path.insert(vx);
+                // in_path.insert(
+
+                let neighbors = graph.outer_view(vx.ix()).unwrap();
+                let neighbors = neighbors
+                    .indices()
+                    .iter()
+                    .map(|i| OrientedNode::from(*i as u32));
+
+                for adj in neighbors {
+                    if in_path.contains(&adj) {
+                        return false;
+                    } else if !visited.contains(&adj) {
+                        stack.push(Inst::Push(adj));
+                    }
+                }
+
+                stack.push(Inst::Pop(vx));
+            }
+            Inst::Pop(vx) => {
+                in_path.remove(&vx);
+            }
+        }
+    }
+
+    true
 }
 
 #[cfg(test)]
