@@ -20,6 +20,7 @@ pub struct Saboten {
     vg_adj: CsMat<u8>,
     // chain_edges: Vec<()>,
     // bridge_edges: Vec<()>,
+    ultrabubbles: Vec<(OrientedNode, OrientedNode)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -51,6 +52,11 @@ impl Saboten {
         let mut chain_edge_labels: HashMap<(usize, usize), bool> =
             HashMap::new();
 
+        let mut chain_edge_pairs: HashMap<
+            (usize, usize),
+            (OrientedNode, OrientedNode),
+        > = HashMap::new();
+
         for &((a, b), chain_ix) in chain_pairs.iter() {
             let chain_edge = if let CacTreeEdge::Chain { net, cycle, .. } =
                 cactus_tree.graph.edge[cactus_tree.net_edges + chain_ix]
@@ -69,18 +75,43 @@ impl Saboten {
             } else {
                 chain_edge_labels.insert(chain_edge, false);
             }
+
+            chain_edge_pairs.insert(chain_edge, (a, b));
         }
 
         // DFS from each chain edge to check the contained chain pairs
+        let mut ultrabubbles: Vec<(OrientedNode, OrientedNode)> = Vec::new();
 
-        // let chain_edges = Vec::new();
-        // let bridge_edges = Vec::new();
+        for (&chain_edge, &is_valid) in chain_edge_labels.iter() {
+            // println!("chain edge {chain_edge:?} is valid = {is_valid}");
+
+            let (net, chain) = chain_edge;
+
+            println!("chain edge {net} -> {chain} is valid = {is_valid}");
+
+            let mut all_valid = is_valid;
+
+            cactus_tree.chain_pair_dfs((chain, net), |from, to| {
+                let contained_valid =
+                    chain_edge_labels.get(&(from, to)).copied().unwrap_or(true);
+
+                println!(
+                    "inner edge {from} -> {to} is valid = {contained_valid}"
+                );
+
+                all_valid &= contained_valid
+            });
+
+            if all_valid {
+                let snarl = chain_edge_pairs.get(&chain_edge).unwrap();
+                ultrabubbles.push(*snarl);
+            }
+        }
 
         Self {
             cactus_tree,
             vg_adj,
-            // chain_edges,
-            // bridge_edges,
+            ultrabubbles,
         }
     }
 }
@@ -311,7 +342,7 @@ impl CactusTree {
 }
 
 impl CactusTree {
-    pub fn dfs(
+    pub fn chain_pair_dfs(
         &self,
         first_step: (usize, usize),
         mut chain_edge_f: impl FnMut(usize, usize),
@@ -328,8 +359,15 @@ impl CactusTree {
                 let from_is_chain = from >= self.net_vertices;
                 let to_is_net = to < self.net_vertices;
 
-                if from_is_chain && to_is_net {
+                if !from_is_chain && !to_is_net {
+                    println!("callback with ({from}, {to})");
                     chain_edge_f(from, to);
+                }
+
+                if !from_is_chain && to_is_net {
+                    // we're traversing a bridge, so we don't want to
+                    // continue down this path
+                    continue;
                 }
 
                 let neighbors = self.graph.adj.outer_view(to).unwrap();
@@ -754,6 +792,24 @@ mod tests {
         let c = ('a' as u8 + step.node().ix() as u8) as char;
         let o = if step.is_reverse() { "-" } else { "+" };
         print!("{c}{o}")
+    }
+
+    #[test]
+    fn paper_fig5_ultrabubbles() {
+        let node_count = 14;
+        let edges = paper_fig5_graph_edges();
+        let saboten = Saboten::from_edges(node_count, edges);
+
+        println!("found {} ultrabubbles", saboten.ultrabubbles.len());
+
+        for (i, (from, to)) in saboten.ultrabubbles.iter().enumerate() {
+            //
+            print!("{i}\t");
+            print_step(*from);
+            print!(", ");
+            print_step(*to);
+            println!();
+        }
     }
 
     #[test]
