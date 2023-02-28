@@ -1,7 +1,7 @@
 use roaring::RoaringBitmap;
 use sprs::{CsMat, CsMatBase, CsVec};
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     sync::Arc,
 };
 use waragraph_core::graph::{
@@ -10,8 +10,70 @@ use waragraph_core::graph::{
         hyper::{Cycle, HyperSpokeGraph, VertexId},
         HubId, SpokeGraph,
     },
+    PathIndex,
 };
 use waragraph_core::graph::{Edge, Node, OrientedNode};
+
+#[derive(Debug, Clone)]
+pub struct Saboten {
+    cactus_tree: CactusTree,
+    vg_adj: CsMat<u8>,
+    // chain_edges: Vec<()>,
+    // bridge_edges: Vec<()>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Snarl {
+    from: OrientedNode,
+    to: OrientedNode,
+
+    is_acyclic_and_bridgeless: bool,
+}
+
+impl Saboten {
+    pub fn from_edges(
+        node_count: usize,
+        edges: impl IntoIterator<Item = Edge>,
+    ) -> Self {
+        let edges = edges.into_iter().collect::<Vec<_>>();
+        let vg_adj = PathIndex::directed_adjacency_matrix(
+            node_count,
+            edges.iter().copied(),
+        );
+
+        let cactus_tree = CactusTree::from_edges(node_count, edges);
+
+        let chain_pairs = cactus_tree.enumerate_chain_pairs();
+
+        let mut chain_edge_labels: HashMap<usize, bool> = HashMap::new();
+
+        // let adj = cactus_tree.
+
+        // let mut snarl_ultrabubble: HashMap<
+
+        for &((a, b), chain_ix) in chain_pairs.iter() {
+            if let Some(net_graph) =
+                cactus_tree.chain_edge_net_graph(&vg_adj, (a, b), chain_ix)
+            {
+                // check bridgeless
+                // the net graph is bridgeless if only `a` and `b` have no
+                // incident black edge
+
+                // check acyclic
+            }
+        }
+
+        // let chain_edges = Vec::new();
+        // let bridge_edges = Vec::new();
+
+        Self {
+            cactus_tree,
+            vg_adj,
+            // chain_edges,
+            // bridge_edges,
+        }
+    }
+}
 
 fn cactus_graph_from_edges(
     node_count: usize,
@@ -239,7 +301,8 @@ impl CactusTree {
 }
 
 impl CactusTree {
-    pub fn rooted_cactus_forest(&self) -> Vec<Vec<usize>> {
+    /// returns (parent, node) traversal pairs
+    pub fn rooted_cactus_forest(&self) -> Vec<Vec<(usize, usize)>> {
         let mut forest = Vec::new();
 
         let mut visited: HashSet<usize> = HashSet::new();
@@ -258,7 +321,10 @@ impl CactusTree {
             while let Some((parent, vi)) = stack.pop() {
                 if !visited.contains(&vi) {
                     visited.insert(vi);
-                    order.push(vi);
+
+                    if let Some(parent) = parent {
+                        order.push((parent, vi));
+                    }
 
                     let on_chain = vi >= self.net_vertices;
 
@@ -339,9 +405,7 @@ impl CactusTree {
             let cycle = &self.cycles[cycle_ix];
 
             // start by "flattening" the cycle, so that both segment endpoints
-            // are present. iterating the flattened cycle produces
-
-            // e.g. [b+, c-] => [b-, b
+            // are present.
             let steps = cycle
                 .steps
                 .iter()
@@ -422,6 +486,8 @@ impl CactusTree {
         })
     }
 
+    /// Returns the chain pairs in the graph, as the pair of segment
+    /// endpoints and the corresponding chain edge index.
     pub fn enumerate_chain_pairs(
         &self,
     ) -> Vec<((OrientedNode, OrientedNode), usize)> {
@@ -446,8 +512,8 @@ impl CactusTree {
                 unreachable!();
             };
 
-            let prev = steps[0].flip();
-            let this = steps[1];
+            // let prev = steps[0].flip();
+            // let this = steps[1];
 
             let cycle = &self.cycles[cycle_ix];
 
@@ -746,10 +812,44 @@ mod tests {
     }
 
     #[test]
+    fn chain_pair_containment() {
+        let cactus_graph = paper_fig5_cactus_graph();
+        let edges = paper_fig5_graph_edges();
+        let cactus_tree = CactusTree::from_cactus_graph(cactus_graph);
+
+        let forest = cactus_tree.rooted_cactus_forest();
+
+        for (i, tree) in forest.iter().enumerate() {
+            println!("{i}\t{tree:#?}");
+        }
+
+        println!();
+
+        println!(" -- chain pairs --");
+
+        let chain_pairs = cactus_tree.enumerate_chain_pairs();
+
+        for &((a, b), chain_ix) in chain_pairs.iter() {
+            println!("\n--------\n");
+            print!("Chain pair: ");
+            print_step(a);
+            print!(", ");
+            print_step(b);
+            println!(", chain: {chain_ix}");
+            // if let Some(net_graph) =
+            //     cactus_tree.chain_edge_net_graph(&vg_adj, (a, b), chain_ix)
+            // {
+            //     sprs::visu::print_nnz_pattern(net_graph.view());
+            // } else {
+            //     zero_bes += 1;
+            // }
+        }
+    }
+
+    #[test]
     fn test_chain_pair_net_graph() {
         let cactus_graph = paper_fig3_cactus_graph();
         let edges = paper_fig3_graph_edges();
-
         let cactus_tree = CactusTree::from_cactus_graph(cactus_graph);
 
         let vg_adj =
@@ -806,12 +906,12 @@ mod tests {
         // TODO better tests once bridges are in
 
         assert_eq!(forest_fig3.len(), 3);
-        assert_eq!(forest_fig3[0].len(), 8);
-        assert_eq!(forest_fig3[1].len(), 5);
-        assert_eq!(forest_fig3[2].len(), 3);
+        assert_eq!(forest_fig3[0].len(), 7);
+        assert_eq!(forest_fig3[1].len(), 4);
+        assert_eq!(forest_fig3[2].len(), 2);
 
         assert_eq!(forest_fig5.len(), 1);
-        assert_eq!(forest_fig5[0].len(), 13);
+        assert_eq!(forest_fig5[0].len(), 12);
 
         println!("\n");
 
@@ -825,10 +925,15 @@ mod tests {
             let inc = &tree_fig3.graph.inc;
 
             let (edges, missing): (Vec<_>, Vec<_>) = tree
-                .windows(2)
-                .map(|ixs| {
-                    let i_row = inc.outer_view(ixs[0]).unwrap();
-                    let j_row = inc.outer_view(ixs[1]).unwrap();
+                .iter()
+                .map(|&(i, j)| {
+                    // let (edges, missing): (Vec<_>, Vec<_>) = tree
+                    //     .windows(2)
+                    // .map(|ixs| {
+                    // let i_row = inc.outer_view(ixs[0].1).unwrap();
+                    // let j_row = inc.outer_view(ixs[1].1).unwrap();
+                    let i_row = inc.outer_view(i).unwrap();
+                    let j_row = inc.outer_view(j).unwrap();
 
                     let edge = i_row
                         .iter()
@@ -840,6 +945,12 @@ mod tests {
                     edge
                 })
                 .partition(|edge| edge.is_some());
+
+            println!("{i}");
+            for edge in &edges {
+                println!("  {edge:?}");
+            }
+            println!();
 
             let (exp_edges, exp_missing) = expected;
 
@@ -853,8 +964,8 @@ mod tests {
             .windows(2)
             .map(|ixs| {
                 let inc = &tree_fig5.graph.inc;
-                let i_row = inc.outer_view(ixs[0]).unwrap();
-                let j_row = inc.outer_view(ixs[1]).unwrap();
+                let i_row = inc.outer_view(ixs[0].1).unwrap();
+                let j_row = inc.outer_view(ixs[1].1).unwrap();
 
                 let edge = i_row
                     .iter()
