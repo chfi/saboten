@@ -21,6 +21,9 @@ pub struct Saboten {
     // chain_edges: Vec<()>,
     // bridge_edges: Vec<()>,
     ultrabubbles: Vec<(OrientedNode, OrientedNode)>,
+
+    // ultrabubble index -> [ultrabubble index]
+    contained_ultrabubbles: BTreeMap<usize, Vec<usize>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -82,22 +85,56 @@ impl Saboten {
         // DFS from each chain edge to check the contained chain pairs
         let mut ultrabubbles: Vec<(OrientedNode, OrientedNode)> = Vec::new();
 
+        let mut ultrabubble_map: HashMap<(usize, usize), usize> =
+            HashMap::new();
+
+        // map from ultrabubble index to chain edges
+        let mut contained: HashMap<usize, Vec<(usize, usize)>> = HashMap::new();
+
         for (&chain_edge, &is_valid) in chain_edge_labels.iter() {
             let (net, chain) = chain_edge;
 
             let mut all_valid = is_valid;
 
+            let mut inner = Vec::new();
+
             cactus_tree.chain_pair_dfs((chain, net), |from, to| {
                 if let Some(contained_valid) =
                     chain_edge_labels.get(&(from, to))
                 {
+                    if *contained_valid {
+                        inner.push((from, to));
+                    }
                     all_valid &= contained_valid
                 }
             });
 
             if all_valid {
                 let snarl = chain_edge_pairs.get(&chain_edge).unwrap();
+
+                let i = ultrabubbles.len();
+                contained.insert(i, inner);
+                ultrabubble_map.insert(chain_edge, i);
+
                 ultrabubbles.push(*snarl);
+            }
+        }
+
+        let mut contained_ultrabubbles: BTreeMap<usize, Vec<usize>> =
+            BTreeMap::new();
+
+        for (ub_i, _ultrabubble) in ultrabubbles.iter().enumerate() {
+            let entry = contained_ultrabubbles.entry(ub_i).or_default();
+
+            if let Some(contained) = contained.get(&ub_i) {
+                contained
+                    .iter()
+                    .filter_map(|inner_chain_edge| {
+                        ultrabubble_map.get(inner_chain_edge)
+                    })
+                    .for_each(|ub_j| {
+                        entry.push(*ub_j);
+                    })
             }
         }
 
@@ -105,6 +142,7 @@ impl Saboten {
             cactus_tree,
             vg_adj,
             ultrabubbles,
+            contained_ultrabubbles,
         }
     }
 }
