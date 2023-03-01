@@ -58,12 +58,6 @@ impl Saboten {
         > = HashMap::new();
 
         for &((a, b), chain_ix) in chain_pairs.iter() {
-            // let chain_edge = if let CacTreeEdge::Chain { net, cycle, .. } =
-
-            let debug = a.ix() == 17 && b.ix() == 22;
-            //     println!("debuggin");
-            // };
-
             let chain_edge = if let CacTreeEdge::Chain { net, cycle, .. } =
                 cactus_tree.graph.edge[cactus_tree.net_edges + chain_ix]
             {
@@ -75,15 +69,8 @@ impl Saboten {
             if let Some(net_graph) =
                 cactus_tree.chain_edge_net_graph(&vg_adj, (a, b), chain_ix)
             {
-                if debug {
-                    println!("{a:?}, {b:?}\t(i-, l+)");
-                    sprs::visu::print_nnz_pattern(net_graph.view());
-                }
                 // the net graph method returns None if the graph has a bridge
                 let is_acyclic = net_graph_is_acyclic(a, &net_graph);
-                if debug {
-                    println!("debug is acyclic: {is_acyclic}");
-                }
                 chain_edge_labels.insert(chain_edge, is_acyclic);
             } else {
                 chain_edge_labels.insert(chain_edge, false);
@@ -96,11 +83,7 @@ impl Saboten {
         let mut ultrabubbles: Vec<(OrientedNode, OrientedNode)> = Vec::new();
 
         for (&chain_edge, &is_valid) in chain_edge_labels.iter() {
-            // println!("chain edge {chain_edge:?} is valid = {is_valid}");
-
             let (net, chain) = chain_edge;
-
-            println!("chain edge {net} -> {chain} is valid = {is_valid}");
 
             let mut all_valid = is_valid;
 
@@ -110,8 +93,6 @@ impl Saboten {
                 {
                     all_valid &= contained_valid
                 }
-
-                // all_valid &= contained_valid
             });
 
             if all_valid {
@@ -372,7 +353,6 @@ impl CactusTree {
                 let to_is_net = to < self.net_vertices;
 
                 if !from_is_chain && !to_is_net {
-                    println!("callback with ({from}, {to})");
                     chain_edge_f(from, to);
                 }
 
@@ -456,15 +436,6 @@ impl CactusTree {
     ) -> Option<CsMat<u8>> {
         use sprs::TriMat;
 
-        let debug = chain_pair.0.ix() == 17 && chain_pair.1.ix() == 22;
-
-        // let debug = chain_pair.0.ix() == 13 || chain_pair.1.ix() == 13;
-        if debug {
-            print!("DEBUG: chain pair {chain_pair:?}\t");
-            print_step_pair(chain_pair);
-            println!();
-        }
-
         // chain pairs only have the one edge with one net vertex,
         // so that's the only vertex we need to project from
         let (net, _cycle_ix) =
@@ -527,12 +498,6 @@ impl CactusTree {
             // if there's just two endpoints, there's just one step,
             // meaning one edge to add, so we're done
             if let &[a, b] = steps.as_slice() {
-                if debug {
-                    print!("two endpoint cycle: ");
-                    print_step_pair((a, b));
-                    println!();
-                }
-
                 let (ca, cb) = chain_pair;
                 let a_chain = a == ca || a == cb;
                 let b_chain = b == ca || b == cb;
@@ -541,11 +506,6 @@ impl CactusTree {
                     && !(a_chain || b_chain)
                 {
                     black_edges.push((a, b));
-
-                    if a.ix() == 25 && b.ix() == 14 {
-                        println!("black edge from singleton cycle");
-                    }
-
                     used_endpoints.insert(a);
                     used_endpoints.insert(b);
                     continue;
@@ -573,9 +533,6 @@ impl CactusTree {
 
                         if b_in && !start_chain && !end_chain {
                             edge_start = None;
-                            if start.ix() == 25 && w[1].ix() == 14 {
-                                println!("black edge from main loop");
-                            }
                             black_edges.push((start, w[1]));
                         }
                     }
@@ -602,30 +559,7 @@ impl CactusTree {
 
         let mut endpoints = endpoints;
 
-        if debug {
-            println!("black edges: {black_edges:#?}");
-        }
-
-        fn print_step(step: OrientedNode) {
-            let c = ('a' as u8 + step.node().ix() as u8) as char;
-            let o = if step.is_reverse() { "-" } else { "+" };
-            print!("{c}{o}")
-        }
-
-        fn print_step_pair(steps: (OrientedNode, OrientedNode)) {
-            print_step(steps.0);
-            print!(", ");
-            print_step(steps.1);
-        }
-
         for (a, b) in black_edges {
-            if debug {
-                print!("black edge: ");
-                print_step_pair((a, b));
-                // println!();
-                println!("\t{a:?}, {b:?}");
-            }
-
             if a.is_reverse() != b.is_reverse() {
                 endpoints.remove(&a);
                 endpoints.remove(&b);
