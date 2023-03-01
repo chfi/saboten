@@ -16,14 +16,12 @@ use waragraph_core::graph::{Edge, Node, OrientedNode};
 
 #[derive(Debug, Clone)]
 pub struct Saboten {
-    cactus_tree: CactusTree,
+    pub cactus_tree: CactusTree,
     vg_adj: CsMat<u8>,
-    // chain_edges: Vec<()>,
-    // bridge_edges: Vec<()>,
-    ultrabubbles: Vec<(OrientedNode, OrientedNode)>,
+    pub ultrabubbles: Vec<(OrientedNode, OrientedNode)>,
 
     // ultrabubble index -> [ultrabubble index]
-    contained_ultrabubbles: BTreeMap<usize, Vec<usize>>,
+    pub contained_ultrabubbles: BTreeMap<usize, Vec<usize>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -859,17 +857,7 @@ mod tests {
         let edges = paper_fig3_graph_edges();
         let saboten = Saboten::from_edges(node_count, edges);
 
-        // this one's finding too many
         println!("found {} ultrabubbles", saboten.ultrabubbles.len());
-
-        for (i, (from, to)) in saboten.ultrabubbles.iter().enumerate() {
-            //
-            print!("{i}\t{from:?}{to:?}\t");
-            print_step(*from);
-            print!(", ");
-            print_step(*to);
-            println!();
-        }
     }
 
     #[test]
@@ -899,6 +887,24 @@ mod tests {
                     print!(", ");
                 }
                 print_step(step);
+            }
+            println!();
+        }
+
+        println!("containment hierarchy");
+
+        for (i, (from, to)) in saboten.ultrabubbles.iter().enumerate() {
+            //
+            print!("{i}\t{from:?}{to:?}\t");
+            print_step(*from);
+            print!(", ");
+            print_step(*to);
+            print!(" contains:\t");
+            for contained in &saboten.contained_ultrabubbles[&i] {
+                let inner = saboten.ultrabubbles[*contained];
+                print!("(");
+                print_step_pair(inner);
+                println!(")");
             }
             println!();
         }
