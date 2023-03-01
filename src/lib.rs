@@ -58,10 +58,23 @@ impl Saboten {
         > = HashMap::new();
 
         for &((a, b), chain_ix) in chain_pairs.iter() {
-            let chain_edge = if let CacTreeEdge::Chain { net, cycle, .. } =
+            // let chain_edge = if let CacTreeEdge::Chain { net, cycle, .. } =
+            let (chain_edge, debug) = if let CacTreeEdge::Chain {
+                net,
+                cycle,
+                prev_step,
+                this_step,
+            } =
                 cactus_tree.graph.edge[cactus_tree.net_edges + chain_ix]
             {
-                (net.ix(), cactus_tree.net_vertices + cycle)
+                let debug = prev_step.ix() == 13
+                    || this_step.ix() == 13
+                    || prev_step.ix() == 8
+                    || this_step.ix() == 8;
+                (
+                    (net.ix(), cactus_tree.net_vertices + cycle),
+                    (prev_step, this_step, debug),
+                )
             } else {
                 unreachable!();
             };
@@ -71,8 +84,18 @@ impl Saboten {
             {
                 // the net graph method returns None if the graph has a bridge
                 let is_acyclic = net_graph_is_acyclic(a, &net_graph);
+                if debug.2 {
+                    println!(
+                        "({:?}, {:?}) acyclic: {is_acyclic}",
+                        debug.0, debug.1
+                    );
+                    sprs::visu::print_nnz_pattern(net_graph.view());
+                }
                 chain_edge_labels.insert(chain_edge, is_acyclic);
             } else {
+                if debug.2 {
+                    println!("({:?}, {:?}) not bridgeless", debug.0, debug.1);
+                }
                 chain_edge_labels.insert(chain_edge, false);
             }
 
@@ -92,14 +115,17 @@ impl Saboten {
             let mut all_valid = is_valid;
 
             cactus_tree.chain_pair_dfs((chain, net), |from, to| {
-                let contained_valid =
-                    chain_edge_labels.get(&(from, to)).copied().unwrap_or(true);
+                if let Some(contained_valid) =
+                    chain_edge_labels.get(&(from, to))
+                {
+                    all_valid &= contained_valid
+                }
 
-                println!(
-                    "inner edge {from} -> {to} is valid = {contained_valid}"
-                );
+                // println!(
+                //     "inner edge {from} -> {to} is valid = {contained_valid}"
+                // );
 
-                all_valid &= contained_valid
+                // all_valid &= contained_valid
             });
 
             if all_valid {
@@ -444,6 +470,12 @@ impl CactusTree {
     ) -> Option<CsMat<u8>> {
         use sprs::TriMat;
 
+        let debug = chain_pair.0.ix() == 13 || chain_pair.1.ix() == 13;
+        if debug {
+            print!("DEBUG: chain pair {chain_pair:?}\t");
+            print_step_pair(chain_pair);
+        }
+
         // chain pairs only have the one edge with one net vertex,
         // so that's the only vertex we need to project from
         let (net, _cycle_ix) =
@@ -481,6 +513,8 @@ impl CactusTree {
 
         let mut black_edges: Vec<(OrientedNode, OrientedNode)> = Vec::new();
 
+        let mut used_endpoints = HashSet::new();
+
         let cycles = self.vertex_cycle_map.get(&net).unwrap();
 
         for &cycle_ix in cycles {
@@ -508,6 +542,8 @@ impl CactusTree {
                     && !(a_chain || b_chain)
                 {
                     black_edges.push((a, b));
+                    used_endpoints.insert(a);
+                    used_endpoints.insert(b);
                     continue;
                 }
             }
@@ -515,8 +551,10 @@ impl CactusTree {
             let mut edge_start: Option<OrientedNode> = None;
 
             for (i, w) in steps.windows(2).enumerate() {
-                let a_in = endpoints.contains(&w[0]);
-                let b_in = endpoints.contains(&w[1]);
+                let a_in = endpoints.contains(&w[0])
+                    && !used_endpoints.contains(&w[0]);
+                let b_in = endpoints.contains(&w[1])
+                    && !used_endpoints.contains(&w[1]);
 
                 if w[0].node() == w[1].node() {
                     // traversing a segment
@@ -546,10 +584,34 @@ impl CactusTree {
 
         let mut endpoints = endpoints;
 
+        if debug {
+            println!("black edges: {black_edges:#?}");
+        }
+
+        fn print_step(step: OrientedNode) {
+            let c = ('a' as u8 + step.node().ix() as u8) as char;
+            let o = if step.is_reverse() { "-" } else { "+" };
+            print!("{c}{o}")
+        }
+
+        fn print_step_pair(steps: (OrientedNode, OrientedNode)) {
+            print_step(steps.0);
+            print!(", ");
+            print_step(steps.1);
+        }
+
         for (a, b) in black_edges {
-            endpoints.remove(&a);
-            endpoints.remove(&b);
-            net_adj.add_triplet(b.ix(), a.ix(), 1);
+            if debug {
+                print!("black edge: ");
+                print_step_pair((a, b));
+                println!();
+            }
+
+            if a.is_reverse() != b.is_reverse() {
+                endpoints.remove(&a);
+                endpoints.remove(&b);
+                net_adj.add_triplet(b.ix(), a.ix(), 1);
+            }
         }
 
         // if there's more than two endpoints left at this point,
@@ -792,6 +854,25 @@ mod tests {
         let c = ('a' as u8 + step.node().ix() as u8) as char;
         let o = if step.is_reverse() { "-" } else { "+" };
         print!("{c}{o}")
+    }
+
+    #[test]
+    fn paper_fig3_ultrabubbles() {
+        let node_count = 18;
+        let edges = paper_fig3_graph_edges();
+        let saboten = Saboten::from_edges(node_count, edges);
+
+        // this one's finding too many
+        println!("found {} ultrabubbles", saboten.ultrabubbles.len());
+
+        for (i, (from, to)) in saboten.ultrabubbles.iter().enumerate() {
+            //
+            print!("{i}\t{from:?}{to:?}\t");
+            print_step(*from);
+            print!(", ");
+            print_step(*to);
+            println!();
+        }
     }
 
     #[test]
